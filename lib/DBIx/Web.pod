@@ -456,7 +456,8 @@ C<ddvRVV>, C<ddfRVE>;
 C<ddvRRV>, C<ddfRRE>;
 C<ddvRHV>; 
 C<ddfRFD>; 
-C<ddfShow>, C<ddfHide>
+C<ddfShow>, C<ddfHide>;
+C<ddvIndex>
 
 
 =back
@@ -523,11 +524,15 @@ Internal cache for computed values
 
 	=> not exists || sub{}($self, 'name', {metadata}, $s->{-pcmd}, $s->{-pdta}) || 'filename.psp' || 'perl filename'
 
+=item -cgcURL
+
+	=> URL to redirect to
+
 (C<Table/Form Description> - C<User Interface>)
 Redirects C<cgiRun> to execute full external implementation of request or screen alike
 C<recNew>, C<recForm>, C<recIns>, C<recUpd>, C<recDel>, C<recRead>, C<recList>, C<recCall>.
 See C<Perl Script Pages> for '*.psp' files description.
-See C<-recXXX> for redirections of request to another form or table.
+See C<-recXXX>, C<-subst>, C<-table> for redirections of request to another form or table.
 See C<-cgvXXX> for external implementation of presentation only.
 
 
@@ -1885,6 +1890,12 @@ Default definitions for all predefined materialized views.
 See source code.
 
 
+=item ddvIndex () -> (Index page default view definition)
+
+C<Default Data Definitions>.
+Default definition for Index page enumerating all C<-menuchs> entries.
+
+
 =item ddvRHV (?[fields definitions] ||undef, -option=>value,...) -> {Record History View default view definition}
 
 C<Default Data Definitions>.
@@ -2728,6 +2739,18 @@ C<psEval> method executes perl script file by parsing, compiling into sub{}, eva
 =head1 VERSION
 
 =over
+
+=head2 2004-06-06 - Publication of Version 0.51
+
+This should not be used yet...
+
+
+=head2 2004-06-05 - Development
+
+CSS support. 
+C<ddvIndex> created.
+Some error corrections.
+
 
 =head2 2004-05-16 - Publication of Version 0.50
 

@@ -5,18 +5,17 @@
 # makarow@mail.com, started 2003-09-16
 #
 # Future ToDo:
+# - log file may be more readable:	!!!logRec - format doubt
+#	- input / operation / rezult	- operation only
+#	- '-name'=>value forms
+#	- quoting and terminating SQL
 # - full-text search in file attachments
-# - log file may be more readable
 # - message translation into russian
 # - ui: XML
-# - ui: html styles
 # - review '!!!'
 # - test sql data engine
 # - ui: changes display, but what differ and how in html?
 # - 'recRead' alike calls may return an objects, knows metadata
-# - cgi-bus warnings to browser
-# - cgi-bus deimpersonation
-# - cgi-bus drop sessions and temporary files saving attachments state
 #
 # Problems - Think:
 #
@@ -26,6 +25,8 @@
 #
 # Done:
 #
+# 2004-06-06 'ddvIndex'; 'logRec' analisys
+# 2004-06-01 ui: html styles - using classes
 # 2004-05-15 '-urole' & '-uname' query keywords
 # 2004-03-16 paused
 # 2004-03-12 table factory triggers and documentation
@@ -89,7 +90,7 @@ use Fcntl qw(:DEFAULT :flock :seek :mode);
 
 use vars qw($VERSION @ISA @EXPORT @EXPORT_OK %EXPORT_TAGS $AUTOLOAD $SELF $CACHE $LNG $IMG);
 
-	$VERSION= '0.50';
+	$VERSION= '0.51';
 	$SELF   =undef;				# current object pointer
 	$CACHE	={};				# cache for pointers to subobjects
 	*isa    = \&UNIVERSAL::isa; isa('','');	# isa function
@@ -123,7 +124,6 @@ $LNG ={
 	,'login'	=>['Login',	'Register as personated user']
 	,'frmCall'	=>['Go',	'Goto/execute choise']
 	,'frmName'	=>['Form',	'Form name to choose']
-	,'-Create-'	=>['-Create-',	'Forms to create data']
 	,'recNew'	=>['New',	'Create new record to insert into database']
 	,'recRead'	=>['Read',	'Read record from the database']
 	,'recEdit'	=>['Edit',	'Edit this data to update in the database']
@@ -135,6 +135,8 @@ $LNG ={
 	,'recList'	=>['List',	'List records, execute query']
 	,'recQBF'	=>['Query',	'Specify records to be listed']
 	,'submit'	=>['Submit',	'Submit this form to be executed by the server']
+	,'Create'	=>['Create']
+	,'Close'	=>['Close']
 
 	#'-key'		=>
 	#'-where'	=>
@@ -159,6 +161,7 @@ $LNG ={
 	,'ddvRVV'	=>['Versions',	'Record Versions View']
 	,'ddvRHV'	=>['History',	'Updates History View']
 	,'ddvRRV'	=>['References','Record References View']
+	,'Index'	=>['Index']
 
 	,'table'	=>['Table',	'Table or recfile name']
 	,'id'		=>['ID',	'Record ID', 'id']
@@ -493,8 +496,8 @@ sub set {
 		$s->{-warn} =eval('use ' .$s->{-die} .($s->{-debug} ?'; \\&cluck'   :'; \\&carp' ));
 		$s->{-die}  =eval('use ' .$s->{-die} .($s->{-debug} ?'; \\&confess' :'; \\&croak'));
 	}
-	$SIG{__DIE__}	=sub{return if $^S; eval{$s->logRec('Die:', ($_[0] =~/(.+)[\n\r]+$/ ? $1 : $_[0]))}; eval{$s->recRollback()}};
-	$SIG{__WARN__}	=sub{return if $^S; eval{$s->logRec('Warn:',($_[0] =~/(.+)[\n\r]+$/ ? $1 : $_[0]))}};
+	$SIG{__DIE__}	=sub{return if $^S; eval{$s->logRec('Die', ($_[0] =~/(.+)[\n\r]+$/ ? $1 : $_[0]))}; eval{$s->recRollback()}};
+	$SIG{__WARN__}	=sub{return if $^S; eval{$s->logRec('Warn',($_[0] =~/(.+)[\n\r]+$/ ? $1 : $_[0]))}};
  }
  if ($opt{-locale}) {
 	$s->{-lng}	='';
@@ -1108,7 +1111,7 @@ sub osCmd {     # OS Command
   my $r;
   my $o;
   local(*RDRFH, *WTRFH);
-  $s->logRec(@_);
+  $s->logRec('osCmd', @_);
   if ($^O eq 'MSWin32' 	        # !!! arguments may need to be quoted
    || $^X =~/perlis\.dll$/i) {	# ISAPI, DB_File operation problem hacks
      if (!$sub) {
@@ -1142,7 +1145,9 @@ sub osCmd {     # OS Command
   $r =$?>>8;
   return(&{$s->{-die}}(join(' ',$s->lng(0,'osCmd'),@_) .($opt !~/h/ ? '' : ' -> ' .join('',@{$o||[]})) ." -> $r")||0) 
        if $r && $opt !~/i/;
-  $s->logRec(@$o) if $o;
+  if ($o) {foreach my $e (@$o) {
+	$s->logRec('osCmd',$e)
+  }}
   !$r ? $o ||[] : undef
 }
 
@@ -1162,7 +1167,7 @@ sub nfclose {	# close opened files (`net file /close`)
 	next if $f !~/^(\d+)\s*(.+)\s+\d+[\n\r\s]*$/i;
 	my ($h,$n) =($1,$2);
 	next if !grep /^\Q$n\E/i, @$list;
-	$_[0]->osCmd("net file $h /close");
+	$_[0]->osCmd('net','file',$h,'/close');
  }
  1
 }
@@ -1364,7 +1369,7 @@ sub varLoad {   # Load common variables
  $hf =$s->hfNew('+<',$fn)->lock($lck||LOCK_SH);
  $s->{-var} =$hf->{-buf} =$hf->load && $s->dsdParse($hf->{-buf});
  $s->{-var}->{'_handle'} =$hf;
- $hf->close if !$lck;
+ $hf->close() if !$lck;
  $s
 }
 
@@ -1383,7 +1388,7 @@ sub varStore {  # Store common variables
         : $s->{-var}->{'_handle'};
  delete($s->{-var}->{'_handle'});
 
- $hf->lock(LOCK_EX)->store($s->dsdMk($s->{-var}))->close;
+ $hf->lock(LOCK_EX)->store($s->dsdMk($s->{-var}))->close();
 
  $hf->{-buf} =$s->{-var};
  $s->{-var}->{'_handle'} =$hf;
@@ -1411,7 +1416,7 @@ sub logRec {    # Add record to log file
  my @w =map {!defined($_) 
 		? 'null' 
 		: !ref($_)
-		? $_
+		? $_	# !!!logRec - more readable may be
 		: ref($_) eq 'ARRAY'
 		? '[' .join(', ',map {!defined($_) ? 'null' : $_} @$_) .']'
 		: isa($_,'HASH') 
@@ -1421,11 +1426,11 @@ sub logRec {    # Add record to log file
 		: $_
 	}
 	@_[1..$#_];
- $_[0]->logOpen if $_[0]->{-log} && !ref($_[0]->{-log});
+ $_[0]->logOpen() if $_[0]->{-log} && !ref($_[0]->{-log});
  $_[0]->{-log}->print(join("\t", $_[0]->strtime, $_[0]->user, @w) ."\n") if $_[0]->{-log};
  $_[0]->{-c}->{-logm} =[] if $_[0]->{-logm} && !$_[0]->{-c}->{-logm};
  splice @{$_[0]->{-c}->{-logm}}, 2, 2, '...' if $_[0]->{-logm} && scalar(@{$_[0]->{-c}->{-logm}}) >$_[0]->{-logm};
- push @{$_[0]->{-c}->{-logm}}, join(', ', @w) if $_[0]->{-logm};
+ push @{$_[0]->{-c}->{-logm}}, $w[0] .' ' .join(', ', @w[1..$#w]) if $_[0]->{-logm};
  1
 }
 
@@ -1621,8 +1626,8 @@ sub uglist {	# User & Group List
 	if ($o =~/g/) {
 		my @g;
 		Win32API::Net::GroupEnum($sd, \@g)
-		|| $s->logRec('uglist','Win32API::Net::GroupEnum',$sd,'error',$!,$^E);
-		# return(&{$s->{-die}}($s->lng(0,'uglist') .": Win32API::Net::GroupEnum('$sd') -> $!($^E)")||$r)
+		|| $s->logRec('Error','uglist','Win32API::Net::GroupEnum',$sd,$!,$^E);
+		#|| return(&{$s->{-die}}($s->lng(0,'uglist') .": Win32API::Net::GroupEnum('$sd') -> $!($^E)")||$r);
 		if (ref($r) eq 'ARRAY') {
 			push(@$r, @g) 
 		}
@@ -1637,7 +1642,8 @@ sub uglist {	# User & Group List
 	if ($o =~/g/) {
 		my @g;
 		Win32API::Net::LocalGroupEnum($sh, \@g)
-		|| $s->logRec('uglist','Win32API::Net::LocalGroupEnum',$sh,'error',$!,$^E);
+		|| $s->logRec('Error','uglist','Win32API::Net::LocalGroupEnum',$sh,$!,$^E);
+		#|| return(&{$s->{-die}}($s->lng(0,'uglist') .": Win32API::Net::LocalGroupEnum('$sd') -> $!($^E)")||$r);
 		if (ref($r) eq 'ARRAY') {
 			push(@$r, @g)
 		}
@@ -1652,7 +1658,8 @@ sub uglist {	# User & Group List
 	if ($o =~/u/) {
 		my @g;
 		Win32API::Net::UserEnum($sd, \@g)
-		|| $s->logRec('uglist','Win32API::Net::UserEnum',$sd,'error',$!,$^E);
+		|| $s->logRec('Error','uglist','Win32API::Net::UserEnum',$sd,$!,$^E);
+		#|| return(&{$s->{-die}}($s->lng(0,'uglist') .": Win32API::Net::UserEnum('$sd') -> $!($^E)")||$r);
 		if (ref($r) eq 'ARRAY') {
 			push(@$r, @g)
 		}
@@ -1721,15 +1728,15 @@ sub w32agf {	# Win32 Apache 'AuthGroupFile' write/refresh
  my @cl;
  my %cx;
  my %gx;
- $s->logRec('w32agf',"hs=$sh, dc=$sd\n");
+ $s->logRec('w32agf',-host=>$sh, -dc=>$sd);
  push @tm, time();
  Win32API::Net::LocalGroupEnum($sh, \@cl)
-	|| $s->logRec('w32agf','Win32API::Net::LocalGroupEnum',$sh,'error',$!,$^E);
+	|| $s->logRec('Error','w32agf','Win32API::Net::LocalGroupEnum',$sh,$!,$^E);
  foreach my $ce (@cl) {
 	next if !$ce ||lc($ce) eq 'none';
 	my $cc =[];
 	Win32API::Net::LocalGroupGetMembers($sh, $ce, $cc)
-		|| $s->logRec('w32agf','Win32API::Net::LocalGroupGetMembers',$sh,$ce,'error',$!,$^E);
+		|| $s->logRec('Error','w32agf','Win32API::Net::LocalGroupGetMembers',$sh,$ce,$!,$^E);
 	$gx{$ce} =$cc;
 	foreach my $e (@$cc) {
 		next if !$e ||$e =~/\$$/;
@@ -1740,12 +1747,12 @@ sub w32agf {	# Win32 Apache 'AuthGroupFile' write/refresh
  }
  push @tm, time();
  Win32API::Net::GroupEnum($sd, \@cl)
-	|| $s->logRec('w32agf','Win32API::Net::GroupEnum',$sd,'error',$!,$^E);
+	|| $s->logRec('Error','w32agf','Win32API::Net::GroupEnum',$sd,$!,$^E);
  foreach my $ce (@cl) {
 	next if !$ce ||lc($ce) eq 'none';
 	my $cc =[];
 	Win32API::Net::GroupGetUsers($sd, $ce, $cc)
-		|| $s->logRec('w32agf','Win32API::Net::GroupGetMembers',$sd,$ce,'error',$!,$^E);
+		|| $s->logRec('Error','w32agf','Win32API::Net::GroupGetMembers',$sd,$ce,$!,$^E);
 	$gx{$ce} =$cc;
 	foreach my $e (@$cc) {
 		next if !$e ||$e =~/\$$/;
@@ -1804,7 +1811,7 @@ sub w32agf {	# Win32 Apache 'AuthGroupFile' write/refresh
  $fh->close();
  push @tm, time();
 
- $s->logRec('w32agf',join('-', map {$tm[$_] -$tm[$_-1]} (1..$#tm)),'sec timing');
+ $s->logRec('w32agf','timing',join('-', map {$tm[$_] -$tm[$_-1]} (1..$#tm)),'sec');
  1
 }
 
@@ -1876,20 +1883,21 @@ sub mdlTable {	# Tables List
 
 sub mdeReaders {# Table readers fields
 		# self, table
- my $r =$_[0]->{-rac} || !$_[0]->uadmin() 
+ my $r =!$_[0]->{-rac} || $_[0]->uadmin() 
  ?      undef
  :	ref($_[1])
  ?	[@{$_[1]->{-racReader} ||$_[0]->{-racReader} ||[]}
 	,@{$_[1]->{-racWriter} ||$_[0]->{-racWriter} ||[]}]
  :	[@{$_[0]->{-table}->{$_[1]}->{-racReader} ||$_[0]->{-racReader}||[]}
 	,@{$_[0]->{-table}->{$_[1]}->{-racWriter} ||$_[0]->{-racWriter}||[]}];
+#$_[0]->logRec('mdeReaders',@_[1..$#_],$r);
  ref($r) && @$r ? $r : undef
 }
 
 
 sub mdeWriters {# Table writers fields
 		# self, table
- 	$_[0]->{-rac} || !$_[0]->uadmin()
+ 	!$_[0]->{-rac} || $_[0]->uadmin()
  ?      undef
  :	ref($_[1])
  ?	$_[1]->{-racWriter} ||$_[0]->{-racWriter} ||undef
@@ -2432,8 +2440,8 @@ sub dbiExplain {# Explain DML plan
    my $c =$i->prepare("explain $q");
        $c->execute;
     my $r;
-    while ($r =$c->fetchrow_hashref()) {
-      $s->logRec('EXPLAIN: ' .join('; ', map {"$_=" .($r->{$_}||'null')} @{$c->{NAME}}));
+    while ($r =$c->fetchrow_hashref()) { # !!!logRec - format doubt
+      $s->logRec('dbiExplain', join(', ', map {"$_=" .($r->{$_}||'null')} @{$c->{NAME}}));
     }
  }
 }
@@ -2726,7 +2734,7 @@ sub dbmSeek {	# Select records from dbm file using -key and -where
 	&& (!$ft || grep {defined($_[2]->{$_}) && $_[2]->{$_} =~/\Q$ft\E/i} keys %{$_[2]})
 	&& (!$wf || &$wf(@_))
 	};
- $s->logRec('dbmSeek'
+ $s->logRec('dbmSeek'	# !!!logRec - format doubt
 	, $a->{-table}, $ox, $k
 	,{$wv	? (-version=>'[' .$s->strdata($wv) .']')	: ()
 	, $wk	? ('-' .substr($o, 2)=>('{' .$s->strdata($wk)) .'}')	 : ()
@@ -3163,18 +3171,18 @@ sub cgiRun {	# Execute CGI query
  my $he =sub{
 	return if $^S;
 	my $e =$_[0]; chomp($e);
-	eval{$s->logRec('Die:', $e)};
+	eval{$s->logRec('Die', $e)};
 	eval{$s->recRollback()};
 	eval{$s->htmlStart()} if !*fatalsToBrowser && !$s->{-c}->{-httpheader};
 	eval{ # $e =htmlEscape($s, $e);
 		$e =~s/[\n\r]/<br \/>\n/g;
-		$s->output('<hr />'
+		$s->output('<span class="_ErrorMessage"><hr />'
 		,'<h1>', 'Error '
 		, htmlEscape($s, lng($s, 0, ($s->{-pcmd} && $s->{-pcmd}->{-cmd})||'Open'))
 		, '@'
 		, htmlEscape($s, lng($s, 0, ($s->{-pcmd} && $s->{-pcmd}->{-cmg})||'Start'))
 		, "</h1>\n"
-		, $e, "\n");
+		, $e, "</span>\n");
 	     $s->cgiFooter();
 	     $s->output("<hr />\n")};
 	eval{$s->end()};
@@ -3210,6 +3218,13 @@ sub cgiRun {	# Execute CGI query
 	$ot =$s->{-pcmd}->{-table} =($oc eq 't' ? $on : $om->{-table});
 
 					# execute external implemtation '-cgcXXX'
+	foreach my $e (map {$om->{$_}} ('-cgcURL', '-redirect')) {
+		next if !defined($e);
+		last if !$e;
+		print $s->cgi->redirect(-uri=>$e, -nph=>(($ENV{SERVER_SOFTWARE}||'') =~/IIS/) ||($ENV{MOD_PERL} && !$ENV{PERL_SEND_HEADER}));
+		$s->end();
+		return($r);
+	}
 	foreach my $e (map {$om->{"-cgc$_"}}
 			 $oa =~/^rec(.+)/ ? $1 : $oa
 			,$og =~/^rec(.+)/ ? $1 : $og, 'Call') {
@@ -3376,7 +3391,7 @@ sub cgiParse {	# Parse CGI call parameters
 
  $c->{-cmg} ='recList' 
 		if !$c->{-cmg} && !$c->{-cmd};
- $c->{-cmd} ='recForm'
+ $c->{-cmd} ='frmCall'	# 'recForm'
 		if !$c->{-cmd};
  $c->{-cmg} =$c->{-cmd} eq 'recForm' ? 'recList' : $c->{-cmd}
 		if !$c->{-cmg};
@@ -3566,7 +3581,7 @@ sub psEval {	# Evaluate perl script file
 	$f =$s->{-path} .'/psp/' .$f;
 	$u =$s->{-url}  if !$u;
  }
- $s->hfNew($f)->read($c, -s $f)->close;
+ $s->hfNew($f)->read($c, -s $f)->close();
  $s->output($s->{-c}->{-httpheader} =$s->cgi->header(
 		  -charset => $s->{-charset}, -expires => 'now'
 		, ref($s->{-httpheader})
@@ -3593,6 +3608,14 @@ sub htmlStart {	# HTTP/HTML/Form headers
 		 -head	=> '<meta http-equiv="Content-Type" content="text/html; charset=' .$s->{-charset} .'">'
 		,-lang	=> $s->{-lang}
 		,-title	=> $s->{-title} ||$s->cgi->server_name()
+		,-class	=> (	  $s->cgiHook('recOp')
+				? '_Form'
+				: $s->cgiHook('recFormQ')
+				? '_Form _QBF'
+				: $s->cgiHook('recHelp')
+				? '_Form _Help'
+				: '_Form _List')
+			   .' ' .($s->{-pcmd}->{-form}||'default')
 		,ref($s->{-htmlstart}) 
 		? %{$s->{-htmlstart}} 
 		: ())
@@ -3697,20 +3720,20 @@ sub htmlMenu {	# Screen menu bar
 	);
 
  !$s->{-icons}
- ? join("\n", @r, $mi, '<br />', $mh, '<br />', $mc ? ($mc, '<br />') : ()) ."\n\n"
- : ("\n<table cellpadding=0><tr>\n"
+ ?  "\n<span class=\"_MenuArea\">" .join("\n", @r, $mi, '<br />', $mh, '<br />', $mc ? ($mc, '<br />') : ()) ."</span>\n\n"
+ : ("\n<table class=\"_MenuArea\" cellpadding=0><tr>\n"
 	.join("\n", @r)
-	."\n" .'<td valign="middle"><nobr>'. $mi .'</nobr></td></tr>'
-	."\n" .'<tr><th align="left" valign="top" colspan=20>' .$mh .'</th></tr>'
+	."\n" .'<td class="_MenuCell" valign="middle"><nobr>'. $mi .'</nobr></td></tr>'
+	."\n" .'<tr><th class="_MenuHeader" align="left" valign="top" colspan=20>' .$mh .'</th></tr>'
 	.(!$mc 	? ''
-		: "\n" .'<tr><td align="left" valign="top" colspan=20>' .$mc .'</th></tr>')
+		: "\n" .'<tr><td class="_MenuComment" align="left" valign="top" colspan=20>' .$mc .'</td></tr>')
 	."\n</table>\n\n")
 }
 
 
 sub htmlMB {	# CGI menu bar button
 		# self, command, url, back|
- my $td0='<td valign="middle" style="border-width: thin; border-style: outset; background-color: buttonface;" ';
+ my $td0='<td class="_MenuButton" valign="middle" style="border-width: thin; border-style: outset; background-color: buttonface;" ';
  my $tdb=' onmousedown="if(window.event.button==1){this.style.borderStyle=&quot;inset&quot;}" onmouseup="this.style.borderStyle=&quot;outset&quot;" onmouseout="this.style.borderStyle=&quot;outset&quot;" ';
   # $tdb='' if ($ENV{HTTP_USER_AGENT}||'') !~/MSIE/;
 
@@ -3727,7 +3750,7 @@ sub htmlMB {	# CGI menu bar button
 		$_[1]
 	}
 	elsif ($_[1] eq 'back') {
-		 '<input type="submit" name="_' .$_[1] .'" '
+		 '<input type="submit" class="_MenuButton" name="_' .$_[1] .'" '
 		.' value="' .htmlEscape($_[0],lng($_[0], 0, $_[1])) .'" '
 		.' onclick="{'
 		.(!$_[3] ||$_[3] <2
@@ -3737,7 +3760,7 @@ sub htmlMB {	# CGI menu bar button
 		.' title="' .htmlEscape($_[0],lng($_[0], 1, $_[1])) .'" />'
 	}
 	else {
-		 '<input type="submit" name="_' .$_[1] .'" '
+		 '<input type="submit" class="_MenuButton" name="_' .$_[1] .'" '
 		.' value="' .htmlEscape($_[0],lng($_[0], 0, $_[1])) .'" '
 		.' title="' .htmlEscape($_[0],lng($_[0], 1, $_[1])) .'" />'
 	}
@@ -3793,13 +3816,15 @@ sub htmlMB {	# CGI menu bar button
 
 sub htmlML {	# CGI menu bar list
  my $i =$_[0]->cgi->param($_[1]) ||$_[0]->{-pcmd}->{-form} ||'';
- ($_[0]->{-icons} ? '<td valign="middle" style="border-width: thin; border-style: outset; background-color: buttonface;" >' : '')
+ ($_[0]->{-icons} ? '<td class="_MenuButton" valign="middle" style="border-width: thin; border-style: outset; background-color: buttonface;" >' : '')
  .'<select name="_' .$_[1] 
  .'" onchange="{_cmd.value=&quot;frmCall&quot;; submit(); return(false);}">'
  ."\n\t"
  .join("\n\t"
 	, map { my ($n, $v) =!ref($_) ? ($_, $_) : ref($_) eq 'ARRAY' ? @$_ : ($_->{-val}, $_->{-lbl});
-		'<option ' .($i && ($n eq $i) ? 'selected' : '') .' value="' 
+		'<option ' .($i && ($n eq $i) ? 'selected' : '') 
+		.(!$n ? ' class="_MenuSeparator"' : '')
+		.' value="' 
 		.htmlEscape($_[0], $n)
 		.'">' 
 		.htmlEscape($_[0], $v)
@@ -3826,7 +3851,7 @@ sub htmlMChs {	# Adjust CGI forms list
  }
  @{$_[0]->{-menuchs}} =sort {lc(ref($a) && $a->[1] || $a) cmp lc(ref($b) && $b->[1] || $b)} @{$_[0]->{-menuchs}};
  if ($_[0]->{-menuchs}) {
-	my @a =( ['',lng($_[0], 0, '-Create-')]
+	my @a =( ['','---' .lng($_[0], 0, 'Create') .'---']
 		, map {[$_->[0] .'+', $_->[1] .' ++']
 			} grep { my $m;
 				  ($m =$_[0]->{-form}->{$_->[0]})
@@ -3840,7 +3865,7 @@ sub htmlMChs {	# Adjust CGI forms list
 	else				{$_[0]->{-menuchs1} =[@a]}
  }}
  if ($_[0]->{-menuchs1} && $_[0]->{-menuchs1}->[0]->[0]) {
-	unshift @{$_[0]->{-menuchs1}}, ['', lng($_[0], 0, '-Create-')]
+	unshift @{$_[0]->{-menuchs1}}, ['', '---' .lng($_[0], 0, 'Create') .'---']
  }
  $_[0]->{-menuchs}
 }
@@ -4090,7 +4115,7 @@ sub htmlField {	# Generate field widget HTML
 			$r    =~s/^(host|urlh):\/\//\//;
 			$r    =~s/^(url|urlr):\/\///;
 			$r    =~s/^(fsurl|urlf):\/\//($s->rfdPath(-url=>$s->{-pcmd}, $s->{-pdta})||$s->rfdPath(-urf=>$s->{-pcmd}, $s->{-pdta})) .'\/'/e;
-			$wgp .="<a href=\"$r\" target =\"_blank\">" .$s->htmlEscape($r) .'</a>';
+			$wgp .="<a href=\"$r\" target =\"_blank\">" .$s->htmlEscape(length($r) >49 ? substr($r,0,47) .'...' : $r) .'</a>';
 		}
 		$v =htmlEscape($s, $v); $v =~s/( {2,})/'&nbsp;' x length($1)/ge; $v =~s/\n/<br \/>\n/g; $v =~s/\r//g;
 		$wgp .=$v;
@@ -4159,9 +4184,11 @@ sub htmlField {	# Generate field widget HTML
 				$t =~s/^(fsurl|urlf):\/\//($s->rfdPath(-url=>$s->{-pcmd}, $s->{-pdta})||$s->rfdPath(-urf=>$s->{-pcmd}, $s->{-pdta})) .'\/'/e;
 				push @h, $t;
 			}
-			$wgp .=join(';&nbsp;'
+			$wgp .=join(';&nbsp; '
 				, map {$_ =htmlEscape($s, $_);
-					"<a href=\"$_\">$_</a>"} @h);
+					"<a href=\"$_\">"
+					.(length($_) >49 ? substr($_,0,47) .'...' : $_)
+                                        .'</a>'} @h);
 			$wgp .='<br />' if $wgp;
 		}
 		$wgp .=$s->cgi->textarea(%$a,-name=>$n,-title=>$t,-override=>1,-default=>$v);
@@ -4233,7 +4260,7 @@ sub htmlRFD {	# RFD widget html
  }
 
  if ($edt) {				# Edit widget
-	my $fo =$s->nfopens($pth); @$fo && unshift @$fo, '---' .$s->lng(0,'close') .'---';
+	my $fo =$s->nfopens($pth); @$fo && unshift @$fo, '---' .$s->lng(0,'Close') .'---';
 	$r .=$s->cgi->filefield(-name=>$fnu, -title=>$s->htmlEscape($s->lng(1,'Upload')))
 	.$s->cgi->submit(-name=>$fnf, -value=>$s->lng(0,'+|-'), -title=>$s->lng(1,'+|-'))
 	.(@$fo	? $s->cgi->scrolling_list(-name=>$fnc, -override=>1, -values=>$fo, -size=>(scalar(@$fo) >4 ? 4 :scalar(@$fo)), -multiple=>'true')
@@ -4443,10 +4470,12 @@ sub cgiList {	# List queried records
 	: $i;
  $i ||return(&{$s->{-die}}('cgiList(' .strdata(@_) .') -> cursor undefined'));
  $b =	  !$b
-	? ["\n<table>\n"	,'<tr>',	   '<td align="left" valign="top">','<a href="', '">', '</a>', '</td>', "</tr>\n", "</table>\n"]
+	? ["\n<table class=\"_ListTable\">\n"
+		,'<tr>',	   '<td align="left" valign="top">','<a href="', '">', '</a>', '</td>', "</tr>\n", "</table>\n"]
 	: $b =~/<select/
-	? [$b			,'<option value="', '',				    '">',	 '',	'',	'',	"</option>\n",	"</select>\n"]
-	: ['',' ',' ',' <a href="','">','</a> ',' ',"$b\n","\n"]
+	? [$b	,'<option value="', '',				    '">',	 '',	'',	'',	"</option>\n",	"</select>\n"]
+	: ['<span class="_ListList">'
+		,' ',' ',' <a href="','">','</a> ',' ',"$b\n","</span>\n"]
 	if !ref($b);
 
  if (ref($href) eq 'HASH') {
@@ -4614,7 +4643,7 @@ sub cgiList {	# List queried records
 
 sub cgiFooter {	# Footer of CGI screen
  my ($s) =@_;
- $s->output("\n<hr />\n"
+ $s->output("\n<span class=\"_FooterArea\"><hr />\n"
 	,($s->cgiHook('recList') && $s->{-fetched}
 	? ('<b>',$s->{-fetched}
 		,$s->{-limited} <=$s->{-fetched} 
@@ -4625,9 +4654,13 @@ sub cgiFooter {	# Footer of CGI screen
 	? ('<b>',$s->{-affected}, ' ', $s->lng(1, '-affected'),"</b><br />\n")
 	: ())
 	, $s->{-c}->{-logm} && $s->{-debug}
-	&& join("<br />\n",
-		map {htmlEscape($s, $_)} @{$s->{-c}->{-logm}}
-		));
+	&& join(";<br />\n",
+		map {	$_ =~/^((?:WARN|WARNING|DIE|ERROR)[:.,\s]+)(.*)$/i
+			? '<strong>' .htmlEscape($s, $1) .'</strong>' .htmlEscape($s, $2)
+			: htmlEscape($s, $_)
+			} @{$s->{-c}->{-logm}}
+		)
+	,"</span>\n");
 }
 
 
@@ -5026,6 +5059,66 @@ sub ddfHide {	# '-hide' detail feature default definition
 		# (self, ? input name)
  my ($s, $n) =@_;
  sub {!($_ || $_[0]->{-pdta}->{$n||'ddfShow_'} ||$_[3])}
+}
+
+
+sub ddvIndex {	# Index page default data definition
+ my $s =$_[0];
+ (-cmt		=>$s->lng(1,'Index')
+ ,-cgcCall	=>sub{
+	my $s =$_[0];
+	$s->output($s->htmlStart()		# HTTP/HTML/Form headers
+		,$s->htmlHidden(@_[1,2])	# common hidden fields
+		,!$s->{-pcmd}->{-print}
+		&& $s->htmlMenu(@_[1,2])	# Menu bar
+		,"\n<table class=\"_ListTable\">\n"
+		);
+	foreach my $e	(($s->{-menuchs} ? @{$s->{-menuchs}} : ())
+			,($s->{-menuchs1}? @{$s->{-menuchs1}}: ())
+			) {
+		my ($n, $l) = ref($e) ? @$e : ($e, $e);
+		my ($o, $a) = $n =~/^(.+?)([+&.]+)$/ ? ($1, $2) : ($n, $n);
+		my $l0 =($s->{-form}->{$o} ||$s->{-table}->{$o} ||{})->{-lbl}||'';
+		my $l1 =($s->{-form}->{$o} ||$s->{-table}->{$o} ||{})->{-cmt}||'';
+		$s->output('<tr><th align="left" valign="top">'
+			, $n
+			? $s->cgi->a({-href=>$s->urlCat('','_form'=>$n,'_cmd'=>'frmCall')
+				,-title=>  $a =~/[+]/ 
+					? $s->lng(0,'Create')	." '$l0'"
+					: $a =~/[&.]/
+					? $s->lng(0,'Open')	." '$l0'"
+					: $s->lng(0,'View')	." '$l0'"
+				}
+				,(!$s->{-icons}
+				? ''
+				: '<img border="0" src="' .$s->{-icons} .'/'
+				. ( $a =~/[+]/  ? $IMG->{'recNew'}
+				  : $a =~/[&.]/ ? $IMG->{'frmCall'}
+				  : $IMG->{'recList'}
+				  ) .'">')
+				. $s->htmlEscape($l0))
+			: $s->htmlEscape($l)
+			, "</th>\n"
+			, '<td>&nbsp;</td><td align="left" valign="bottom">'
+			, $s->htmlEscape( !$l1 || $l1 ne $l0
+					? $l1
+					: $a =~/[+]/ 
+					? $s->lng(0,'Create')	." '$l0'"
+					: $a =~/[&.]/
+					? $s->lng(0,'Open')	." '$l0'"
+					: $s->lng(0,'View')	." '$l0'"
+					)
+			, "</td></tr>\n"
+			)
+		}
+	$s->output("\n</table>\n");
+	# $s->recCommit();
+	$s->cgiFooter() if !$s->{-pcmd}->{-print};
+	$s->output($s->cgi->endform);
+	$s->output($s->cgi->end_html);
+	$s->end();
+	}
+ )
 }
 
 

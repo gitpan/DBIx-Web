@@ -78,7 +78,9 @@ $w->set(-table=>{
 	});
 
 $w->set(-form=>{
-	  'default'=>{-subst=>'note'}
+	  'default'=>{
+		$w->ddvIndex()	# -subst=>'note'
+		}
 	 ,'notehier'=>{
 		 -lbl		=>'Notes hierarchy'
 		,-cmt		=>'Notes hierarchy'
