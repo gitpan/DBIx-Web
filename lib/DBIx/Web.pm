@@ -5,15 +5,10 @@
 # makarow@mail.com, started 2003-09-16
 #
 # Future ToDo:
-# - log file may be more readable:	!!!logRec - format doubt
-#	- input / operation / rezult	- operation only
-#	- '-name'=>value forms
-#	- quoting and terminating SQL
-# - full-text search in file attachments
-# - message translation into russian
 # - ui: XML
 # - review '!!!'
 # - test sql data engine
+# - message translation into russian
 # - ui: changes display, but what differ and how in html?
 # - 'recRead' alike calls may return an objects, knows metadata
 #
@@ -25,6 +20,12 @@
 #
 # Done:
 #
+# 2004-06-13 log file more readable
+#		+ input / operation / rezult	- operation only
+#		+ '-name'=>value forms
+#		+ quoting and terminating SQL
+# 2004-06-11 full-text search in file attachments
+# 2004-06-08 corrected 'nfopens', 'nfclose', 'w32domain'
 # 2004-06-06 'ddvIndex'; 'logRec' analisys
 # 2004-06-01 ui: html styles - using classes
 # 2004-05-15 '-urole' & '-uname' query keywords
@@ -90,7 +91,7 @@ use Fcntl qw(:DEFAULT :flock :seek :mode);
 
 use vars qw($VERSION @ISA @EXPORT @EXPORT_OK %EXPORT_TAGS $AUTOLOAD $SELF $CACHE $LNG $IMG);
 
-	$VERSION= '0.51';
+	$VERSION= '0.52';
 	$SELF   =undef;				# current object pointer
 	$CACHE	={};				# cache for pointers to subobjects
 	*isa    = \&UNIVERSAL::isa; isa('','');	# isa function
@@ -147,10 +148,13 @@ $LNG ={
 	,'-qftext'	=>['FULL TEXT',	'Full-text search string']
 	,'-qversion'	=>['VERSIONS',	'Including old versions of records']
 	,'-qorder'	=>['ORDER BY',	'ORDER BY query clause']
+	,'-qlimit'	=>['LIMIT',	'LIMIT query clause']
 
 	,'Attachments'	=>['Attachments','File Attachments']
 	,'Upload'	=>['Upload',	'File to upload']
 	,'+|-'		=>['+/ -',	'Upload file, delete attachments selected']
+	,'rfaopen'	=>['...',	'Opened file attachments to be closed']
+	,'rfadelm'	=>['Delete',	'Mark file attachments to be deleted']
 
 	,'ddlbopen'	=>['...',	'Open values']
 	,'ddlbsubmit'	=>['Set',	'Assign value selected']
@@ -161,7 +165,10 @@ $LNG ={
 	,'ddvRVV'	=>['Versions',	'Record Versions View']
 	,'ddvRHV'	=>['History',	'Updates History View']
 	,'ddvRRV'	=>['References','Record References View']
-	,'Index'	=>['Index']
+	,'ddvIndex'	=>['Index',	'Index page']
+	,'ddvFTQuery'	=>['Query text','Full-text query on files']
+	,'qftCall'	=>['Search',	'Full-text search on files']
+	,'-qftwhere'	=>['Query',	'Full-text query condition']
 
 	,'table'	=>['Table',	'Table or recfile name']
 	,'id'		=>['ID',	'Record ID', 'id']
@@ -521,7 +528,7 @@ sub lng {
 ? ($_[0]->{-lng}->{$_[2]}->[$_[1]] ||$LNG->{''}->{$_[2]}->[$_[1]] ||$_[2])
 : eval {my $r =lng(@_[0..2]); 
 	my $v =!ref($_[3]) ? $_[3] : ref($_[3]) eq 'CODE' ? &{$_[3]}(@_) : strdata($_[0], $_[3]);
-	   $v ='null' if !defined($v);
+	   $v ='undef' if !defined($v);
 	$r =~s/\$_/$v/ge ? $r : "$r $v"
 	}
 }
@@ -546,7 +553,8 @@ sub start {	# start session
  $s->{-fetched} =0;
  $s->{-limited} =0;
  $s->{-affected}=0;
- $s->w32IISdpsn() if (($ENV{SERVER_SOFTWARE}||'') =~/IIS/) && $ENV{REMOTE_USER};
+ $s->w32IISdpsn() if (($ENV{SERVER_SOFTWARE}||'') =~/IIS/) && $ENV{REMOTE_USER}
+			&& $s->cgi->param('_qftwhere');
  $s->varLoad($s->{-serial} >2 ? LOCK_EX : $s->{-serial} >1 ? LOCK_SH : 0);
  $s->logOpen if $s->{-log} && !ref($s->{-log});
  $s->{-log}->lock(0) if ref($s->{-log});
@@ -635,7 +643,7 @@ sub setup {	# Setup script execution
 			$v =$s->dbi->do($cmd);
 			print $s->dbi->err ? $s->dbi->errstr : 'ok'
 		}
-		print ': ', defined($v) ? $v : 'null', "\n\n";
+		print ': ', defined($v) ? $v : 'undef', "\n\n";
 		$cmd ='';
 		$cmt ='';
 	}
@@ -764,6 +772,16 @@ sub strdatah {	# Stringify hash data structure
  chop($r);
  $r
 }
+
+
+sub strquot {	# Quote and Escape string
+ my $v =$_[1];
+ return('undef') if !defined($v);
+ $v =~s/([\\'])/\\$1/g;
+ $v =~s/([\x00-\x1f])/sprintf("\\x%02x",ord($1))/eg;
+ $v =~/^\d+$/ ? $v : ('\'' .$v .'\'');
+}
+
 
 
 sub datastr {	# Data structure from String
@@ -1051,12 +1069,13 @@ sub xmlsTag {	# Attribute list to xml strings list
 
 sub cgi {       # CGI object
  return($_[0]->{-cgi}) if $_[0]->{-cgi};
-#!!! commented below failures CGI.pm !!!
+#!!!ToDo: commented below failures CGI.pm
 #$ENV{'TMPDIR'}=$_[0]->pthForm('tmp');
+ eval("use CGI; 1") || &{$_[0]->{-die}}("use CGI -> $@");
 #$TempFile::TMPDIRECTORY =$_[0]->pthForm('tmp');
 #$TempFile::TMPDIRECTORY =~s/\//\\/g if $^O eq 'MSWin32';
- $_[0]->{-cgi} =eval("use CGI; CGI->new()")
-	|| &{$_[0]->{-die}}($_[0]->lng(0,'cgi') .": CGI::new() -> $@");
+ $_[0]->{-cgi} =eval("CGI->new()")
+	|| &{$_[0]->{-die}}("CGI::new() -> $@");
 }
 
 
@@ -1153,21 +1172,50 @@ sub osCmd {     # OS Command
 
 
 sub nfopens {	# opened files (`net file`)
- return([]) if $^O ne 'MSWin32';
+		# (mask, ?container)
+ return(undef) if $^O ne 'MSWin32';
+ my $rc =$_[2]||[];
  my $mask =$_[1]||''; $mask =~s/\//\\/ig;
- [map {chomp($_); $_} map {/^\d+\s+(.+)\s+\d+[\n\r\s]*$/ ? $1 : $_} grep /^\d+\s*\Q$mask\E/i, `net file`]
+#[map {chomp($_); $_} map {/^\d+\s+(.+)\s+\d+[\n\r\s]*$/ ? $1 : $_} grep /^\d+\s*\Q$mask\E/i, `net file`]
+ my $o =eval('use Win32::OLE; Win32::OLE->GetObject("WinNT://'
+	.(eval{Win32::NodeName()}||$ENV{COMPUTERNAME}) .'/lanmanserver")');
+ return(undef) if !$o;
+ if (ref($rc) eq 'HASH') {
+	%$rc =map {(substr($_->{Path}, length($mask)+1), $_->{User} .': ' .substr($_->{Path}, length($mask)+1))
+		} grep {(eval{$_->{Path}}||'') =~/^\Q$mask\E/i
+			} Win32::OLE::in($o->Resources());
+	# %$rc =(1=>'1.1',2=>'2.1',3=>'3.1');
+	$rc =undef if !%$rc
+ }
+ else {
+	@$rc =map {eval{substr($_->{Path}, length($mask)+1)}
+		} grep {(eval{$_->{Path}}||'') =~/^\Q$mask\E/i  # $_->GetInfo;
+			} Win32::OLE::in($o->Resources());
+	$rc =undef if !@$rc
+ }
+ $rc
 }
 
 
 sub nfclose {	# close opened files (`net file /close`)
+		# (mask, [filelist])
  return(0) if $^O ne 'MSWin32';
  my $mask =$_[1]||''; $mask =~s/\//\\/ig;
  my $list =$_[2]||[];
- foreach my $f (grep /^\d+\s*\Q$mask\E/i, `net file`) {
-	next if $f !~/^(\d+)\s*(.+)\s+\d+[\n\r\s]*$/i;
-	my ($h,$n) =($1,$2);
-	next if !grep /^\Q$n\E/i, @$list;
-	$_[0]->osCmd('net','file',$h,'/close');
+#foreach my $f (grep /^\d+\s*\Q$mask\E/i, `net file`) {
+#	next if $f !~/^(\d+)\s*(.+)\s+\d+[\n\r\s]*$/i;
+#	my ($h,$n) =($1,$2);
+#	next if !grep /^\Q$n\E/i, @$list;
+#	$_[0]->osCmd('net','file',$h,'/close');
+#}
+ my $o =eval('use Win32::OLE; Win32::OLE->GetObject("WinNT://'
+	.(eval{Win32::NodeName()}||$ENV{COMPUTERNAME}) .'/lanmanserver")');
+ return(0) if !$o;
+ foreach my $f (grep {$_ && (eval{$_->{Path}}||'')=~/^\Q$mask\E/i
+			} Win32::OLE::in($o->Resources())) {
+	my $n =eval{$f->{Path} =~/^\Q$mask\E[\\\/]*(.+)/i ? $1 : undef};
+	next if !$n || !grep /^\Q$n\E$/i, @$list;
+	$_[0]->osCmd('net','file',$f->{Name},'/close');
  }
  1
 }
@@ -1413,26 +1461,44 @@ sub logLock {   # Log File lock
 
 sub logRec {    # Add record to log file
  return(1) if !$_[0]->{-log} && !$_[0]->{-logm};
- my @w =map {!defined($_) 
-		? 'null' 
-		: !ref($_)
-		? $_	# !!!logRec - more readable may be
-		: ref($_) eq 'ARRAY'
-		? '[' .join(', ',map {!defined($_) ? 'null' : $_} @$_) .']'
-		: isa($_,'HASH') 
-		? '{' .join(', ',eval{my $h =$_; 
-			map {("$_=" .(!defined($h->{$_}) ? 'null' : $h->{$_}))} 
-			sort keys %$h}) .'}'
-		: $_
-	}
-	@_[1..$#_];
  $_[0]->logOpen() if $_[0]->{-log} && !ref($_[0]->{-log});
- $_[0]->{-log}->print(join("\t", $_[0]->strtime, $_[0]->user, @w) ."\n") if $_[0]->{-log};
+ $_[0]->{-log}->print(strtime($_[0]),"\t",$_[0]->user,"\t",logEsc($_[0],@_[1..$#_]),"\n") if $_[0]->{-log};
  $_[0]->{-c}->{-logm} =[] if $_[0]->{-logm} && !$_[0]->{-c}->{-logm};
  splice @{$_[0]->{-c}->{-logm}}, 2, 2, '...' if $_[0]->{-logm} && scalar(@{$_[0]->{-c}->{-logm}}) >$_[0]->{-logm};
- push @{$_[0]->{-c}->{-logm}}, $w[0] .' ' .join(', ', @w[1..$#w]) if $_[0]->{-logm};
+ push @{$_[0]->{-c}->{-logm}}, $_[0]->logEsc(@_[1..$#_]) if $_[0]->{-logm};
  1
 }
+
+
+sub logEsc {	# Escape list for logging
+ my $s =$_[0];
+ my $b =" ";
+ my $r =$_[1] .$b;
+ for (my $i=2; $i <=$#_; $i++) {
+	my $v =$_[$i];
+	$r .=	( !defined($v)
+		? 'undef,'
+		: ref($v) eq 'ARRAY'
+		? '[' .join(', '
+			,map {strquot($s, $_);
+			} @$v) .'],'
+		: isa($v,'HASH')
+		? '{' .join(', '
+			,map {(defined($_) && $_ =~/^-\w+[\d\w]*$/
+				? $_
+				: strquot($s, $_)) .'=>' .strquot($s, $v->{$_})
+			} sort keys %$v) .'},'
+		: $v =~/^\d+$/
+		? $v .','
+		: $v =~/^-\w+[\d\w]*$/
+		? $v .'=>'
+		: $v =~/^(select|insert|update|delete|drop|commit|rollback)\s+/i && $i ==2
+		? $v .';'
+		: (strquot($s, $v) .',')) .$b
+ }
+ $r =~/^(.+?)[\s,;=>]*$/ ? $1 : $r
+}
+
 
 
 #########################################################
@@ -1680,7 +1746,7 @@ sub uglist {	# User & Group List
 
 
 sub w32IISdpsn {# deimpersonate Microsoft IIS impersonated process
-		# !!! Problems may be. Implement '-fswtr' login also?
+		# !!!Future: Problems may be. Implement '-fswtr' login also?
 		# 'Win32::API' used.
 		# Set 'IIS / Home Directory / Application Protection' = 'Low (IIS Process)'
 		# or see 'Administrative Tools / Component Services'.
@@ -1706,6 +1772,7 @@ sub w32IISdpsn {# deimpersonate Microsoft IIS impersonated process
 sub w32domain {	# Win32 domain name
 		# !!! domain Name of logged in user may be
     $ENV{DOMAINNAME}
+ || (0 && eval('use Win32::OLE; Win32::OLE->CreateObject("ADSystemInfo")->DomainShortName'))
  || eval('use Win32::TieRegistry; $Registry->{\'LMachine\\\\SOFTWARE\\\\Microsoft\\\\Windows NT\\\\CurrentVersion\\\\Winlogon\\\\\\\\CachePrimaryDomain\'} || $Registry->{\'LMachine\\\\SOFTWARE\\\\Microsoft\\\\Windows NT\\\\CurrentVersion\\\\Winlogon\\\\\\\\DefaultDomainName\'}')
  || Win32::DomainName()
 }
@@ -2440,8 +2507,8 @@ sub dbiExplain {# Explain DML plan
    my $c =$i->prepare("explain $q");
        $c->execute;
     my $r;
-    while ($r =$c->fetchrow_hashref()) { # !!!logRec - format doubt
-      $s->logRec('dbiExplain', join(', ', map {"$_=" .($r->{$_}||'null')} @{$c->{NAME}}));
+    while ($r =$c->fetchrow_hashref()) {
+      $s->logRec('dbiExplain', join(', ', map {"$_=> " .$s->strquot($r->{$_})} @{$c->{NAME}}));
     }
  }
 }
@@ -2716,7 +2783,7 @@ sub dbmSeek {	# Select records from dbm file using -key and -where
  my $wf=$a->{-filter};
  my $we=$wc;
  if (defined($wc) && !ref($wc) && $wc) {
-	# !!! where string parsing, examples:
+	# !!!ToDo: where string parsing, examples:
 	#	$x =~/^[\s\n]*(?<!\\)(?:\\\\)*<[\s\n]*([^\s><\/"]+)[\s\n]*((?:[^<>]|(?<!\\)(?:\\\\)*\\[<>]){0,1})[\s\n]*>[\s\n]*/
 	#	$a =~/[\s\n]*([^=]+)="((?:\\"|[^"])*)"[\s\n]*/
 	#	$x =~/^[\s\n]*((?:[^<]|(?<!\\)(?:\\\\)*\\[<])*)[\s\n]*((?:<.+){0,1})/
@@ -2734,17 +2801,17 @@ sub dbmSeek {	# Select records from dbm file using -key and -where
 	&& (!$ft || grep {defined($_[2]->{$_}) && $_[2]->{$_} =~/\Q$ft\E/i} keys %{$_[2]})
 	&& (!$wf || &$wf(@_))
 	};
- $s->logRec('dbmSeek'	# !!!logRec - format doubt
+ $s->logRec('dbmSeek'
 	, $a->{-table}, $ox, $k
-	,{$wv	? (-version=>'[' .$s->strdata($wv) .']')	: ()
-	, $wk	? ('-' .substr($o, 2)=>('{' .$s->strdata($wk)) .'}')	 : ()
+	, $wv	? (-version=> $wv)	: ()
+	, $wk	? ('-' .substr($o, 2)=>$wk)	 : ()
 	, $we	? (-where=>$we)		: ()
-	, $wa	? (-rac=>'[' .$s->strdata($wa) .']')	: ()
+	, $wa	? (-rac	=>$wa)		: ()
 	, $wr	? (-urole=>$a->{-urole}, -uname=>$a->{-uname})	: ()
 	, $ft	? (-ftext=>$ft)		: ()
 	, $wf	? (-filter=>$wf)	: ()
 	, $e	? (-subw=>$e)		: ()
-	});
+	);
  $s->dbmTable($a->{-table})->keSeek($ox,$k,$w,$e);
 }
 
@@ -2769,7 +2836,7 @@ sub dbiLsLike {	# SQL List LIKE or RLIKE
 	? ' RLIKE ' 
 		.$_[0]->dbi->quote('[[:<:]](' 
 				.join('|', @{$_[4]}) 
-				.')[[:>:]]')	# !!! case sensitivity ???
+				.')[[:>:]]')	# "REGEXP is case insensitive for normal (not binary) strings"
 	: $_[4];
  ' ' .$_[2] .' '
 	. ref($l)
@@ -3195,6 +3262,16 @@ sub cgiRun {	# Execute CGI query
  $s->set(-autocommit=>0);
  local $s->{-affect} =1;
 
+ # cmg transitions:
+ # global       commands
+ # -------      --------
+ # recList:	recList,	  recForm, recQBF->
+ # recQBF:	recQBF,  	  recForm, recList->
+ # recNew:	recNew,  	  recForm, recIns->
+ # recRead:	recRead, recEdit, recForm, recIns, recUpd, recDel->, recNew->
+ # recDel:			  recForm
+ # recForm?			  recForm
+
 		# Accept & parse CGI params, find form, command, global command, key...
  $s->cgiParse();
  my $oa =$s->{-pcmd}->{-cmd};
@@ -3257,22 +3334,11 @@ sub cgiRun {	# Execute CGI query
 	last;
  }
 
- # !!! recForm called in too diffirent contexts ???
- # !!! cmg transitions ???
- # global       commands
- # -------      --------
- # recList:	recList,	  recForm, recQBF->
- # recQBF:	recQBF,  	  recForm, recList->
- # recNew:	recNew,  	  recForm, recIns->
- # recRead:	recRead, recEdit, recForm, recIns, recUpd, recDel->, recNew->
- # recDel:			  recForm
- # recForm?			  recForm
-
 		# Execute action
  if	(ref(my $e =$om->{"-$oa"}) eq 'CODE') {
 	$s->{-pout} =&$e($s, $on, $om, $s->{-pcmd}, $s->{-pdta});
  }
- elsif	($ot && $oa =~/^rec/) {		# !!! incapsulate action executor ???
+ elsif	($ot && $oa =~/^rec/) {		# !!!ToDo: incapsulate action executor ???
 	if	($oa =~/^recList/) {
 		$s->{-pout} =$s->cgiQuery($on, $om)
 	}
@@ -3359,7 +3425,7 @@ sub cgiParse {	# Parse CGI call parameters
  $s->{-lng} =$s->{-lng} =~/^([^ ;,]+)/ ? $1 : $s->{-lng};
  foreach my $k (keys %$d) {
 	next if !defined($d->{$k} || $d->{$k} eq '');
-	if ($k =~/^_(cmd|cmg|frmCall|frmName\d*|recNew|recRead|recPrint|recEdit|recIns|recUpd|recDel|recForm|recList|recQBF|submit.*|app.*|form|key|qkey|qwhere|qurole|quname|qftext|qversion|qorder|qlist|edit|backc|login|print|xml)(?:\.[xXyY]|__S){0,1}$/i) {
+	if ($k =~/^_(cmd|cmg|frmCall|frmName\d*|recNew|recRead|recPrint|recEdit|recIns|recUpd|recDel|recForm|recList|recQBF|submit.*|app.*|form|key|qkey|qwhere|qurole|quname|qftext|qversion|qorder|qlist|qlimit|qftwhere|qftord|edit|backc|login|print|xml)(?:\.[xXyY]|__S){0,1}$/i) {
 		my ($c, $v) =($1, $d->{$k});
 		if ($k =~/^(.+)\.[xXyY]$/) {
 			$g->param($1, 1);
@@ -3391,7 +3457,8 @@ sub cgiParse {	# Parse CGI call parameters
 
  $c->{-cmg} ='recList' 
 		if !$c->{-cmg} && !$c->{-cmd};
- $c->{-cmd} ='frmCall'	# 'recForm'
+ $c->{-cmd} =!$c->{-cmg}? 'frmCall' 
+			: $c->{-cmg} eq 'recList' ? 'recList' : 'recForm'
 		if !$c->{-cmd};
  $c->{-cmg} =$c->{-cmd} eq 'recForm' ? 'recList' : $c->{-cmd}
 		if !$c->{-cmg};
@@ -3640,7 +3707,7 @@ sub htmlHidden {# Common hidden fields
 		.'" />'
 		} (qw(edit backc key)
 		, $s->{-pcmd}->{-cmg} ne 'recQBF'
-		? qw(qkey qwhere qurole quname qversion qorder)
+		? qw(qkey qwhere qurole quname qversion qorder qlimit)
 		: qw(qlist)	)
 	) ."\n"
 }
@@ -3709,14 +3776,17 @@ sub htmlMenu {	# Screen menu bar
 	? ''
 	: join("; "
 	, grep {$_
-		} htmlEscape($s, $c->{-qorder} && $c->{-qorder} =~/^-/ ? lng($s, 0, '-qorder') .' ' .substr($c->{-qorder},0) : '')
-		, htmlEscape($s, strdata($s, $c->{-qkey}))
+		} 
+		  htmlEscape($s, $c->{-qkey}
+				? join(', ', map { $_ .' ? ' .strquot($s,$c->{-qkey}->{$_})
+					} sort keys %{$c->{-qkey}})
+				: '')
 		, htmlEscape($s, $c->{-qwhere})
 		, htmlEscape($s, $c->{-qurole}	? lng($s, 0, '-qurole')   .' ' .$c->{-qurole} : '')
 		, htmlEscape($s, $c->{-quname}	? lng($s, 0, '-quname')   .' ' .$c->{-quname} : '')
 		, htmlEscape($s, $c->{-qftext}	? lng($s, 0, '-qftext')   .' ' .$c->{-qftext} : '')
 		, htmlEscape($s, $c->{-qversion}? lng($s, 0, '-qversion') .' ' .$c->{-qversion} : '')
-		, htmlEscape($s, $c->{-qorder} && $c->{-qorder} !~/^-/ ? lng($s, 0, '-qorder') .' ' .$c->{-qorder} : '')
+		, htmlEscape($s, $c->{-qorder}	? lng($s, 0, '-qorder')	  .' ' .$c->{-qorder} : '')
 	);
 
  !$s->{-icons}
@@ -3815,7 +3885,7 @@ sub htmlMB {	# CGI menu bar button
 
 
 sub htmlML {	# CGI menu bar list
- my $i =$_[0]->cgi->param($_[1]) ||$_[0]->{-pcmd}->{-form} ||'';
+ my $i =$_[0]->cgi->param('_' .$_[1]) ||$_[0]->{-pcmd}->{-form} ||'';
  ($_[0]->{-icons} ? '<td class="_MenuButton" valign="middle" style="border-width: thin; border-style: outset; background-color: buttonface;" >' : '')
  .'<select name="_' .$_[1] 
  .'" onchange="{_cmd.value=&quot;frmCall&quot;; submit(); return(false);}">'
@@ -4042,7 +4112,7 @@ sub cgiForm {	# Print CGI screen form
  }
 
  if ($qm) {	# Query condition fields
-	# !!! display default query clauses
+	# !!!ToDo: display default query clauses
 	$s->output("<table>\n") if !defined($rskip);
 	$rskip =0;
 	my $th ='<tr><th align="left" valign="top">';
@@ -4074,6 +4144,11 @@ sub cgiForm {	# Print CGI screen form
 	$s->output($th, htmlEscape($s, lng($s,0,'-qorder')), '</th>', $td
 		, htmlField($s, '_qorder', lng($s,1,'-qorder'), {$de eq 'dbm' ?(-labels=>$qo) :(-asize=>50)}, $s->{-pcmd}->{-qorder}||'')
 		, "</td></tr>\n");
+	$s->output($th, htmlEscape($s, lng($s,0,'-qlimit')), '</th>', $td
+		, htmlField($s, '_qlimit', lng($s,1,'-qlimit')
+			, {-values=>[128,256,512,1024,2048,4096]}
+			, $s->{-pcmd}->{-qlimit}||'')
+		, "(512 default)</td></tr>\n");
 	$s->output($th, '</th>', $td
 		, $s->htmlEscape($s->urlCat($s->cgi->url(-relative=>1)
 			, '_cmd'=>'recList', '_form'=>$s->{-pcmd}->{-form}
@@ -4094,7 +4169,6 @@ sub cgiForm {	# Print CGI screen form
 
 sub htmlField {	# Generate field widget HTML
 		# self, field name, title, meta, value
-		# !!! rewrite some calls to CGI.pm ???
  my ($s, $n, $t, $m, $v) =@_;
  my $wgp ='';
  $v ='' if !defined($v);
@@ -4247,6 +4321,7 @@ sub htmlRFD {	# RFD widget html
  my  $fnc='_file_c';
  my  $fnf='_file_f';
  my  $fnl='_file_l';
+ my  $fno='_file_o';
  my  $r ='';
  if ($edt && $s->cgi->param($fnu)) {	# Upload
 	$s->rfaUpload($c, $d, $fnu);
@@ -4260,16 +4335,24 @@ sub htmlRFD {	# RFD widget html
  }
 
  if ($edt) {				# Edit widget
-	my $fo =$s->nfopens($pth); @$fo && unshift @$fo, '---' .$s->lng(0,'Close') .'---';
+	my $fo =($s->cgi->param($fno)||$s->cgi->param($fnc))
+		&& $s->nfopens($pth,{});
 	$r .=$s->cgi->filefield(-name=>$fnu, -title=>$s->htmlEscape($s->lng(1,'Upload')))
 	.$s->cgi->submit(-name=>$fnf, -value=>$s->lng(0,'+|-'), -title=>$s->lng(1,'+|-'))
-	.(@$fo	? $s->cgi->scrolling_list(-name=>$fnc, -override=>1, -values=>$fo, -size=>(scalar(@$fo) >4 ? 4 :scalar(@$fo)), -multiple=>'true')
+	.(!$fo && $^O eq 'MSWin32'
+		? $s->cgi->submit(-name=>$fno, -value=>$s->lng(0,'rfaopen'), -title=>$s->lng(1,'rfaopen'))
 		: '')
-	.'&nbsp;&nbsp;&nbsp;'
+	.($fo	? $s->cgi->scrolling_list(-name=>$fnc, -override=>1, -multiple=>'true'
+			, -title=>$s->lng(1,'rfaopen')
+			, -values=>	['---' .$s->lng(0,'Close') .'---'
+					,ref($fo) eq 'HASH' ? sort keys %$fo : @$fo]
+			, ref($fo) eq 'HASH' ? (-labels=>$fo) : ())
+		: '')
+	."\n&nbsp;&nbsp;&nbsp;\n"
 	.join('; ', 
 		map {	my $f =$s->urlEscape($_);
 			$s->cgi->a({-href=>"$url/$f", -target=>'_blank'}
-			, $s->cgi->checkbox(-name=>$fnl, -value=>$_, -label=>$_))
+			, $s->cgi->checkbox(-name=>$fnl, -value=>$_, -label=>$_, -title=>$s->lng(1,'rfadelm')))
 		} $s->rfdGlobn($c, $d))
  }
  else	{				# View widget
@@ -4315,7 +4398,7 @@ sub cgiDDLB {	# CGI Drop-down list box
 	}
 	$s->output("</select>");
  }
- elsif	(ref($d) eq 'HASH') {	# && 0 !!! test 'cgiList' with hash ???
+ elsif	(ref($d) eq 'HASH') {	# && 0 !!!ToDo: test 'cgiList' with hash ???
 	$s->output($sl, "\n");
 	foreach my $e (sort {lc(ref($d->{$a}) ? join(' - ',@{$d->{$a}}) : $d->{$a}) 
 			cmp  lc(ref($d->{$b}) ? join(' - ',@{$d->{$b}}) : $d->{$b})} 
@@ -4418,6 +4501,7 @@ sub cgiQuery {	# Query records
  $a{-ftext}	=$c->{-qftext}		if $c->{-qftext};
  $a{-version}	=$c->{-qversion}	if $c->{-qversion};
  $a{-order}	=$c->{-qorder}		if $c->{-qorder};
+ $a{-limit}	=$c->{-qlimit}		if $c->{-qlimit};
 
  if	(!$a{-data} && $m->{-field}) {
 	$a{-data} =[grep {ref($_) eq 'HASH' 
@@ -4644,14 +4728,14 @@ sub cgiList {	# List queried records
 sub cgiFooter {	# Footer of CGI screen
  my ($s) =@_;
  $s->output("\n<span class=\"_FooterArea\"><hr />\n"
-	,($s->cgiHook('recList') && $s->{-fetched}
-	? ('<b>',$s->{-fetched}
-		,$s->{-limited} <=$s->{-fetched} 
-		?('/', $s->{-fetched})
+	,($s->cgiHook('recList') && defined($s->{-fetched})
+	? ('<b>',$s->{-fetched}||0
+		,$s->{-limited} && ($s->{-limited} <=$s->{-fetched})
+		?('/', $s->{-limited})
 		:''
 		,' ', $s->lng(1, '-fetched'),"</b><br />\n")
 	: defined($s->{-affected})
-	? ('<b>',$s->{-affected}, ' ', $s->lng(1, '-affected'),"</b><br />\n")
+	? ('<b>',$s->{-affected}||0, ' ', $s->lng(1, '-affected'),"</b><br />\n")
 	: ())
 	, $s->{-c}->{-logm} && $s->{-debug}
 	&& join(";<br />\n",
@@ -4781,6 +4865,8 @@ sub ddfRVE {	# Record Versions Embedded view default field definition
  $v ='version' if !$v;
  sub{	
 	return('')	if ($_[0]->{-pcmd}->{-cmg} eq 'recQBF')
+			|| !$_[0]->{-pcmd}->{-table}
+			|| !$_[0]->{-pout}->{'id'}
 			|| $_[0]->{-pcmd}->{-print};
 	$_[0]->output("\n<font size=\"-1\">");
 	$_[0]->cgiList('-!h'
@@ -5016,7 +5102,10 @@ sub ddfRRE {	# Record References Embedded view default field definition
  my ($s, $v) =@_;	# (self, references store)
  $v ='reference' if !$v;
  sub{	
-	return('') if $_[0]->{-pcmd}->{-cmg} eq 'recQBF';
+	return('') 
+		if ($_[0]->{-pcmd}->{-cmg} eq 'recQBF')
+		|| !$_[0]->{-pcmd}->{-table}
+		|| !$_[0]->{-pout}->{'id'};
 	$_[0]->output("\n");
 	$_[0]->cgiList('-!h'
 	,$v, undef
@@ -5064,9 +5153,12 @@ sub ddfHide {	# '-hide' detail feature default definition
 
 sub ddvIndex {	# Index page default data definition
  my $s =$_[0];
- (-cmt		=>$s->lng(1,'Index')
+ (-lbl		=>$s->lng(0,'ddvIndex')
+ ,-cmt		=>$s->lng(1,'ddvIndex')
  ,-cgcCall	=>sub{
 	my $s =$_[0];
+	$s->{-fetched}	=undef;
+	$s->{-affected}	=undef;
 	$s->output($s->htmlStart()		# HTTP/HTML/Form headers
 		,$s->htmlHidden(@_[1,2])	# common hidden fields
 		,!$s->{-pcmd}->{-print}
@@ -5121,6 +5213,132 @@ sub ddvIndex {	# Index page default data definition
  )
 }
 
+sub ddvFTQuery {	# Full-Text Query
+ my $s =$_[0];
+ (-lbl		=>$s->lng(0,'ddvFTQuery')
+ ,-cmt		=>$s->lng(1,'ddvFTQuery')
+ ,-cgcCall	=>sub{
+	my $s =$_[0];
+	my $g =$s->cgi();
+	$s->{-fetched}	=0;
+	$s->{-affected}	=undef;
+	$s->{-pcmd}->{-cmd} =$s->{-pcmd}->{-cmg} ='recQBF';
+	$s->output($s->htmlStart()		# HTTP/HTML/Form headers
+		,$s->htmlHidden(@_[1,2])	# common hidden fields
+		,!$s->{-pcmd}->{-print}
+		&& $s->htmlMenu(@_[1,2])	# Menu bar
+		,"\n"
+		);
+	# $s->die('Microsoft IIS required')	if $ENV{SERVER_SOFTWARE} !~/IIS/;
+	$s->output($g->textfield(-name=>'_qftwhere', -size=>70, -title=>$s->lng(1,'-qftwhere'))
+		, $g->submit(-name =>'_qftCall'
+			,-value=>$s->lng(0,'qftCall')
+			,-title=>$s->lng(1,'qftCall'))
+		, '<br />'
+		, $g->popup_menu(-name=>'_qftord'
+			,-values=>['write','hitcount','vpath','docauthor']
+			,-labels=>{
+				 'write'	=>'Chronologically'
+				,'hitcount'	=>'Ranked'
+				,'vpath'	=>'by Name'
+				,'docauthor'	=>'by Author'
+				}
+			,-default=>'write')
+		, $g->popup_menu(-name=>'_qlimit'
+			,-values=>['',128,256,512,1024,2048,4096]
+			,-labels=>{
+				 ''  =>'512  default'
+				,128 =>'128  max'
+				,256 =>'256  max'
+				,512 =>'512  max'
+				,1024=>'1024 max'
+				,2048=>'2048 max'
+				,4096=>'4096 max'
+				}
+			,-default=>512)
+		, $g->a({-href=>
+			-e ($ENV{windir} .'/help/ix/htm/ixqrylan.htm')
+			? '/help/microsoft/windows/ix/htm/ixqrylan.htm'
+			: '/help/microsoft/windows/isconcepts.chm' # .'::/ismain-concepts_30.htm'
+			}, '?')
+		, "<br />\n");
+
+	my $ftq  = (defined($g->param('_qftwhere')) && $g->param('_qftwhere') ne '')
+		#||(defined($g->param('_qftext')) && $g->param('_qftext') ne '')
+		 ||'';
+	if ($ftq ne '') {
+		eval('use Win32::OLE');
+		Win32::OLE->Initialize();
+		# Win32::OLE->Initialize(&Win32::OLE::COINIT_OLEINITIALIZE);
+		# Search MSDN for 'ixsso.Query'
+		my $oq =Win32::OLE->CreateObject("ixsso.Query");
+		!$oq && $s->die("'OLE->CreateObject(ixsso.Query)' failed '$!'/'$@'/" .Win32::OLE->LastError);
+		my $ou =Win32::OLE->CreateObject("ixsso.util");
+		!$oq && $s->die("'OLE->CreateObject(ixsso.util)' failed '$!'/'$@'/" .Win32::OLE->LastError);
+		my $qs =[];
+		my $qt =[];
+		$oq->{Query} =$ftq =~/^(@\w|\{\s*prop\s+name\s+=)/i
+				? $ftq
+				: ('@contents ' .$ftq);
+		$oq->{Catalog}    ='Web';
+		$oq->{MaxRecords} =$g->param('_qlimit') ||256;
+		$oq->{MaxRecords} =4096 if $oq->{MaxRecords} >4096;
+		$oq->{SortBy}     =$g->param('_qftord') ||'write';
+		$oq->{SortBy}    .=$oq->{SortBy} =~/^(write|hitcount)$/i 
+				? '[d],docauthor[a]' 
+				: '[a],write[d]';
+		$oq->{Columns}    ='vpath,path,filename,hitcount,write,doctitle,docauthor,characterization';
+		$oq->{LocaleID}   =1049; # ru
+
+		my $ol =eval {$oq->CreateRecordset('sequential')}; # 'nonsequential'
+		!$oq && $s->die("'OLE->CreateRecordset(sequential)' failed '$!'/'$@'/" .Win32::OLE->LastError);
+		$s->output('No records found') if $ol->{EOF};
+
+		my ($rcf, $rct, $rcd) =(0, 0, 0);
+		while (!$ol->{EOF}) {
+			my $vp =$ol->{vPath}->{Value};
+			$rcf +=1;
+			if (!$vp) {
+				$rct +=1;
+			}
+			if ($vp) {
+				$rcd +=1;
+				my $vt =$g->escapeHTML($ol->{DocTitle}->{Value});
+				$vt = ($vt ? '$vt' .'&nbsp;&nbsp;' : '')
+				. '(' .$g->escapeHTML($ol->{DocAuthor}->{Value}) .')'
+					if $ol->{DocAuthor}->{Value};
+				$vt = ($vt ? $vt .'&nbsp;&nbsp;&nbsp;(' : '')
+					. $g->escapeHTML($vp) .')';
+				$s->output($g->a({-href=>$vp||$ol->{Path}->{Value}
+						,-title=>$ol->{HitCount}->{Value}
+						.': ' .$ol->{Path}->{Value}}
+						, $vt)
+					, $ol->{Characterization}->{Value}
+					? '<br />' .$g->escapeHTML($ol->{Characterization}->{Value})
+					: ''
+					, "<br /><br />\n");
+			}
+			if (!eval {$ol->MoveNext; 1}) {
+				$s->output('Bad query');
+				last
+			}
+		}
+		Win32::OLE->FreeUnusedLibraries;
+		# Win32::OLE->Uninitialize;
+		$s->{-fetched}	=$rcd;
+		$s->{-affected}	=$rcf;
+		$s->logRec('FTQuery',-fetched=>$rcd, -found=>$rcf, -vpathgen=>$rct, -max=>($oq->{MaxRecords}||'undef'));
+	}
+	else  {
+		$s->output('Enter query condition')
+	}
+	$s->{-pcmd}->{-cmd} =$s->{-pcmd}->{-cmg} ='recList';
+	$s->cgiFooter() if !$s->{-pcmd}->{-print};
+	$s->output($s->cgi->endform);
+	$s->output($s->cgi->end_html);
+	$s->end();
+ })
+}
 
 sub ddvAll {	# All predefined Views default definitions
  return(
@@ -5803,13 +6021,13 @@ sub keSeek {
 
 
 sub keScan {
- &{shift->parent->{-die}}("DBFile: 'keScan' not implemented yet!!!")
+ &{shift->parent->{-die}}("DBFile: 'keScan' not implemented yet!")
 }
 
 
 
 #########################################################
-# Condition code block object, use isa($object,'CODE') !!!
+# Condition code block object, use isa($object,'CODE') !
 #########################################################
 
 

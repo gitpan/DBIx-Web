@@ -78,10 +78,10 @@ $w->set(-table=>{
 	});
 
 $w->set(-form=>{
-	  'default'=>{
-		$w->ddvIndex()	# -subst=>'note'
-		}
-	 ,'notehier'=>{
+	 'default'	=>{-subst=>'index'}
+	,'index'	=>{$w->ddvIndex()}
+	,'fulltext'	=>{$w->ddvFTQuery()}
+	,'notehier'	=>{
 		 -lbl		=>'Notes hierarchy'
 		,-cmt		=>'Notes hierarchy'
 		,-table		=>'note'

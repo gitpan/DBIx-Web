@@ -238,7 +238,7 @@ C<lng>
 =item Misc Data methods
 
 C<max>, C<min>, C<dwnext>, C<orarg>, C<grep1>;
-C<strpad>, C<strdata>, C<strdatah>, C<datastr>;
+C<strpad>, C<strquot>; C<strdata>, C<strdatah>, C<datastr>;
 C<dsdClone>, C<dsdMk>, C<dsdParse>;
 C<strtime>, C<timestr>, C<timeadd>;
 C<cptran>;
@@ -457,7 +457,7 @@ C<ddvRRV>, C<ddfRRE>;
 C<ddvRHV>; 
 C<ddfRFD>; 
 C<ddfShow>, C<ddfHide>;
-C<ddvIndex>
+C<ddvIndex>, C<ddvFTQuery>
 
 
 =back
@@ -1890,10 +1890,19 @@ Default definitions for all predefined materialized views.
 See source code.
 
 
+=item ddvFTQuery () -> (Full-text search default view definition)
+
+C<Default Data Definitions>.
+Default definition for Full-text search page.
+See inplementation for limitations and details.
+
+
 =item ddvIndex () -> (Index page default view definition)
 
 C<Default Data Definitions>.
 Default definition for Index page enumerating all C<-menuchs> entries.
+
+
 
 
 =item ddvRHV (?[fields definitions] ||undef, -option=>value,...) -> {Record History View default view definition}
@@ -2477,6 +2486,12 @@ C<Misc Data methods>.
 Default pad char is '0', default min length is $NLEN, string will not be trimmed.
 
 
+=item strquot (value) -> quoted and escaped
+
+C<Misc Data methods>.
+Escapes and quotes value given if needed.
+
+
 =item strtime (?mask, L<time|perlfunc> ||L<localtime|perlfunc> ||L<gmtime|perlfunc>) -> stringified
 
 C<Misc Data methods>.
@@ -2740,16 +2755,21 @@ C<psEval> method executes perl script file by parsing, compiling into sub{}, eva
 
 =over
 
-=head2 2004-06-06 - Publication of Version 0.51
 
+=head2 2004-06-13 - Development Version 0.52
+
+C<ddvFTQuery> created.
+Log more readable.
+Some corrections.
 This should not be used yet...
 
 
-=head2 2004-06-05 - Development
+=head2 2004-06-06 - Development Version 0.51
 
 CSS support. 
 C<ddvIndex> created.
 Some error corrections.
+This should not be used yet...
 
 
 =head2 2004-05-16 - Publication of Version 0.50
