@@ -1,0 +1,11 @@
+MANIFEST
+Makefile.PL
+readme
+test.pl
+
+examples/cgi-bin/web.cgi
+
+lib/DBIx/Web.pm
+lib/DBIx/Web.pod
+
+

@@ -1,0 +1,2815 @@
+=head1 NAME
+
+DBIx::Web - Active Web Database Layer
+
+
+=head1 SYNOPSIS
+
+  use DBIx::Web;
+  my $w =DBIx::Web->new(
+	 -serial=>2
+	,-debug=>2
+	,-index=>1
+	,-path=>'path to file store'
+	,-url=>'base URL of file store'
+	,-urf=>'filesystem URL to file store'
+	);
+  $w->set(-table=>{
+  ...... see examples ......
+	,'version'=>$w->ddvRVV()
+	,'history'=>$w->ddvRHV()
+	});
+  $w->set(-form=>{
+  ...... see examples ......
+	,'default'=>{-subst=>'default form or table name'}
+	});
+  $w->cgiRun();
+
+
+=head1 DESCRIPTION
+
+
+This is a database layer for Perl scripts, implementing triggers,
+record versioning, 
+access control at the record level, 
+file attachments to records,
+materialised views.
+There is a web user interface also.
+
+Based on L<DBI|DBI> and L<DB_File|DB_File> data engines.
+Based on L<CGI|CGI> for user interface.
+
+Currently implemented and tested on Win32 Apache and IIS (considering C<w32IISdpsn> warnings).
+
+L<CGI::Bus|CGI/Bus>, the previous project, was: 
+focused on CGI user interface to database tables, not database metaphor;
+too complex in record version control programming;
+too complex and surplus in architecture and setup.
+
+L<WODA|WODA> has a very interesting database metaphor, 
+but not many features.
+
+
+=head1 CONCEPTS
+
+=over
+
+=item RELATIONAL DATABASES
+
+Have several disadvantages:
+
+=item Record Level Access Control
+
+Many of relational databases have not explicit record level access control.
+It may be implemented via views and triggers, within another application code.
+Fields for readers and authors names are useful, 
+further needs dependences between records.
+
+
+=item Temporal Data Model
+
+Many of relational databases have not temporal data model.
+It may be implemented via triggers and views, within another application code,
+but see R3 data model architecture...
+
+But it may be useful recognize, who, when, what record edited.
+Further needs date-times of actuality of record.
+
+
+=item Polymorph records
+
+Can I query and view data not from concrete tables but from database?
+It may be implemented via materialized views metaphor, using triggers.
+Further needs uniform record identifiers, to point to any record from any record, or URL.
+Full-text queries are also useful.
+
+
+=item Storage Size
+
+Record types are implemented via database tables.
+Some tables due to generalization may grow.
+Very big tables may be difficult in repair or maintenance.
+
+
+=item File Attachments
+
+May be implemented via BLOBs.
+But how to attach several files to any record?
+
+
+=item GROUPWARE DATABASES
+
+Alike Lotus Domino, have several additional disadvantages:
+
+=item Bad Development Capabilities
+
+There are no triggers, transactions, joins...
+
+
+=item WEB DATABASES
+
+Have several disadvantages:
+
+=item Triggers Implementation
+
+All application codes are concentrated at the server.
+Why programmer needs to use different programming languages to implement
+triggers and stored procedures in the database 
+and another procedures in the web server?
+Why user interface hooks may not be considered as a kind of triggers?
+
+Should be interesting a separate 'triggers server'?
+Or this may be considered as a kind of application servers?
+
+
+=item Database Engines
+
+Why sole engine should be core?
+There may be many data sources and several engines.
+
+
+=item WEB COLLABORATIVE TOOLS
+
+Alike Wiki, have several disadvantages:
+
+Forms, views and queries may be added without metaphor changes,
+but implementation changes may be great.
+And what about file attachments?
+
+
+=item THIS DATABASE
+
+The goal may to be conceptually better then Lotus Notes
+or to look alike some Wiki, but with 
+remaining ability to implement any relational database 
+and any data source interface.
+
+Any case, this database has several disadvantages too:
+
+=item Effectiveness
+
+Triggers level implementation is not very efficient.
+
+One of the problems is repeating cursor loops in
+C<recUpd> (one for '0R' trigger and one inside C<dbiUpd>)
+and C<recDel> (for '0R' trigger and C<dbiDel> or C<recUpd>).
+The last loop is always effectively implemented inside L<DBI|DBI> SQL databases,
+but for L<DB_File|DB_File>s it should be implemented implicitly inside 
+C<dbiUpd> or C<dbiDel>.
+To implement '1R' triggers inside C<recUpd> or C<recDel>, 
+and also for effectiveness of L<DB_File|DB_File>s, 
+C<dbiUpd> and C<dbiDel> should not be oriented to the groups of rows,
+or there should be a fast additional single row oriented interface.
+Also C<recDel> should use a fast single row oriented interface of C<recUpd>.
+So, there should be two interfaces to C<recUpd>, C<dbiUpd> and C<dbiDel> for effectiveness.
+But this is difficult in develop and test.
+
+
+=item Restricted Database API
+
+Database API implements restricted choice of SQL capabilities.
+SQL is comprehensive, but alien to any host language.
+It is too difficult to translate host programming to SQL,
+SQL to triggers implementation,
+triggers implementation to SQL towards database.
+
+
+=item Restricted Database Implementations
+
+It is too difficult for embedded C<Database Engines> 
+to support transactions and many SQL features.
+It is very difficult to implement transactions covering file attachments.
+
+It is very difficult to implement real
+full-text search and full-text indexing
+both for database records and file attachments.
+Existed external indexing machine should understand data records and access rights.
+Embedded indexing machine should understand formats of files attached.
+Database may have it's own full-text implementation also.
+
+
+=item Another
+
+See version info.
+See marked with '!!!' comments in the source code.
+
+
+=back
+
+
+=head1 CLASSIFICATION
+
+=over
+
+=item Slots and Methods
+
+C<Slots> are available via C<set> call or $self->{-name} syntax.
+See C<initialize> source for preferred to be defined in C<new> call slots.
+Table and Form description (C<-table>, C<-form>) 
+slots, special data fields, and another keywords
+are denoted specially. 
+The first value listed is the default.
+
+C<Methods> are used via $object->call() syntax.
+
+Slot names begin with '-' sign.
+
+
+=item Creation and Setup
+
+C<new>, C<initialize>, C<class>, C<set>;
+C<start>, C<end>;
+C<setup>, C<-setup>
+
+=item Error Processing
+
+C<-die>, C<-warn>, C<-debug>;
+
+C<die>, C<warn>
+
+
+=item Locale
+
+C<-locale>, C<-lang>, C<-charset>, C<-lng>;
+
+C<lng>
+
+
+=item Misc Data methods
+
+C<max>, C<min>, C<dwnext>, C<orarg>, C<grep1>;
+C<strpad>, C<strdata>, C<strdatah>, C<datastr>;
+C<dsdClone>, C<dsdMk>, C<dsdParse>;
+C<strtime>, C<timestr>, C<timeadd>;
+C<cptran>;
+C<ishtml>, C<htmlEscape>, C<htmlUnescape>, C<urlEscape>, C<urlUnescape>, C<urlCat>, C<htlsTag>;
+C<xmlEscape>, C<xmlAttrEscape>, C<xmlTagEscape>, C<xmlUnescape>, C<xmlsTag>
+
+
+=item File Store
+
+C<-path>, C<-url>, C<-urf>, C<-fswtr>, C<-fsrdr>;
+
+C<pthForm>;
+C<pthMk>, C<pthGlob>, C<pthGlobn>, C<pthRm>, C<pthCln>, C<pthCp>
+
+
+=item Persistent Variables
+
+C<-var>, C<-serial>;
+
+C<varFile>, C<varLoad>, C<varLock>, C<varStore>
+
+
+=item Logging
+
+C<-log>, C<-logm>;
+
+C<logOpen>, C<logLock>, C<logRec>
+
+
+=item SubObjects
+
+C<-dbi>, C<-dbiarg>, C<-cgi>, C<-output>;
+
+C<dbi>, C<cgi>;
+C<hfNew>, C<dbmNew>, C<dbmTable>, C<ccbNew>;
+C<osCmd>;
+C<output>, C<outhtm>, C<outhtml>, C<outxml>
+
+
+=item User Identification
+
+C<-user>, C<-unames>, C<-ugroups>, C<-AuthUserFile>, C<-AuthGroupFile>;
+
+C<user>, C<userln>, C<uguest>, C<unames>, C<ugroups>, C<ugnames>, C<uglist>;
+C<ugrexp>, C<ugmember>, C<uadmin>;
+C<w32IISdpsn>, C<w32agf>
+
+
+=item Database Options
+
+C<-serial>, C<-autocommit>, 
+C<-limit>, C<-affect>, C<-affected>, C<-fetched>, C<-limited>,
+C<-host>, C<-recInsID>, C<-idsplit>
+
+
+=item Database Description
+
+C<-title>, C<-table> and C<-form> (C<Table/Form Description>);
+C<-mdlTable>, C<-mdeTable>;
+C<Triggers>
+
+
+=item Table/Form Description
+
+=item Table Description
+
+=item Form Description
+
+C<-table> slot contains database tables descriptions.
+C<-form> slot contains C<User Interface> forms descriptions.
+Some slots (like C<-field>, C<-wkey>, C<Triggers>, C<User Interface>) are common to C<-table> and C<-form>.
+'-qXXX' and C<-limit> slots are sufficient to describe queries or views or lists of records.
+Some slots may appear at database level also.
+
+
+C<-field> (C<Field Description>);
+C<-key>, C<-keycmp>, C<-wkey>;
+C<-ixcnd>, C<-ixrec>;
+C<-optrec>;
+C<-dbd>;
+C<Triggers>;
+C<User Interface> (C<-cgcXXX>; C<-subst>, C<-recXXX>, C<-recRead>, C<-qlist>;
+C<-query>, C<-qfilter>, C<-qhref>, C<-qhrcol>, C<-qfetch>, C<-limit>; C<-cgvXXX>)
+
+
+=item Field Description
+
+C<-field> C<Table/Form Description> slot contains array ref of field
+descriptions (hash refs) and formatting strings.
+
+C<-fld>, C<-expr>, C<-lbl>, C<-lblhtml>, C<-cmt>, C<-flg>;
+C<-hide>, C<-hidel>, C<-edit>, C<-null>;
+C<-inp>, C<-inphtml>, C<-ddlb>, C<-ddlbmult>, C<-ddlbtgt>;
+C<-colspan>, C<-colwidth>;
+C<-lsthtml>
+
+
+=item Record level Access Control
+
+C<-rac>; 
+C<-racAdmin>, C<-racReader>, C<-racWriter>; 
+C<-racActor>, C<-racPrincipal>;
+C<-editable>
+
+
+=item Record level Version Control
+
+C<-rvcInsBy>, C<-rvcInsWhen>, C<-rvcUpdBy>, C<-rvcUpdWhen>,
+C<-rvcActPtr>, C<-rvcFinState>, C<-rvcCkoState>, C<-rvcDelState>.
+
+See also C<ddoRVC>
+
+
+=item Record File Attachments
+
+C<-rfa>, C<-rfdName>;
+C<-file>;
+
+C<rfdPath>, C<rfdEdmd>, C<rfdGlobn>, C<rfdRm>;
+C<rfaUpload>, C<rfaRm>
+
+See also C<ddfRFD>
+
+
+
+=item Materialised Views
+
+C<-index>, C<-ixcnd>, C<-ixrec>;
+
+C<recIndex>, C<recReindex>
+
+See also C<ddoRVC>, C<ddvRVV>, C<ddvRHV>
+
+
+
+=item Record ID References
+
+C<-ridRef>
+
+See also C<ddvRRV>, C<ddfRRE>
+
+
+
+=item Triggers
+
+Triggers may be defined (in execution order) at database level, table level, form level.
+Common trigger sub{} arguments are ($self, {command}, {command field => value}, {database field => value}).
+Database values should be considered as old values in '0R' triggers,
+as new values in '1R' triggers and 
+also in '1C' triggers of single-row operations.
+
+C<-recNew0R>, C<-recNew1C>;
+C<-recForm1R>, C<-recForm1C>;
+C<-recIns0C>, C<-recIns0R>, C<-recInsID>, C<-recIns1R>, C<-recIns1C>;
+C<-recUpd0C>, C<-recUpd0R>, C<-recUpd1C>;
+C<-recDel0C>, C<-recDel0R>, C<-recDel1C>;
+C<-recIndex0R>;
+C<-recSel0C>;
+C<-recRead0C>, C<-recRead0R>, C<-recRead1R>, C<-recRead1C>;
+C<-recJoint1R>
+
+
+=item Database Operation
+
+C<start>, C<end>;
+C<recCommit>, C<recRollback>;
+
+C<recNew>, C<recForm>, C<recIns>, C<recUpd>, C<recDel>;
+C<recSel>, C<recList>, C<recRead>, C<recQBF>;
+
+C<recFields>, C<recValues>, C<recData>, C<recKey>, C<recWKey>.
+
+See also C<Database Engines>.
+
+
+=item Data Record Special fields
+
+Record's hash ref returned from C<Database Operation> calls contains
+data fields and values. 
+But some fields are specially computed to describe record:
+
+C<-new>, C<-file>, C<-editable>
+
+
+=item User Interface
+
+Start review with C<cgiRun>.
+
+C<Table/Form Description>;
+C<-pcmd>, C<-pdta>, C<-pout>;
+C<-form>;
+C<-cgcXXX>;
+C<-subst>, C<-qlist>;
+C<-recXXX> (C<-recNew>, C<-recForm>, C<-recIns>, C<-recUpd>, C<-recDel>, C<-recRead>, C<-recList>,...);
+C<-httpheader>, C<-htmlstart>;
+C<-logo>, C<-icons>, C<-menuchs>, C<-menuchs1>;
+C<-login>;
+C<-cgvXXX>;
+
+C<cgiRun>, C<cgiParse>, C<cgiQuery>; C<psParse>, C<psEval>; 
+C<htmlStart>, C<htmlHidden>, C<htmlMenu>, 
+C<cgiForm> (and also C<htmlField>, C<cgiDDLB>, C<ddfRVE>, C<ddfRFD>, C<ddfRRE>),
+C<cgiList>, 
+C<cgiFooter>.
+
+See also C<Perl Script Pages>.
+
+
+=item Default Data Definitions
+
+C<-ns>, C<ns>;
+C<ddoRVC>; 
+C<ddvAll>, C<ddfAll>; 
+C<ddvRVV>, C<ddfRVE>; 
+C<ddvRRV>, C<ddfRRE>;
+C<ddvRHV>; 
+C<ddfRFD>; 
+C<ddfShow>, C<ddfHide>
+
+
+=back
+
+
+=head1 SLOTS
+
+=over
+
+=item Slots
+
+See C<Slots and Methods>
+
+
+=item -affect
+
+	=> not exists || 1
+
+(C<Database Options>)
+Number of rows to be affected by DML 'recUpd' or 'recDel' operation.
+Distinguish from C<-limit>.
+
+
+=item -affected
+
+(C<Database Options>)
+Number of rows really affected by DML 'recIns', 'recUpd', 'recDel' operation.
+See also C<-affect>
+
+
+=item -AuthUserFile
+
+	=> not exists || file path
+
+(C<User Identification>)
+Apache Users file, to be used in C<uglist> method, optional
+
+
+=item -AuthGroupFile
+
+	=> not exists || file path
+
+(C<User Identification>)
+Apache Groups file, to be used in C<ugroups> and C<uglist> methods, optional.
+See also C<w32agf>.
+
+
+=item -autocommit
+
+	=> 1 || false
+
+(C<Database Options>)
+Autocommit database mode
+
+
+=item -c 
+
+	=> {}
+
+Internal cache for computed values
+
+
+=item -cgcXXX
+
+	=> not exists || sub{}($self, 'name', {metadata}, $s->{-pcmd}, $s->{-pdta}) || 'filename.psp' || 'perl filename'
+
+(C<Table/Form Description> - C<User Interface>)
+Redirects C<cgiRun> to execute full external implementation of request or screen alike
+C<recNew>, C<recForm>, C<recIns>, C<recUpd>, C<recDel>, C<recRead>, C<recList>, C<recCall>.
+See C<Perl Script Pages> for '*.psp' files description.
+See C<-recXXX> for redirections of request to another form or table.
+See C<-cgvXXX> for external implementation of presentation only.
+
+
+=item -cgi	
+
+	=> not exists || CGI object
+
+(C<SubObjects>)
+CGI object, if used, created and available via C<cgi> call
+
+
+=item -cgvXXX
+
+	=> not exists || sub{}($self, 'name', {metadata}, $s->{-pcmd}, $s->{-pdta}) || 'filename.psp' || 'perl filename'
+
+(C<Table/Form Description> - C<User Interface>)
+Redirects C<cgiRun> to execute presentation external implementation of request or screen alike
+C<recNew>, C<recForm>, C<recIns>, C<recUpd>, C<recDel>, C<recRead>, C<recList>, C<recCall>.
+See C<Perl Script Pages> for '*.psp' files description.
+See C<-recXXX> for redirections of request to another form or table.
+See C<-cgcXXX> for full external implementation.
+
+
+=item -charset
+
+	=> locale specific || '1252' || 'sharset code' || not exists
+
+(C<Locale>)
+Application's charset, see also C<-locale>
+
+
+=item -cmt
+
+	=> not exists || field comment
+
+(C<Field Description>)
+Text of field description to display to users.
+See also C<-lbl>
+
+
+=item -colspan
+
+	=> not exists || colspan html td element attribute
+
+(C<Field Description>)
+Number of form layout columns to be occupied by field.
+See also C<-colwidth>
+
+
+=item -colwidth
+
+	=> not exists || width html td element attribute
+
+(C<Field Description>)
+Width of form layout column to be occupied by field.
+See also C<-colspan>
+
+
+=item -debug
+
+	=> 0 || 1
+
+(C<Error Processing>)
+Debug mode switch, debug features level
+
+
+=item -dbd
+
+	=> not exists || 'dbi' || 'dbm' || ...
+
+(C<Table Description>, C<Database Description>)
+Database engine used for table or as default for database.
+See also C<Database Engines>.
+
+
+=item -dbi
+
+	=> not exists || DBI object
+
+(C<SubObjects>)
+DBI object, if used, created and available via C<dbi> call, using C<-dbiarg> to create
+
+
+=item -dbiarg
+
+	=> not exists || 'arguments' || [arguments]
+
+(C<SubObjects>)
+DBI connection arguments string or array, used in C<dbi> call
+
+
+=item -ddlb
+
+	=> not exists || sub{}(self, {field}) -> ddlb || [value,...[value=>labels],...] || {value=>label,..., value=>[labels],...} || cursor
+
+(C<Field Description>)
+Drop-down list box with editable input and produced on button press selection list.
+See also C<-ddlbmult>, C<-ddlbtgt>
+
+
+=item -ddlbmult
+
+	=> not exists || boolean
+
+(C<Field Description>)
+Drop down list box allowing multi value selection.
+Reserved.
+See C<-ddlb>.
+
+
+=item -ddlbtgt
+
+	=> not exists || field name || [field name,.. ? '<+field name',.. ? [field name => label, ? multi],..]
+
+(C<Field Description>)
+Drop down list box targets.
+'+' marks multivalue fields.
+'multi' mark considered as boolean digit or values delimiter.
+Single field name will be represented with submit button,
+array will be represented with javascript buttons;
+default is current field.
+See C<-ddlb>.
+
+
+=item -die
+
+	=> \&croak, see source code
+
+(C<Error Processing>)
+Failure sub{}: die  / croak / confess; using &{$s->{-die} }('error') inside.
+C<set>(-die=>'core'||'perl'||'Module name') call sets also C<-warn>.
+
+
+=item -edit
+
+	=> not exists || sub{}({self},{field},edit,query,value) || boolean
+
+(C<Field Description>)
+Editable field condition. Otherways field will be readonly.
+
+
+=item -editable
+
+	=> not exists || boolean
+
+(C<Data Record Special fields>, C<Record level Access Control>)
+Editable record sign. 
+Stamped by C<Database Operation> calls.
+Useful for C<User Interface> level.
+
+
+=item -expr
+
+	=> not exists || database field name or formula
+
+(C<Field Description>)
+Field name as used inside SQL database engine,
+or SQL expression.
+Field name for application is explained as C<-fld>
+
+
+=item -fetched
+
+(C<Database Options>)
+Number of rows retrieved from the database query result set.
+May be C<-limited> by C<-limit>.
+Distinguish from C<-affected>
+
+
+=item -field
+
+	=> [{field},..., ''||"\t"||"\n"||"\f"||'text'||sub{},..., {field}]
+
+	=> {name => {attributes}} # deprecated
+
+(C<Table/Form Description> - C<Field Description>)
+Array ref contains field descriptions as a hash refs.
+Another type entries are for screen formatting.
+Text or result of sub{} evaluation will be outputted.
+'' continues labels and fields output in the current row.
+"\t" skips one table cell.
+"\n" continues on the next row.
+"\f" finishes tabular form layout, passes to simple rows. 
+
+
+=item -file
+
+	=> not exists || record file attachments subdirectory
+
+(C<Data Record Special fields>, C<Record File Attachments>)
+Record file attachments sign and place. 
+Stamped by C<Database Operation> calls.
+Use C<rfdPath> to obtain absolute location.
+
+
+=item -fld
+
+	=> field name
+
+(C<Field Description>)
+Name of the field as used by application.
+Database field name or expression may be explained by C<-expr>.
+
+
+=item -flg
+
+	=> not exists || 'akweuql'
+
+(C<Field Description>)
+Flags of the field:
+
+'a'll operation below, except 'k'ey and 'w'key, default
+
+'k'ey - primary key, C<-key> preffered
+
+'w'here key - optimistic locking key, C<-wkey> preffered
+
+'e'ditable, C<-edit> preffered, see also C<-hide>
+
+'u'pdateable, may be inserted or saved into database
+
+'q'uery form, may be used to form query condition
+
+'l'istable, may be used in lists of records
+
+
+=item -form
+
+	=> not exists || {form name => {form description} }
+
+(C<Form Description>, C<User Interface>)
+User Interface forms descriptions.
+
+
+=item -fsrdr
+
+	=> not exists || [users names]
+
+(C<File Store>)
+File Store Readers - users names
+
+
+=item -fswtr
+
+	=> [$ENV{USERNAME} || $^O eq 'MSWin32' ? eval{Win32::LoginName} : `logname`]
+
+(C<File Store>)
+File Store Writers - users names
+
+
+=item -ftext
+
+	=> not exists || [field names]
+
+(C<Table/Form Description>)
+Fields for full-text search.
+Default is all fields of record.
+
+
+=item -hide
+
+	=> not exists || sub{}({self},{field},edit,query,value) || boolean
+
+(C<Field Description>)
+Hide field condition.
+
+
+=item -hidel
+
+	=> not exists || sub{}({self},{field},edit,query,value) || boolean
+
+(C<Field Description>)
+Hide field condition with left shift of following layout.
+
+
+=item -host
+
+	=> see source code
+
+(C<Database Options>)
+Host name to use in record unique IDs generated, see also C<-recInsID>
+
+
+=item -htmlstart
+
+	=> not exists || {}
+
+(C<User Interface>)
+L<CGI|CGI>::start_html call parameters hash ref
+
+
+=item -httpheader
+
+	=> not exists || {}
+
+(C<User Interface>)
+L<CGI|CGI>::header call parameters hash ref
+
+
+=item -icons
+
+	=> '/icons'
+
+(C<User Interface>)
+URL to Apache default icons
+
+
+=item -idsplit
+
+	=> true || false || sub{}($self, {command}, key value)
+
+(C<Database Options>)
+Split complex record ID to table name and row ID,
+if record ID is so complex.
+Used within C<rmlIdSplit>.
+
+
+=item -index
+
+	=> not exists || boolean
+
+(C<Materialised Views> - C<Table Description> or C<Database Description>)
+Materialized views support switch, see C<-ixcnd>, C<-ixrec>
+
+
+=item -inp
+
+	=> not exists || {L<CGI|CGI> widget parameters} || sub{}(C<htmlField> args) -> html
+
+(C<Field Description>)
+Widget description, mostly in terms of L<CGI|CGI>, 
+to which description will be passed. 
+Type selection and additional meanings specified below.
+See also C<-ddlb>, C<-ddlbtgt> for editable list boxes.
+See also C<-inphtml>, C<-lbl>, C<-lblhtml>
+
+not exists		# text field
+
+-htmlopt=> boolean	# html may be, determined via C<ishtml>
+
+-hrefs	=> boolean	# hyperlinks, including 'urlh://' for host relative, 'urlr://' for script relative, 'urlf://' for record file attachments directory relative URLs
+
+-cols	=> number	# text area
+
+-rows	=> number	# text area
+
+-arows	=> min		# text area of variable height
+
+-asize	=> min		# text field of variable length
+
+-labels	=> sub{}(self) ||{value=>label,...}	# list box, see C<-ddlb> for editable features
+
+-values	=> sub{}(self) ||[value,...]		# list box, optional if '-labels'
+
+-rfd	=> boolean	# record file attachments widget
+
+otherwise		# text field
+
+
+=item -inphtml
+
+	=> not exists || html text || sub{}({self},{field},edit,query,value) -> html
+
+(C<Field Description>)
+HTML presentation of field entry, use it together with C<-inp>.
+Sub{} will be evaluated to produce HTML string.
+'$_' in HTML will be replaced with C<-inp>.
+See also C<-lblhtml>
+
+
+=item -ixcnd
+
+	=> not exists || boolean || sub{}(self, {command}, {record}) -> boolean
+
+(C<Table/Form Description>)
+Index table (C<Materialised Views>) indication.
+Scalar 'true' value is used for indexes should be updated from C<-recIndex0R> indexing trigger.
+Sub{} used as condition for inclusion of particular record from particular table into index.
+C<-ixrec> used to obtain values for inclusion/exclusion
+
+
+=item -ixrec
+
+	=> not exists || sub{}(self, {command}, {record}, '+'||'-') -> {record}||[{record},...]
+
+(C<Table/Form Description>)
+Index table (C<Materialised Views>) records former.
+May directly create ('+') or delete ('-') index records,
+or return values of records to be included or excluded.
+See also C<-ixcnd>
+
+
+=item -key
+
+	=> [field name,...]
+
+(C<Table Description>)
+Key fields names of the table.
+
+
+=item -keycmp
+
+	=> not exists || sub{}(self, [key a], [key b])
+
+(C<Table Description>)
+Key compare dbm sub{}.
+Generally not used.
+See 'compare' parameter of L<DB_File|DB_File>.
+
+
+=item -lang
+
+	=> locale specific || 'en' || 'language abbreviation' || not exists
+
+(C<Locale>)
+Application's language, see also C<-locale>
+
+
+=item -lbl
+
+	=> not exists || field label
+
+(C<Field Description>)
+Label or external name of the field to be displayed to user.
+See also C<-lblhtml>, C<-inp>, C<-inphtml>
+
+
+
+=item -lblhtml
+
+	=> not exists || html text || sub{}({self},{field},edit,query,value) -> html
+
+(C<Field Description>)
+HTML presentation of field label, use it together with C<-lbl>.
+Sub{} will be evaluated to produce HTML string.
+'$_' in HTML will be replaced with C<-lbl>.
+
+
+=item -limit
+
+	=> not exists (default 512 used) || number
+
+(C<Database Options>, C<Table/Form Description>)
+Limit of rows to be retrieved from the database query result set.
+Distinguish from C<-affect>.
+See also C<-fetched>, C<-limited>.
+
+
+=item -limited
+
+(C<Database Options>)
+Number of rows limited by C<-limit> during retrieve of query result set.
+Equals to C<-fetched> if set.
+Distinguish from C<-affected>
+
+
+=item -lng
+
+	=> '' || not exists || 'language'
+
+(C<Locale>)
+User's language, about L<CGI|CGI>::http('Accept_language'), see also C<-locale>
+
+
+=item -locale
+
+	=> POSIX::setlocale(&POSIX::LC_CTYPE())
+
+(C<Locale>)
+Application's locale, C<set>(-locale=>...) call changes also 
+C<-charset>, C<-lang>, C<-lng>.
+
+
+=item -log
+
+        => 1 || undef || DBIx::Web::FileHandle object
+
+(C<Logging>)
+Log file switch / handle, opened with C<logOpen>
+
+
+=item -logm
+
+	=> 100
+
+(C<Logging>)
+Log strings list max size to be displayed
+
+
+=item -login
+
+	=> '/cgi-bin/ntlm/'
+
+(C<User Identification>)
+Login URL part, where web server authentication is estimated.
+
+
+=item -logo
+
+	=> not exists || HTML
+
+(C<User Interface>)
+Logotype to display in the button bar
+
+
+=item -lsthtml
+
+	=> not exists || sub{}($self, cursor, [record]) -> HTML # local $_ =value
+
+(C<Field Description>)
+Conversion of field value to HTML in the list of records via C<cgiList>.
+Value may be found in local $_.
+
+
+=item -mdeTable
+
+	=> not exists || sub{}($self, table name) -> C<-table> changed
+
+(C<Database Description>)
+Table factory, called if datafile description is not found within C<-table>.
+May add datafile metadata to C<-table> and create datafile if needed.
+See also C<-mdlTable>.
+
+
+=item -mdlTable
+
+	=> not exists || sub{}($self) -> table list
+
+(C<Database Description>)
+List of datafiles within database.
+Some datafiles may not be described initially within C<-table>,
+but may be listed using C<-mdlTable> for C<recReindex>.
+See also C<-mdeTable>.
+
+
+=item -menuchs
+
+=item -menuchs1
+
+	=> not exists || [[form name => form label],...]
+
+(C<User Interface>)
+User Interface forms list. Default will be generated from C<-form> or C<-table>.
+
+
+=item -new
+
+	=> not exists || boolean
+
+(C<Data Record Special fields>)
+New record sign, stamped in C<recNew>, considered in C<recForm>.
+
+
+=item -ns
+	
+	=> {default naming set}
+
+(C<Default Data Definitions>)
+Default naming set, also available via C<ns>. 
+This is an only place for hard coded default special names.
+See source code for default naming.
+
+
+=item -null
+
+	=> null value
+
+(C<Field Description>)
+Field value to be converted to undef, used by C<cgiDBData>.
+
+
+=item -optrec
+
+	=> not exists || boolean
+
+(C<Table Description>)
+
+Optional records switch.
+To allow C<recRead> or C<recUpd> records not really present in the database.
+C<-optrec> may be used as C<recUpd> keyword also.
+
+
+=item -output
+
+	=> not exists || sub{}($self, arguments to be printed out)
+
+(C<SubObjects>)
+Output sub{} to be used instead of 'print' by C<output> calls
+
+
+=item -path
+
+       => "$ENV{DOCUMENT_ROOT}/dbix-web" (see source code for more details)
+
+(C<File Store>)
+Path to File Store.
+Subdirectories inside File Store (see C<pthForm>): 
+'var' - variables file 'var.pl' (see C<varLoad>, C<varStore>), 'usergroup' and 'authgroup' files ($^O eq 'MSWin32', C<w32agf>);
+'log' - log files (see C<logRec>); 
+'tmp' - temporary files;
+'dbm' - L<DB_File|DB_File> data files; 
+'rfa' - attached to records files.
+See also C<-url>, C<-urf>.
+
+
+=item -pdta
+
+	=> not exists || {}
+
+(C<User Interface>)
+User data input parsed, see C<cgiRun>, C<cgiParse>
+
+
+=item -pcmd
+
+	=> not exists || {}
+
+(C<User Interface>)
+User command input / output, see C<cgiRun>, C<cgiParse>
+
+
+=item -pout
+
+	=> not exists || {}
+
+(C<User Interface>)
+User data output, see C<cgiRun>, C<cgiParse>
+
+
+=item -qfetch
+
+	=> not exists || sub{}(self, cursor, [borders]) -> success
+
+(C<Table/Form Description> - C<User Interface>)
+Sub{} to fetch and display next data row by C<cgiList>.
+Default is formed using C<-qfilter>, C<-qhref>, C<-qhrcol>, C<-limit>
+
+
+=item -qfilter
+
+	=> not exists || sub{}(self, 'form name', {metadata}, {command}, {record}) -> success
+
+(C<Table/Form Description> - C<User Interface>)
+Sub{} to filter to user data records by C<cgiList>.
+Record may be changed during filtering.
+
+
+=item -qhrcol
+
+	=> not exists || 0...
+
+(C<Table/Form Description> - C<User Interface>)
+Last column number to display C<-qhref> hyperlink in C<cgiList>.
+Default is 0 - the first column.
+
+
+=item -qhref
+
+	=> not exists || {hyperlink spec} || sub{}(self, {record})
+
+(C<Table/Form Description> - C<User Interface>)
+Specification of hyperlinks (URLs) to be displayed in each data row listed to user
+by C<cgiList>.
+Keywords are: 
+'-cmd'  => not exists || 'command' || sub{}(self, {record}) - command to be specified in the URL, default is C<recRead>;
+'-key'  => not exists || ['field name',..., ['field name'=>number],...]  || sub{}(self, {record}) - C<-key> specification of record to be opened, default is obtained from table/form description;
+'-form' => not exists || 'form name'  || sub{}(self, {record}) - constant name of the form to be opened via URL, default is current table/form name;
+'-formfld' => not exists || 'field name' - field name to store form name to open via URL.
+
+
+=item -qlist
+
+	=> not exists || table or form name
+
+(C<Table/Form Description> - C<User Interface>)
+Substitutes another object name to process C<recList> request from
+C<recQBF> screen in C<cgiRun>.
+See also C<-recXXX>, C<recForm>, C<-subst> redirections.
+
+
+=item -query
+
+	=> not exists || {C<recSel> arguments}
+
+(C<Table/Form Description> - C<User Interface>)
+Default specification of data records to be retrieved by C<cgiQuery>
+and listed for user by C<cgiList>.
+
+
+
+=item -rac
+
+	=> 1 || boolean
+
+(C<Database Description>)
+Record level Access Control switch
+
+
+=item -racAdmin
+
+	=> 'Administrators,root'
+
+(C<Database Description>)
+Users, can read or edit any record.
+Format of this value is alike containing list of user names string field.
+See also C<uadmin>.
+
+
+=item -racActor
+
+	=> not exists || ['field name',...]
+
+(C<Database Description>, C<Table/Form Description> - C<Record level Access Control>, C<Default Data Definitions>)
+Field(s) to store names of user(s) to be considered as actors of record.
+Default is about C<-rvcUpdBy>.
+
+
+=item -racPrincipal
+
+	=> not exists || ['field name',...]
+
+(C<Database Description>, C<Table/Form Description> - C<Record level Access Control>, C<Default Data Definitions>)
+Field(s) to store names of user(s) to be considered as principals of record.
+Default is about C<-rvcInsBy>.
+
+
+=item -racReader
+
+	=> not exists || [field names]
+
+(C<Database Description>, C<Table Description>) 
+Readers of record - fieldnames with usernames.
+
+
+=item -racWriter
+
+	=> not exists || [field names]
+
+(C<Database Description>, C<Table Description>) 
+Writers of record - fieldnames with usernames.
+
+
+=item -rfa
+
+	=> 1 || boolean
+
+(C<Database Description>, C<Table/Form Description>)
+Record File Attachments switch
+
+
+=item -rfdName
+
+	=> not exists || sub{}($self, key field name => field value,...)
+
+(in database or table descriptions)
+Formula to convert record's key into directory name.
+Default behaviour exists, see C<rfdName> source code
+
+
+=item -ridRef
+
+	=> not exists || [field name,...]
+
+(C<Database Description>, C<Table/Form Description> - C<Record ID References>)
+Fields may contain references to another records.
+Scalar reference may be in form 'record id' or 'table//id'.
+Embedded into text references are considered as '_key=table//id' or '_key=id%3Dtable//id' URL parts.
+See also C<ddvRRV>, C<ddfRRE>.
+
+
+=item -recDel
+
+	=> not exists || 'form name' || sub{}($self, 'name', {metadata}, $s->{-pcmd}, $s->{-pdta}) -> $s->{-pout}
+
+(C<Table/Form Description> - C<User Interface>)
+C<recDel> operation UI implementation
+
+
+=item -recDel0C	
+
+=item -recDel0R
+
+=item -recDel1C		
+
+	=> not exists || sub{}($self, {command}, new {field => value}, database {field => value})
+
+(C<Database Description>, C<Table Description>, C<Form Description>; all executed)
+C<recDel> triggers before command ('0C'), before each row ('0R'), after command ('1C').
+Old values in command ('C') triggers are not available.
+New values will be surprise!
+When record versioning, update triggers will be executed too, within.
+
+
+=item -recForm
+
+	=> not exists || 'form name' || sub{}($self, 'name', {metadata}, $s->{-pcmd}, $s->{-pdta}) -> $s->{-pout}
+
+(C<Table/Form Description> - C<User Interface>)
+C<recForm> operation UI implementation.
+Used also for C<recNew>, C<recRead>, C<recDel>, C<recQBF> operation.
+See also C<-subst> redirection for all operations,
+C<-qlist> to redirect from C<recQBF> to C<recList> transition,
+C<-recXXX> for particular redirections.
+
+
+=item -recForm1R
+
+=item -recForm1C		
+
+	=> not exists || sub{}($self, {command}, source {field => value}, result {field => value})
+
+(C<Database Description>, C<Table Description>, C<Form Description>; all executed)
+C<recForm> triggers after each row ('1R') and after command ('1C').
+C<recRead> triggers will be executed before, to produce result values.
+
+
+=item -recIndex0R
+
+	=> not exists || sub{}($self, {command}, new {field => value}, old {field => value})
+
+(C<Table Description>, in table description only)
+Indexing trigger, may be used instead of C<-ixcnd> and C<-ixrec>.
+New values hash will be undefined in C<recDel>.
+Old values hash will be undefined in C<recIns>.
+
+
+=item -recIns
+
+	=> not exists || 'form name' || sub{}($self, 'name', {metadata}, $s->{-pcmd}, $s->{-pdta}) -> $s->{-pout}
+
+(C<Table/Form Description> - C<User Interface>)
+C<recIns> operation UI implementation
+
+
+=item -recIns0C	
+
+=item -recIns0R
+
+=item -recIns1R
+
+=item -recIns1C
+
+	=> not exists || sub{}($self, {command}, source {field => value}, result {field => value})
+
+(C<Database Description>, C<Table Description>, C<Form Description>; all executed)
+C<recIns> triggers before command ('0C'), before each row ('0R'), after each row ('1R'), after command ('1C').
+Result values are not available in '0R' and 'C' triggers.
+C<-recForm1R> will be executed before C<-recIns0R>;
+C<-recInsID> - after.
+
+
+=item -recInsID
+
+	=> not exists || sub{}($self, {command}, {field => value})
+
+(C<Database Description>, C<Table Description>; nearest executed)
+C<recIns> row ID generation trigger.
+Default operation exists in C<Database Description>.
+
+
+=item -recJoint1R
+
+	=> not exists || sub{}($self, {command}, source {field => value}, result {field => value})
+
+(C<Database Description>, C<Table Description>, C<Form Description>; all executed)
+Executed after any single-record operation '1R' trigger,
+in C<recNew>, C<recForm>, C<recIns>, C<recUpd>, C<recRead>.
+May be used to add some calculated fields to record's hash ref will be returned.
+Distinguish from C<-recRead> UI implementation hash ref form.
+
+
+=item -recList
+
+	=> not exists || 'form name' || sub{}($self, 'name', {metadata}, $s->{-pcmd}, $s->{-pdta}) -> $s->{-pout}
+
+(C<Table/Form Description> - C<User Interface>)
+C<recList> operation UI implementation
+
+
+=item -recNew
+
+	=> not exists || 'form name' || sub{}($self, 'name', {metadata}, $s->{-pcmd}, $s->{-pdta}) -> $s->{-pout}
+
+(C<Table/Form Description> - C<User Interface>)
+C<recNew> operation UI implementation
+
+
+=item -recNew0R
+
+	=> not exists || sub{}($self, {command}, record {field => value}, sample {field => value})
+
+=item -recNew1C		
+
+	=> not exists || sub{}($self, {command})
+
+(C<Database Description>, C<Table Description>, C<Form Description>; all executed)
+C<recNew> triggers before each row ('0R'), after command ('1C').
+Newly created record's hash ref is available in '0R' trigger, which
+may add some sample field values.
+
+
+=item -recRead
+
+	=> not exists || 'form name' || sub{}($self, 'name', {metadata}, $s->{-pcmd}, $s->{-pdta})  -> $s->{-pout} || {'recRead' args}
+
+(C<Table/Form Description> - C<User Interface>)
+C<recRead> operation UI implementation.
+Distinguish hash ref form, 
+will be executed in C<cgiRun> after any single-record C<User Interface> operation,
+from C<-recJoint1R> trigger inside C<Database Operation>.
+
+
+=item -recRead0C
+
+=item -recRead0R
+
+=item -recRead1R
+
+=item -recRead1C
+
+	=> not exists || sub{}($self, {command}, source {field => value}, result {field => value})
+
+(C<Database Description>, C<Table Description>, C<Form Description>; all executed)
+C<recRead> triggers before command ('0C'), before each row ('0R'), after each row ('1R'), after command ('1C').
+Result values are not available in '0R' and 'C' triggers.
+Source values should be ignored.
+
+
+=item -recSel0C
+
+	=> not exists || sub{}($self, {command}, undef, undef)
+
+(C<Database Description>, C<Table Description>, C<Form Description>; all executed)
+C<recSel> before command trigger.
+
+
+=item -recUpd
+
+	=> not exists || 'form name' || sub{}($self, 'name', {metadata}, $s->{-pcmd}, $s->{-pdta}) -> $s->{-pout}
+
+(C<Table/Form Description> - C<User Interface>)
+C<recUpd> operation UI implementation
+
+
+=item -recUpd0C	
+
+=item -recUpd0R
+
+=item -recUpd1C
+
+	=> not exists || sub{}($self, {command}, new {field => value}, old {field => value})
+
+(C<Database Description>, C<Table Description>, C<Form Description>; all executed)
+C<recUpd> triggers before command ('0C'), before each row ('0R'), after command ('1C').
+Old values are not available in 'C' triggers.
+
+
+=item -recXXX
+
+	=> not exists || 'form name' || sub{}($self, 'name', {metadata}, $s->{-pcmd}, $s->{-pdta})  -> $s->{-pout} || {'recXXX' args}
+
+(C<Table/Form Description> - C<User Interface>)
+C<-recNew>, C<-recForm>, C<-recIns>, C<-recUpd>, C<-recDel>, C<-recRead>, C<-recList>, C<-recQBF>
+operation UI implementation.
+See also C<-subst> redirection for all operations and C<-qlist> to redirect from C<recQBF> to C<recList> transition.
+
+
+
+=item -rvcActPtr
+
+	=> not exists || 'field name'
+
+(C<Database Description>, C<Table/Form Description> - C<Record level Version Control>)
+Field to store ID of the actual version of this record.
+If this field is empty, the record is the last version, actual.
+If this field is not empty, the record is an old version or is checked-out.
+
+
+=item -rvcCkoState
+
+	=> not exists || [field name => state]
+
+(C<Database Description>, C<Table/Form Description> - C<Record level Version Control>)
+Check-out state of record: Field name and state value.
+If record is check out, old version will not be created at record update.
+And file attachments may be edited.
+Check-out record may be checked-in C<-rvcActPtr> record.
+Distinguish from C<-rvcFinState>, which could not be checked-in.
+
+
+=item -rvcDelState
+
+	=> not exists || [field name => state]
+
+(C<Database Description>, C<Table/Form Description> - C<Record level Version Control>)
+Deleted state of record: Field name and state value.
+
+
+=item -rvcFinState
+
+	=> not exists || [field name => state,...]	
+
+(C<Database Description>, C<Table/Form Description> - C<Record level Version Control>)
+Field name to store record's state and list of the final state values.
+When record is not in final state, old version will not be created at record update.
+And file attachments may be edited.
+Distinguish from C<-rvcCkoState>, which may be checked-in.
+
+
+=item -rvcInsBy
+
+	=> not exists || 'field name'
+
+(C<Database Description>, C<Table/Form Description> - C<Record level Version Control>)
+Field to store name of user record inserted.
+
+
+=item -rvcInsWhen
+
+	=> not exists || 'field name'	
+
+(C<Database Description>, C<Table/Form Description> - C<Record level Version Control>)
+Field for time record inserted when
+
+
+=item -rvcUpdBy
+
+	=> not exists || 'field name'
+
+(C<Database Description>, C<Table/Form Description> - C<Record level Version Control>)
+Field to store name of user record updated.
+
+
+=item -rvcUpdWhen
+
+	=> not exists || 'field name'	
+
+(C<Database Description>, C<Table/Form Description> - C<Record level Version Control>)
+Field for time record updated when
+
+
+=item -serial
+
+	=> 1 || 0 || 2 || 3
+
+(C<Database Options>)
+Serialisation level of database operation: 
+0 - none, 1 - updates, 2 - reads and updates, 3 - everything (exclusive).
+
+
+=item -setup
+
+	=> not exists || boolean
+
+(C<Creation and Setup>)
+Allows automatic C<setup> when C<main::DATA> last modify time later C<varStore>d
+
+
+=item -subst
+
+	=> not exists || table or form name
+
+(C<Table/Form Description> - C<User Interface>)
+Substitutes another object name to process request in C<cgiRun>.
+See also C<-recXXX>, C<-recForm>, C<-qlist> redirections for particular operations.
+
+
+=item -table
+
+	=> {table name=>{table description}}
+
+	=> form's basic table name
+
+(C<Database Description>)
+Data records files (database tables) descriptions.
+
+(C<Table/Form Description>)
+Name of the basic table of the form.
+
+
+=item -title
+
+	=> ''
+
+(C<Database Description>)
+Application's title
+
+
+=item -ugroups
+
+	=> not exists || sub{} || [group names]
+
+(C<User Identification>)
+User groups sub{} or [] value.
+See C<ugroups>.
+
+
+=item -unames
+
+	=> not exists || sub{} || [user name variants]
+
+(C<User Identification>)
+User name variants sub{} or [] value.
+See C<unames>.
+
+
+=item -urf
+
+	=> "file://{-path}/dbix-web"
+
+(C<File Store>)
+Filesystem URL to File Store, see also C<-path>, C<-url>
+
+
+=item -url
+
+	=> '/dbix-web'
+
+(C<File Store>)
+URL to File Store, see also C<-path>, C<-urf>
+
+
+=item -user
+
+	=> sub{$ENV{REMOTE_USER}||$ENV{USERNAME}||$GUEST}
+
+(C<User Identification>)
+User name sub{} or value
+
+
+=item -var
+
+	=> not exists || {variable name => variable value}
+
+(C<Persistent Variables>)
+Variables hash ref, handled via C<varLoad> and C<varStore> calls.
+
+
+=item -warn
+
+       => \&carp, see source code
+
+(C<Error Processing>)
+Warning sub{}: warn / carp  / cluck; using &{$s->{-warn}}('warning') inside.
+See also C<-die>
+
+
+=item -wkey
+
+	=> not exists || [field name,...]
+
+(C<Table/Form Description>)
+Table's fields used for optimistic record
+locking during edit operation (C<User Interface> C<recUpd> or C<recDel>).
+C<-key> used if not defined.
+
+
+
+=back
+
+
+
+=head1 METHODS
+
+=over
+
+
+=item Methods
+
+See C<Slots and Methods>
+
+
+=item ccbNew (condition string) -> new condition code block object
+
+C<SubObjects>. Creates and returns new condition code block object
+(C<DBIx::Web::ccbHandle>).
+
+
+=item cgi () -> L<CGI|CGI> object
+
+C<SubObjects>. Returns L<CGI|CGI> object, creates it if not exists in C<-cgi>.
+
+
+=item cgiDDLB ({C<-field> metadata})
+
+C<User Interface>.
+Performs drop-down list box via C<output>.
+Uses C<-ddlb>, C<-ddlbtgt>, C<-ddlbmult>.
+Used by C<cgiForm>.
+
+
+=item cgiFooter ()
+
+C<User Interface>.
+Outputs C<cgiRun> screen footer with operation and debug messages via C<output>.
+Uses C<-fetched>, C<-limited>, C<-affected>, C<-logm>, C<-debug>.
+
+
+=item cgiForm (table / form name, {table / form metadata}, ? {command}||C<-pcmd>, ? {data}||C<-pout>)
+
+C<User Interface>.
+Outputs record's form via C<output>, used by C<cgiRun> for record and QBF operations (see C<-recXXX>).
+See C<Table/Form Description> for form specifications and C<-field> for formatting considerations.
+See C<htmlField> for independent widgets.
+Use C<ddfRFD> or C<-inp> for file attachments.
+Use C<cgiList> and C<-field> for embedded views.
+
+
+=item cgiList (?'-!h', table / form name, {table / form metadata}, ? {command} ||C<-pcmd>, ? cursor ||{query} ||[data rows] ||sub{fetch row} ||C<-query>, ? [row and column delimiters] || '<select...' || row delimiter || [default table])
+
+C<User Interface>.
+Lists data rows via C<output>, used by C<cgiRun> for C<cgiQuery> results.
+'!h' option turns off table header.
+See C<Table/Form Description> for query and list specifications.
+
+
+=item cgiParse ()
+
+C<User Interface>.
+Parses CGI input parameters:
+command, parameters, keywords into C<-pcmd>;
+data into C<-pdta>.
+Used internally by C<cgiRun>.
+
+
+=item cgiQuery (table / form name, {table / form metadata}, ? {command}||C<-pcmd>) -> cursor
+
+C<User Interface>.
+Forms and starts query using C<recSel>. Returns cursor.
+Used by C<cgiRun>, with C<cgiList> follows.
+See C<Table/Form Description> for query and list specifications.
+
+
+=item cgiRun () -> success
+
+C<User Interface>.
+CGI server response implementation.
+Sets error handlers.
+Starts and ends session with C<start> and C<end>.
+Accepts and parses input parameters with C<cgiParse> 
+into C<-pcmd> and C<-pdta>.
+Logins if needed (cgi redirection to C<-login>).
+Determines required action, form and table using
+C<-cgcXXX>, C<-subst>, C<-qlist>, C<-recXXX>, C<-table>.
+If external implementation found, invokes it and returns.
+Invokes action required (stores result in C<-pout>): C<Database Operation> or C<cgiQuery> or embedded implementation.
+Reassigns C<-form> if found inside C<-pout>.
+Determines external presentation implementation via C<-cgvXXX> and invokes it.
+Or outputs http and html headers (C<htmlStart>), 
+hidden fields (C<htmlHidden>), menu bar (C<htmlMenu>),
+record's form (C<cgiForm>) or list of records (C<cgiList>),
+screen footer (C<cgiFooter>),
+form and html footers.
+
+Also implements '-reindex' (run C<recReindex>(1)) and '-setup' (run C<setup>)
+service command line options.
+
+
+=item class () -> class name
+
+C<Creation and Setup>.
+Returns class name of the object.
+
+
+=item cptran (fromCP, toCP, string) -> translated string
+
+C<Misc Data methods>.
+Translates strings between cyrillic codepages.
+
+
+=item datastr (stringified data structure) -> data structure
+
+C<Misc Data methods>.
+Restores data structure from stringified format of C<strdata> result.
+
+
+=item dbi () -> L<DBI|DBI> connection object
+
+C<SubObjects>. Returns L<DBI|DBI> connection object,
+creates it if not exists using C<-dbiarg> and C<-autocommit>
+
+
+=item dbmNew (file name) -> new isam data file object
+
+=item dbmNew (-option=>value,...) -> new isam data file object
+
+C<SubObjects>. Creates and returns new isam data file object
+(C<DBIx::Web::dbmHandle>).
+
+
+=item dbmTable (table name) -> new isam datafile object
+
+C<SubObjects>. Returns isam data file object with table name given,
+creates and opens it if needed using 
+C<dbmNew>(-name=>C<pthForm>('dbm', table name)).
+
+
+=item ddfAll () -> (All predefined Fields default definitions)
+
+C<Default Data Definitions>.
+Default definitions for all possible predefined form fields,
+may be added to the end of C<-field> layout.
+See source code.
+
+
+=item ddfHide (?'button name') -> C<-hide> definition
+
+C<Default Data Definitions>.
+C<-hide>/C<-hidel> feature default definition to be used with C<ddfShow>.
+See source code.
+
+
+=item ddfRFD (-option=>value,...) -> {record file directory default field declaration}
+
+C<User Interface>.
+Returns list may be used as C<-field> description for C<Record File Attachments>.
+See source code.
+
+
+=item ddfRRE (?'version') -> {Record References View default field definition}
+
+C<Default Data Definitions>.
+Default definition for field with embedded 'reference' view.
+See source code.
+See also C<ddvRRV>
+
+
+=item ddfRVE (?'reference') -> {Record Versions View default field definition}
+
+C<Default Data Definitions>.
+Default definition for field with embedded 'version' view.
+See source code.
+See also C<ddvRVV>
+
+
+=item ddfShow (?'button name', ?[detail fields], ?'html pattern') -> C<-lblhtml> definition
+
+C<Default Data Definitions>.
+Show empty details default feature (button) definition for C<-lblhtml>.
+See source code.
+See also C<ddfHide>
+
+
+=item ddoRVC (-option=>value,...) -> (Record Version Control default options definition)
+
+C<Default Data Definitions>.
+Default table description slots and values for record version control.
+See source code.
+
+
+=item ddvAll () -> (All predefined Views default definitions)
+
+C<Default Data Definitions>.
+Default definitions for all predefined materialized views.
+See source code.
+
+
+=item ddvRHV (?[fields definitions] ||undef, -option=>value,...) -> {Record History View default view definition}
+
+C<Default Data Definitions>.
+Default definition for 'history' materialized view.
+See source code.
+
+
+=item ddvRRV (?[fields definitions] ||undef, -option=>value,...) -> {Record References View default view definition}
+
+C<Default Data Definitions>.
+Default definition for 'reference' materialized view.
+See source code.
+
+
+=item ddvRVV (?[fields definitions] ||undef, -option=>value,...) -> {Record Versions View default view definition}
+
+C<Default Data Definitions>.
+Default definition for 'version' materialized view.
+See source code.
+
+
+=item die (message string) -> failure exception
+
+C<Error Processing>.
+Raises failure exception like L<CORE::die|perlfunc> or L<croak|Carp>.
+Executes &{$_[0]->{-die}}(@_[1..$#_]).
+See also C<-die>, C<-warn>, C<warn>
+
+
+=item dsdClone (data structure) -> copy of data structure
+
+C<Misc Data methods>.
+Copies data structure recursively.
+
+
+=item dsdMk (data structure) -> stringified data structure
+
+C<Misc Data methods>.
+Stringifies any data structure with L<Data::Dumper|Data/Dumper>
+Use C<dsdParse> to restore data structure from stringified form.
+Alike C<strdata>.
+
+
+=item dsdParse (stringified data structure) -> data structure
+
+C<Misc Data methods>.
+Restores data structure from stringified format of C<dsdMk> result.
+Uses L<Data::Dumper|Data/Dumper>.
+Alike C<datastr>.
+
+
+=item dwnext (string, ? min length) -> next alphanumeric string value
+
+C<Misc Data methods>.
+Returns the next value of ([0-9]|[a-z]) string left padded to min length.
+For record IDs generation.
+
+
+=item end () -> self object
+
+C<Creation and Setup>.
+Ends (commits) and cleans operation session or transaction C<start>ed.
+
+
+=item grep1 (list) -> first non-empty value
+
+=item grep1 (sub{}(), list) -> first non-empty result
+
+C<Misc Data methods>.
+Returns the first non-empty value or true evaluation result.
+Alike L<grep|perlfunc>, but differs.
+
+
+=item hfNew () -> new file handle object
+
+=item hfNew (?mode, file name) -> new file handle object
+
+C<SubObjects>. Creates and returns new file handle object
+(C<DBIx::Web::FileHandle>).
+File will be opened if file name given.
+
+
+=item htlsTag (name, attribute=>value,..., ''=>[content]) -> list
+
+=item htlsTag (name, attribute=>value,..., '0') -> <name atrr="val"...>
+
+=item htlsTag (name, attribute=>value,...) -> <name atrr="val"... />
+
+=item htlsTag ({-tag=>name, attribute=>value,...})
+
+=item htlsTag ([[name,...],...{-tag=>name,...}],...)
+
+=item htlsTag (..., "\n")
+
+C<Misc Data methods>.
+Converts parameters given to the list to print HTML tag
+with 'name', 'attributes' and optional 'content' tags inside.
+Leading '-' signs in attribute names are ignored.
+Values are escaped.
+Newlines string may be the last parameter to format output.
+The list structure will not be documented.
+See also C<xmlsTag>, C<outhtm>
+
+
+=item htmlEscape (strings) -> escaped
+
+=item htmlUnescape (string) -> unecaped
+
+C<Misc Data methods>.
+Escapes and unescapes to and from HTML text.
+See also C<urlEscape>.
+
+
+=item htmlField (name, title, {C<-inp> metadata}, value) -> html field string
+
+C<User Interface>.
+Generates HTML field, used by C<cgiForm>.
+Empty name means readonly.
+See C<-inp> for metadata.
+
+
+=item htmlHidden () -> hidden fields html string
+
+C<User Interface>.
+Generates hidden fields HTML to C<output> by C<cgiRun>
+Uses C<-pcmd>.
+
+
+=item htmlMenu () -> screen menu bar html string
+
+C<User Interface>.
+Generates menu bar HTML to C<output> by C<cgiRun>
+Uses C<-pcmd>, C<-pdta>, C<-pout>.
+
+
+=item htmlStart () -> http and html headers string
+
+C<User Interface>.
+Generates http and html headers using C<-httpheader>, C<-htmlstart>, L<start_multipart_form|CGI>
+to C<output> by C<cgiRun>
+
+
+=item initialize (-option=>value,...) -> initiated as DBIx::Web object
+
+C<Creation and Setup>.
+Initiates new DBIx::Web object. Used internally, by C<new>().
+See C<initialize> and C<set> sources for defaults.
+
+
+=item ishtml (string) -> alike HTML?
+
+C<Misc Data methods>.
+Looks string given like HTML code?
+
+
+=item lng (index, 'string', ?additional values) -> user language specific string
+
+C<Locale>.
+Returns user language specific variant of string given, short (index=0)
+or long (index=1).
+See language translations in '$LNG' hash ref in the source code.
+
+
+=item logOpen () -> C<-log>
+
+C<Logging>.
+Opens Log file. This does C<start> call.
+
+
+=item logLock (lock level) -> success
+
+C<Logging>.
+Locks Log file. This is not needed.
+
+
+=item logRec (data list) -> success
+
+C<Logging>.
+Add record to Log file.
+
+
+=item max (number, number) -> maximum
+
+C<Misc Data methods>.
+Maximum of two numbers given.
+
+
+=item min (number, number) -> minimum
+
+C<Misc Data methods>.
+Minimum of two numbers given.
+
+
+=item new ('class', -option=>value,...) -> new DBIx::Web object
+
+C<Creation and Setup>.
+Creates new DBIx::Web object. Calls C<initialize>(-option=>value,...).
+
+
+=item ns () -> {default naming set}
+
+=item ns (metaname) -> default name
+
+C<Default Data Definitions>.
+Default naming set (C<-ns>) interface.
+
+
+=item orarg (L<-X|perlfunc>, argument,...) -> first succeeded argument
+
+=item orarg (sub{}(), argument,...) -> first succeeded argument
+
+C<Misc Data methods>.
+The value of the first succeeded argument.
+Alike C<grep1>, but differs.
+
+
+=item osCmd (?opt, command, arguments) -> success
+
+C<SubObjects>. Invokes operating system command given.
+Options:
+'-i'gnore return code,
+'-h'ide output.
+
+
+=item output (strings list) -> success
+
+=item outhtm (HTML tag data structure) -> success
+
+=item outhtml (HTML tag data structure) -> success
+
+=item outxml (XML tag data structure) -> success
+
+C<SubObjects>. Outputs data given via C<-output> sub{} call or
+L<print|perlfunc>. 
+C<htlsTag> or C<xmlsTag> called to stringify tag data structure.
+
+
+=item psEval (? '-e', filename, ? base URL)
+
+C<User Interface>.
+Evaluates perl script file using C<psParse>.
+'e'mbeddable option prevents output of HTTP and HTML headers.
+Relative filename will be based on 'C<-path>/psp/' with
+C<-url> as default base URL.
+See C<Perl Script Pages>.
+
+
+=item psParse (? '-e', perl script source string, ? base URL) -> perl source string
+
+C<User Interface>.
+Converts HTML with embedded perl into perl source with C<output> calls.
+'e'mbeddable html option prevents generation output of html headers.
+Perl code markers are: '<% perl formula %>', '<script> perl script </script>', '<script language=PerlScript|Perl runat=Server>'.
+'@_' considered to contain application object, options, filename, base URL, additional args.
+See C<Perl Script Pages>.
+
+
+=item pthCln (path) -> success
+
+C<File Store>.
+Removes path if empty.
+Recourses bottom-up. 
+Empty path may contain '.htaccess' files.
+
+
+=item pthCp (source, target) -> success
+
+C<File Store>.
+Copies source path to target using operating system copy command via C<osCmd>.
+Options:
+'-d'irectory target hint,
+'-f'ile target hint,
+'-r'ecurse subdirectories,
+'-i'gnore errors.
+
+
+=item pthGlob (path mask) -> entries paths list
+
+C<File Store>.
+Lists directory's contents by mask. Full path names will be returned
+
+
+=item pthGlobn (path mask) -> entries names list
+
+C<File Store>.
+Lists directory's contents by mask. Relative names will be returned
+
+
+=item pthForm (type, name,...) -> filesystem path string
+
+C<File Store>.
+Forms filesystem path for 'tmp'||'log'||'var'||'dbm'||'rfa' type.
+Creates type directory if needed.
+
+
+=item pthMk (path) -> success
+
+C<File Store>.
+Creates directory if needed.
+Returns 1 if directory exists, 2 if directory was created.
+
+
+=item pthRm (?opt, path) -> success
+
+C<File Store>.
+Removes path if needed.
+Options:
+'-r'ecurse subdirectories,
+'-i'gnore errors.
+
+
+
+=item recCommit () -> self
+
+C<Database Operation>.
+Commits changes to database. Called from C<end>.
+See also C<recRollback>
+
+
+=item recData ({-keyword ||fieldname => value,...}) -> {fieldname=>value,...}
+
+C<Database Operation>.
+Obtains data field names and values from record manipulation hash ref.
+See also C<recFields>, C<recValues>, C<recKey>
+
+
+=item recDel (? -table => name, ? -form => name, ? -key => {original C<recKey>}, ? -where => 'condition') -> successful {command}
+
+C<Database Operation>.
+Deletes record(s) into database, under '-key' or '-where' conditions.
+When C<Record level Version Control>, operation will be passed to C<recUpd>.
+But C<recDel> triggers (C<-recDel0C>, C<-recDel0R>, C<-recDel1C>) will be executed anyway.
+Returns command hash ref or the result of C<recUpd>.
+
+
+=item recFields ({-keyword ||fieldname => value,...}) -> field names
+
+C<Database Operation>.
+Lists field names from record manipulation hash ref.
+See also C<recValues>
+
+
+=item recForm (? -table => name, ? -form => name, ? (-data => {fieldname => value,..}) || (fieldname => value,..), ? -key => {original C<recKey>}) -> formed {field => value,...}
+
+C<Database Operation>.
+Recalculates record, new or existing in database.
+Original field values will be obtained via C<recRead>(-table=>name, -key=>{original C<recKey>})
+and added to new data given if not exists.
+C<-recForm1R>, C<-recForm1C> triggers will be executed.
+
+
+=item recIndex (index table name, key {field=>value}, ? data {field=>value})
+
+C<Materialised Views>.
+Update index entry with key given.
+Index entry will be deleted if undefined reference to hash of data values.
+Useful for C<-recIndex0R> trigger.
+
+
+=item recIns (? -table => name, ? -form => name, ? (-data => {fieldname => value,..}) || (fieldname => value,..), ? -key => {prototype C<recKey>}) -> successfully inserted {field => value,...}
+
+=item recIns (...? -from => C<recSel> cursor) -> successful {command}
+
+C<Database Operation>.
+Inserts record(s) into database.
+Data to be inserted may be given from 
+prototype record via C<recRead>(-table=>name, -key=>{original C<recKey>}),
+or C<recSel> cursor.
+Then, given field values will be applied;
+C<-rvcInsBy> C<-rvcUpdBy>, C<-rvcInsWhen>, C<-rvcUpdWhen> filled;
+C<-recForm1R>, C<-recIns0R>, C<-recInsID> executed;
+record inserted into database;
+<-recIns1R>, C<-recJoint1R>, C<-recIns1C> executed.
+Returns record inserted, or command hash ref when insertion from cursor.
+See also C<recNew> and C<recForm>, but they are not required to prepare data to be inserted.
+
+
+=item recKey (table name, {fieldname => value,...}) -> {keyfield => value,...}
+
+C<Database Operation>.
+Obtains Key fields names and values from record's data hash ref using C<-key>.
+See also C<recData>, C<recWKey>
+
+
+=item recList () -> C<recSel>(@_)
+
+C<Database Operation>.
+Lists records from database.
+Passes all work to C<recSel> now, may be redesigned.
+
+
+=item recNew (? -table => name, ? -form => name, ? (-data => {fieldname => value,..}) || (fieldname => value,..), ? -key => {prototype C<recKey>}) -> successfully new {field => value,...}
+
+C<Database Operation>.
+Creates a new data record to be inserted into database.
+Prototype's field values obtained via C<recRead>(-table=>name, -key=>{prototype C<recKey>}),
+but not used instead of C<-recNew0R>.
+Given field values used to initiate new record's hash ref,
+C<-recNew0R> executed,
+C<-rvcInsBy> C<-rvcUpdBy>, C<-rvcInsWhen>, C<-rvcUpdWhen> filled,
+C<-recNew1R>, C<-recJoint1R>, C<-recNew1C> executed.
+The following calls may be C<recForm> and C<recIns>.
+
+
+=item recQBF
+
+C<Database Operation> - C<User Interface>.
+This is not method, only C<User Interface> query condition 
+command and screen behaviour,
+implemented within C<cgiRun> and C<cgiForm>
+
+
+=item recRead (? -table => 'table name', 
+? -form => name
+? -key => {field name=>value,...},
+? -where => 'condition',
+? -optrec => false || true,
+? -version => false || true
+) 
+-> successfully read {fieldname => value,...}
+
+C<Database Operation>.
+Reads single record from database using C<recSel>, 
+returns this record as a hash ref (with C<-file>, C<-editable> slots if applicable).
+Executes C<-recRead1R>, C<-recJoint1R>, C<-recRead1C>.
+
+
+=item recReindex (clear?, ?index names) -> success
+
+C<Materialised Views>.
+Reindexes database.
+List of selected indexes to rebuild may be provided.
+Indexes will be truncated before reindexing if 'clear'.
+
+
+=item recRollback () -> self
+
+C<Database Operation>.
+Rollbacks changes to database. Should be called from $SIG{__DIE__}, 
+see C<set> source for example.
+See also C<recCommit>.
+
+
+=item recSel (
+-table => 'from clause' || [table name, [table, alias], [table, alias, join],...],
+? -data => [field, [field => alias], {-fld => alias, -expr => formula,..},...],
+? -key => {field name => value,...},
+? -where => 'where clause' || ['where clause',...],
+? -urole => 'author'||'authors'||'actors'||'principals',
+? -uname => 'role username'
+? -ftext => 'full-text search string',
+? -version => false ||true,
+? -order => string || [field, [field => order],...],
+? -keyord => -(a|f|d|b)(all|eq|ge|gt|le|lt),
+? -filter=> sub{}(cursor, undef, {field=>value,...})
+) -> cursor
+
+C<Database Operation>.
+Retrieves records from database.
+Cursor's slot C<-rec> with hash ref {field alias || name => value,...} is bound as field variables.
+Cursor's slot C<-rfr> contains array ref with references to values in C<-rec> in order of C<-data> list.
+At least C<fetch>, C<fetchrow_arrayref>, C<fetchrow_hashref>, C<finish>, C<close> 
+methods are supported by cursor.
+See also C<-recSel0C>, C<recList>, C<recRead>.
+
+
+=item recUpd (? -table => name, ? -form => name, ? (-data => {fieldname => value,..}) || (fieldname => value,..), ? -key => {original C<recKey>}, ? -where => 'condition', ? -optrec => false ||true) -> successfully updated {field => value,...} || successful {command}
+
+C<Database Operation>.
+Updates record(s) into database, under '-key' or '-where' conditions.
+With '-optrec', record will be inserted if not present.
+Returns record updated if one only, or command hash ref if zero or more then one record updated.
+See also C<-recUpd0C>, C<-recUpd0R>, C<-recJoint1R>, C<-recUpd1C>.
+
+
+=item recValues ({-keyword ||fieldname => value,...}) -> field values
+
+C<Database Operation>.
+Lists field values from record manipulation hash ref in corresponding to
+C<recFields> order
+
+
+=item recWKey (table name, {fieldname => value,...}) -> {keyfield => value,...}
+
+C<Database Operation>.
+Alike C<recKey>, but using C<-wkey> and providing optimistic locking.
+
+
+=item rfaRm ({rec data} ||(table name, {rec data}), attachment name || [list of attachments names])
+
+C<Record File Attachments>.
+Removes file attachments listed (alike C<rfdGlobn> output).
+Record should be C<-editable> with C<-file>, which are C<Data Record Special fields>
+provided by C<Database Operation>.
+
+
+=item rfaUpload ({rec data} ||(table name, {rec data}), L<CGI|CGI> filefield)
+
+C<Record File Attachments>.
+Adds record's file attachment from L<CGI::upload|CGI>.
+Record should be C<-editable> with C<-file>, which are C<Data Record Special fields>
+provided by C<Database Operation>.
+
+
+=item rfdEdmd (table name ||{command}, {rec data}) -> attachments edit allowed?
+
+C<Record File Attachments>.
+Record's state (C<-rvcFinState>) permits editing of file attachments
+
+
+=item rfdGlobn ({rec data} ||(table name, {rec data}), ?subdirectory,...) -> list of file attachments
+
+C<Record File Attachments>.
+Returns list of record's file attachments names, relative to C<rfdPath>.
+
+
+=item rfdPath (-path ||-url ||-urf => ({rec data} ||(table name, {rec data})), ?subdirectory,...) -> path to file attachments
+
+C<Record File Attachments>.
+Returns path to record's file attachments.
+This may be absolute filesystem path (-path), URL (-url), or filesystem URL (-urf).
+C<Database Operation> provides C<-file>, one of C<Data Record Special fields>,
+if file attachments present.
+
+
+=item rfdRm ({rec data} ||(table name, {rec data})) -> path removed
+
+C<Record File Attachments>.
+Removes record's file attachments directory and cleans the path bottom-up.
+Record should be C<-editable> with C<-file>, which are C<Data Record Special fields>
+provided by C<Database Operation>.
+
+
+=item set () -> (slot names of the object)
+
+=item set (-option) -> value of the option given
+
+=item set (-option=>value,...) -> self object
+
+C<Creation and Setup>.
+Retrieves and sets values of the C<SLOTS>.
+$s->{-option} direct access may be used also, 
+but C<set> smartly processes some options.
+
+
+=item setup ()
+
+C<Creation and Setup>.
+Reads and executes setup script from C<main::DATA> file handle.
+See examples source for details.
+
+
+=item start (-option=>value,...) -> self object
+
+C<Creation and Setup>.
+Starts operation session or transaction.
+Cleans previous session or transaction state.
+Uses C<set> to assign options.
+C<end> ends (commits) and cleans session or transaction C<start>ed.
+
+
+=item strdata (data structure) -> stringified
+
+C<Misc Data methods>.
+Stringifies any data structure.
+Special C<strdatah> form is for optimization needs.
+Use C<datastr> to restore data structure from string.
+
+
+=item strdatah (key=>value,...) -> stringified hash
+
+C<Misc Data methods>.
+Stringifies hash, see C<strdata> also.
+
+
+=item strpad (string, ?pad char, ?min length) -> left padded string
+
+C<Misc Data methods>.
+Default pad char is '0', default min length is $NLEN, string will not be trimmed.
+
+
+=item strtime (?mask, L<time|perlfunc> ||L<localtime|perlfunc> ||L<gmtime|perlfunc>) -> stringified
+
+C<Misc Data methods>.
+Stringifies time value by mask.
+Default mask is 'yyyy-mm-dd hh:mm:ss' (ISO).
+L<POSIX::strftime|POSIX> uses different mask agreement.
+See also C<timestr>.
+
+
+=item timeadd (seconds, add seconds, ?minutes, ?hours, ?days, ?months, ?years) -> seconds incremented
+
+C<Misc Data methods>.
+
+Add values given to time given. Calculation via L<POSIX::mktime|POSIX>.
+
+
+=item timestr (?mask, stringified time) -> seconds
+
+C<Misc Data methods>.
+Converts stringified with C<strtime> time string to seconds form 
+with L<POSIX::mktime|POSIX>
+
+
+=item uadmin () -> is current user an admin?
+
+C<User Identification>.
+Returns true if current user is a member of C<-racAdmin>,
+just C<ugmember>(C<-racAdmin>).
+
+
+=item uglist (? '-ug', ? [] || {}) -> [user and group names]
+
+C<User Identification>.
+Returns user ('-u') and group ('-g') names in array ([]) or hash ({}) ref.
+Default is both ('-ug') in array ref ([]).
+Uses C<-AuthUserFile> and C<-AuthGroupFile>, or L<Win32API::Net|Win32API/Net>.
+
+
+=item ugmember (group name strings or array refs) -> is current user a member?
+
+C<User Identification>.
+Returns true if current user is a member of one of the groups given.
+Argument may be
+a group name,
+a string with the list of group names,
+a reference to array of variants above.
+
+
+=item ugnames () -> [current user and group names]
+
+C<User Identification>.
+Returns reference to array with names of current user (C<unames>) 
+and groups current user belongs to (C<ugroups>).
+
+
+=item ugrexp () -> sub{}('user,user,...') matching C<ugnames>
+
+C<User Identification>.
+Returns sub{} to match string with user names list against C<ugnames>
+
+
+=item ugroups () -> [current user group names]
+
+C<User Identification>.
+Returns reference to array with names of groups current user belongs to.
+Uses C<-ugroups> sub{} or value.
+Default is using C<-AuthGroupFile> or C<w32agf> generated files.
+
+
+=item uguest () -> is current user a guest?
+
+C<User Identification>.
+Returns true if current user is not logged in.
+
+
+=item unames () -> [current user name variants]
+
+C<User Identification>.
+Returns reference to array with variants of current user name.
+Uses C<-unames> sub{} or value.
+Default is [C<user>] with C<userln> and 'domain\\user' form added if applicable and not met.
+
+
+=item urlCat (url, name=>value,...) -> escaped URL
+
+=item urlEscape (strings) -> escaped
+
+=item urlUnescape (string) -> unecaped
+
+C<Misc Data methods>.
+Escapes and unescapes to and from URL format.
+See also C<htmlEscape>.
+
+
+
+=item user () -> current user name
+
+C<User Identification>.
+Returns name of the current user.
+Uses C<-user> sub{} or value.
+Translates 'domain\\user' form to 'user@domain'.
+
+
+=item userln () -> current user local name
+
+C<User Identification>.
+Returns local name of the current user, or C<user>.
+User name domain component (after '@') is discarded
+if it equals to host name domain component (Windows or DNS).
+
+
+=item varFile () -> variables store filename
+
+C<Persistent Variables>.
+Returns file name to store values of variables.
+
+
+=item varLoad (?lock) -> self object
+
+C<Persistent Variables>.
+Loads variables into C<-var>.
+Default lock level is LOCK_SH.
+File will be locked until C<end> call.
+
+
+=item varLock (?lock) -> success
+
+C<Persistent Variables>.
+Locks variables file.
+Default is LOCK_EX.
+File will be locked until C<end> call.
+
+
+=item varStore () -> self
+
+C<Persistent Variables>.
+Stores C<-var> into variables file.
+LOCK_EX is used.
+File will be locked until C<end> call.
+
+
+=item w32agf () -> success
+
+C<User Identification>.
+Creates or periodically updates user group files using Microsoft Windows system catalogue.
+C<pthForm>('var','usergroup') file is useful for C<ugroups>.
+C<pthForm>('var','authgroup') file may be used as Apache's 'AuthGroupFile'.
+C<-AuthGroupFile> should not be set to C<pthForm>('var','authgroup'),
+it should be set only to externally controlled file!
+
+
+=item w32IISdpsn () -> success
+
+C<User Identification>.
+Deimpersonation of authenticated user session on Microsoft IIS.
+See source for details and warnings!
+
+
+=item warn (message string) -> warning raise
+
+C<Error Processing>.
+Raises warning like L<CORE::warn|perlfunc> or L<carp|Carp>.
+Executes &{$_[0]->{-warn}}(@_[1..$#_]).
+See also C<-die>, C<-warn>, C<die>.
+
+
+=item xmlEscape (strings) -> escaped
+
+=item xmlAttrEscape (strings) -> escaped as C<xmlEscape>
+
+=item xmlTagEscape (strings) -> escaped
+
+=item xmlUnescape (string) -> unecaped
+
+C<Misc Data methods>.
+Escapes and unescapes to and from XML text.
+See also C<htmlEscape>.
+
+
+=item xmlsTag (name, attribute=>value,..., ''=>[content]) -> list
+
+=item xmlsTag (name, attribute=>value,..., '0') -> <name atrr="val"...>
+
+=item xmlsTag (name, attribute=>value,...) -> <name atrr="val"... />
+
+=item xmlsTag ({-tag=>name, attribute=>value,...})
+
+=item xmlsTag ([[name,...],...{-tag=>name,...}],...)
+
+=item xmlsTag (..., "\n")
+
+C<Misc Data methods>.
+Converts parameters given to the list to print XML tag
+with 'name', 'attributes' and optional 'content' tags inside.
+Leading '-' signs in attribute names are ignored.
+Values are escaped.
+Newlines string may be the last parameter to format output.
+The list structure will not be documented.
+See also C<htlsTag>, C<outxml>
+
+
+=back
+
+
+=head1 Database Engines
+
+=over
+
+=item Database Engines
+
+Logical database functionality is implemented in C<recXXX> methods.
+Corresponding 'Physical' database interfaces are implemented in C<dbiXXX> methods.
+See source for details.
+
+=item DBI engine
+
+C<-dbd> eq 'dbi'.
+See L<DBI|DBI>, C<-dbi>, C<-dbiarg>, C<dbi>.
+
+
+=item DB_File engine
+
+C<-dbd> eq 'dbm'.
+See L<DB_File|DB_File>, C<dbmTable>.
+
+
+=item XML record files engine
+
+C<-dbd> eq 'xmr'.
+May be in future?
+
+
+=item Inbox items engine
+
+May be in future?
+
+
+=back
+
+
+
+=head1 Perl Script Pages
+
+=over
+
+=item Perl Script Pages
+
+This is HTML (may be XML?) files with embedded Perl code.
+This may be CGI scripts with HTML following '__END__'.
+There is simplest and shortest implementation.
+
+C<psParse> method translates perl script string into perl source;
+'@_' will contain application object, options, filename, base URL, additional args.
+C<psEval> method executes perl script file by parsing, compiling into sub{}, evaluating.
+
+
+=back
+
+
+=head1 VERSION
+
+=over
+
+=head2 2004-05-16 - Publication of Version 0.50
+
+This should not be used yet, only looked at, may not work at all.
+
+=item ToDo
+
+See beginning of source code
+
+
+=head2 2004-03-16 - Paused
+
+http://makarov.arkhangelsk.ru/index-anton.htm 
+
+
+
+=head2 2004-01-29 - Preview Release
+
+This should not be used yet, only looked at, may not work at all.
+
+
+=head2 2004-01-26 - Size Analysis
+
+The biggest are C<User Interface> (43.7 Kb), 
+C<Database Options> (39.5 Kb), tools (30 Kb, C<Misc Data methods> and C<SubObjects>).
+Details, in kilobytes:
+
+C<Creation and Setup>		12
+
+C<Misc Data methods>		9.6
+
+C<SubObjects>			3 + 20.7 of internal objects
+
+C<File Store>			5.6
+
+C<Persistent Variables>		1
+
+C<Logging>			1.2
+
+C<User Identification>		10.4
+
+C<Database Options>		39.5
+
+C<User Interface>		43.7
+
+C<Default Data Definitions>	3.4
+
+
+
+=head2 2003-09-16 - 2004-01-25 - Initial Implementation and Documentation.
+
+=item ToDo
+
+  - see Web.pm
+
+
+
+=back
+
+
+
+=head1 LICENSE
+
+This is free software; 
+you can use redistribute it and/or modify it 
+under the same terms as Perl itself.
+
+Without specially written agreement
+prohibited using completely, partially or in ideas
+for impairing nature, wood and timber, mining, cosmic
+industries
+in Archangel region;
+Russian kgbists,
+bureaucracy and vertical functionary structures.
+
+
+=head1 AUTHOR
+
+Andrew V Makarow <makarow@mail.com>
+with aid of 
+Anton Uemlyanin
+
+=cut
+
+
