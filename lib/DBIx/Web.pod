@@ -16,8 +16,8 @@ DBIx::Web - Active Web Database Layer
 	);
   $w->set(-table=>{
   ...... see examples ......
-	,'version'=>$w->ddvRVV()
-	,'history'=>$w->ddvRHV()
+	,$w->tvmVersions()
+	,$w->tvmHistory()
 	});
   $w->set(-form=>{
   ...... see examples ......
@@ -218,7 +218,7 @@ Slot names begin with '-' sign.
 =item Creation and Setup
 
 C<new>, C<initialize>, C<class>, C<set>;
-C<start>, C<end>;
+C<start>, C<end>, C<-end0>, C<-endh>, C<-end1>;
 C<setup>, C<-setup>
 
 =item Error Processing
@@ -280,11 +280,13 @@ C<output>, C<outhtm>, C<outhtml>, C<outxml>
 
 =item User Identification
 
-C<-user>, C<-unames>, C<-ugroups>, C<-AuthUserFile>, C<-AuthGroupFile>;
+C<-user>, C<-unames>, C<-ugroups>; 
+C<-AuthUserFile>, C<-AuthGroupFile>;
+C<-udflt>, C<-unflt>, C<-ugflt>;
 
 C<user>, C<userln>, C<uguest>, C<unames>, C<ugroups>, C<ugnames>, C<uglist>;
-C<ugrexp>, C<ugmember>, C<uadmin>;
-C<w32IISdpsn>, C<w32agf>
+C<ugrexp>, C<ugmember>, C<uadmin>, C<uadmrdr>;
+C<w32IISdpsn>, C<w32adhi>, C<w32agf>
 
 
 =item Database Options
@@ -314,8 +316,9 @@ Some slots (like C<-field>, C<-wkey>, C<Triggers>, C<User Interface>) are common
 Some slots may appear at database level also.
 
 
+C<-table>;
 C<-field> (C<Field Description>);
-C<-key>, C<-keycmp>, C<-wkey>;
+C<-key>, C<-keycmp>, C<-wkey>, C<-urm>;
 C<-ixcnd>, C<-ixrec>;
 C<-optrec>;
 C<-dbd>;
@@ -339,7 +342,7 @@ C<-lsthtml>
 =item Record level Access Control
 
 C<-rac>; 
-C<-racAdmin>, C<-racReader>, C<-racWriter>; 
+C<-racAdmin>, C<-racAdmRdr>, C<-racReader>, C<-racWriter>; 
 C<-racActor>, C<-racPrincipal>;
 C<-editable>
 
@@ -349,7 +352,7 @@ C<-editable>
 C<-rvcInsBy>, C<-rvcInsWhen>, C<-rvcUpdBy>, C<-rvcUpdWhen>,
 C<-rvcActPtr>, C<-rvcFinState>, C<-rvcCkoState>, C<-rvcDelState>.
 
-See also C<ddoRVC>
+See also C<ttoRVC>
 
 
 =item Record File Attachments
@@ -360,7 +363,7 @@ C<-file>;
 C<rfdPath>, C<rfdEdmd>, C<rfdGlobn>, C<rfdRm>;
 C<rfaUpload>, C<rfaRm>
 
-See also C<ddfRFD>
+See also C<tfdRFD>
 
 
 
@@ -370,7 +373,7 @@ C<-index>, C<-ixcnd>, C<-ixrec>;
 
 C<recIndex>, C<recReindex>
 
-See also C<ddoRVC>, C<ddvRVV>, C<ddvRHV>
+See also C<ttoRVC>, C<tvmVersions>, C<tvmHistory>
 
 
 
@@ -378,7 +381,7 @@ See also C<ddoRVC>, C<ddvRVV>, C<ddvRHV>
 
 C<-ridRef>
 
-See also C<ddvRRV>, C<ddfRRE>
+See also C<tvmReferences>, C<tfvReferences>
 
 
 
@@ -390,6 +393,7 @@ Database values should be considered as old values in '0R' triggers,
 as new values in '1R' triggers and 
 also in '1C' triggers of single-row operations.
 
+C<-end0>, C<-endh>, C<-end1>,
 C<-recNew0R>, C<-recNew1C>;
 C<-recForm1R>, C<-recForm1C>;
 C<-recIns0C>, C<-recIns0R>, C<-recInsID>, C<-recIns1R>, C<-recIns1C>;
@@ -440,24 +444,36 @@ C<-cgvXXX>;
 
 C<cgiRun>, C<cgiParse>, C<cgiQuery>; C<psParse>, C<psEval>; 
 C<htmlStart>, C<htmlEnd>, C<htmlHidden>, C<htmlMenu>, 
-C<cgiForm> (and also C<htmlField>, C<cgiDDLB>, C<ddfRVE>, C<ddfRFD>, C<ddfRRE>),
+C<cgiForm> (and also C<htmlField>, C<cgiDDLB>, C<tfvVersions>, C<tfdRFD>, C<tfvReferences>),
 C<cgiList>, 
 C<cgiFooter>.
 
-See also C<Perl Script Pages>.
+See also C<Perl Script Pages>, C<Templates>.
 
 
-=item Default Data Definitions
+=item UI Substitutions
 
-C<-ns>, C<ns>;
-C<ddoRVC>; 
-C<ddvAll>, C<ddfAll>; 
-C<ddvRVV>, C<ddfRVE>; 
-C<ddvRRV>, C<ddfRRE>;
-C<ddvRHV>; 
-C<ddfRFD>; 
-C<ddfShow>, C<ddfHide>;
-C<ddvIndex>, C<ddvFTQuery>
+C<cgiRun> (C<-cgcXXX>, C<-subst>, C<-qlist> vs C<-recList>, C<-recXXX>, C<-cgvXXX>);
+
+C<cgiForm> (C<-field>, C<-query> C<-data>, C<-table> C<-field>);
+
+C<cgiList> (C<-query> C<-data>, C<-field>, C<-table> C<-field>)
+
+See also C<User Interface>.
+
+
+=item Templates
+
+C<-tn>, C<tn>;
+C<ttoRVC>; 
+C<ttsAll>, C<tfsAll>; 
+C<tvmVersions>, C<tfvVersions>; 
+C<tvmReferences>, C<tfvReferences>;
+C<tvmHistory>; 
+C<tfdRFD>; 
+C<tfoShow>, C<tfoHide>;
+C<tvdIndex>, C<tvdFTQuery>
+
 
 
 =back
@@ -682,6 +698,25 @@ Editable field condition. Otherways field will be readonly.
 Editable record sign. 
 Stamped by C<Database Operation> calls.
 Useful for C<User Interface> level.
+
+
+=item -end0
+
+	=> not exists || sub{}($self)
+
+=item -endh
+
+	=> {} || {name=>sub{}($self)}
+
+=item -end1
+
+	=> not exists || sub{}($self)
+
+(C<Creation and Setup>, C<Triggers>)
+C<end> operation triggers.
+C<-end0> - before cleanup.
+C<-endh> - delayed commands, cleaned after execution.
+C<-end1> - after cleanup.
 
 
 =item -expr
@@ -1086,16 +1121,6 @@ User Interface forms list. Default will be generated from C<-form> or C<-table>.
 New record sign, stamped in C<recNew>, considered in C<recForm>.
 
 
-=item -ns
-	
-	=> {default naming set}
-
-(C<Default Data Definitions>)
-Default naming set, also available via C<ns>. 
-This is an only place for hard coded default special names.
-See source code for default naming.
-
-
 =item -null
 
 	=> null value
@@ -1130,7 +1155,7 @@ Output sub{} to be used instead of 'print' by C<output> calls
 (C<File Store>)
 Path to File Store.
 Subdirectories inside File Store (see C<pthForm>): 
-'var' - variables file 'var.pl' (see C<varLoad>, C<varStore>), 'usergroup' and 'authgroup' files ($^O eq 'MSWin32', C<w32agf>);
+'var' - variables file 'var.pl' (see C<varLoad>, C<varStore>), 'uagroup' and 'ualist' files ($^O eq 'MSWin32', C<w32agf>);
 'log' - log files (see C<logRec>); 
 'tmp' - temporary files;
 'dbm' - L<DB_File|DB_File> data files; 
@@ -1199,6 +1224,7 @@ by C<cgiList>.
 Keywords are: 
 '-cmd'  => not exists || 'command' || sub{}(self, {record}) - command to be specified in the URL, default is C<recRead>;
 '-key'  => not exists || ['field name',..., ['field name'=>number],...]  || sub{}(self, {record}) - C<-key> specification of record to be opened, default is obtained from table/form description;
+'-urm'	=> C<-urm> specification, alike '-key' above;
 '-form' => not exists || 'form name'  || sub{}(self, {record}) - constant name of the form to be opened via URL, default is current table/form name;
 '-formfld' => not exists || 'field name' - field name to store form name to open via URL.
 
@@ -1236,16 +1262,25 @@ Record level Access Control switch
 	=> 'Administrators,root'
 
 (C<Database Description>)
-Users, can read or edit any record.
+Users, can edit any record.
 Format of this value is alike containing list of user names string field.
-See also C<uadmin>.
+See also C<uadmin>, C<-racAdmRdr>.
+
+
+=item -racAdmRdr
+
+	=> not exists || 'user,...'
+
+(C<Database Description>)
+Users, can read any record.
+See also C<uadmrdr>, C<-racAdmin>.
 
 
 =item -racActor
 
 	=> not exists || ['field name',...]
 
-(C<Database Description>, C<Table/Form Description> - C<Record level Access Control>, C<Default Data Definitions>)
+(C<Database Description>, C<Table/Form Description> - C<Record level Access Control>, C<Templates>)
 Field(s) to store names of user(s) to be considered as actors of record.
 Default is about C<-rvcUpdBy>.
 
@@ -1254,7 +1289,7 @@ Default is about C<-rvcUpdBy>.
 
 	=> not exists || ['field name',...]
 
-(C<Database Description>, C<Table/Form Description> - C<Record level Access Control>, C<Default Data Definitions>)
+(C<Database Description>, C<Table/Form Description> - C<Record level Access Control>, C<Templates>)
 Field(s) to store names of user(s) to be considered as principals of record.
 Default is about C<-rvcInsBy>.
 
@@ -1300,7 +1335,7 @@ Default behaviour exists, see C<rfdName> source code
 Fields may contain references to another records.
 Scalar reference may be in form 'record id' or 'table//id'.
 Embedded into text references are considered as '_key=table//id' or '_key=id%3Dtable//id' URL parts.
-See also C<ddvRRV>, C<ddfRRE>.
+See also C<tvmReferences>, C<tfvReferences>.
 
 
 =item -recDel
@@ -1621,6 +1656,36 @@ Name of the basic table of the form.
 Application's title
 
 
+=item -tn
+	
+	=> {template naming set}
+
+(C<Templates>)
+Template or default naming set, also available via C<tn>. 
+This is an only place for hard coded default special names.
+See source code for default naming.
+
+
+=item -udflt
+
+	=> not exists || sub{}()
+
+(C<User Identification>)
+User domains filter sub{} to be evaluated against each domain name in $_.
+Considered in C<w32agf>.
+See also C<-unflt>, C<-ugflt>.
+
+
+=item -ugflt
+
+	=> not exists || sub{}()
+
+(C<User Identification>)
+User groups filter sub{} to be evaluated against each group name in $_.
+Considered in C<ugroups> and C<uglist> default code.
+See also C<-unflt>.
+
+
 =item -ugroups
 
 	=> not exists || sub{} || [group names]
@@ -1639,6 +1704,16 @@ User name variants sub{} or [] value.
 See C<unames>.
 
 
+=item -unflt
+
+	=> not exists || sub{}()
+
+(C<User Identification>)
+User names filter sub{} to be evaluated against each name in $_.
+Considered in C<uglist> default code.
+See also C<-ugflt>.
+
+
 =item -urf
 
 	=> "file://{-path}/dbix-web"
@@ -1653,6 +1728,16 @@ Filesystem URL to File Store, see also C<-path>, C<-url>
 
 (C<File Store>)
 URL to File Store, see also C<-path>, C<-urf>
+
+
+=item -urm
+
+	=> [field name,...]
+
+(C<Table Description>)
+Table's fields to be used for "unread mark" part of URLs
+produced by C<User Interface> C<cgiList>;
+C<-wkey> used if not defined.
 
 
 =item -user
@@ -1737,7 +1822,7 @@ C<User Interface>.
 Outputs record's form via C<output>, used by C<cgiRun> for record and QBF operations (see C<-recXXX>).
 See C<Table/Form Description> for form specifications and C<-field> for formatting considerations.
 See C<htmlField> for independent widgets.
-Use C<ddfRFD> or C<-inp> for file attachments.
+Use C<tfdRFD> or C<-inp> for file attachments.
 Use C<cgiList> and C<-field> for embedded views.
 
 
@@ -1828,102 +1913,6 @@ C<SubObjects>. Creates and returns new isam data file object
 C<SubObjects>. Returns isam data file object with table name given,
 creates and opens it if needed using 
 C<dbmNew>(-name=>C<pthForm>('dbm', table name)).
-
-
-=item ddfAll () -> (All predefined Fields default definitions)
-
-C<Default Data Definitions>.
-Default definitions for all possible predefined form fields,
-may be added to the end of C<-field> layout.
-See source code.
-
-
-=item ddfHide (?'button name') -> C<-hide> definition
-
-C<Default Data Definitions>.
-C<-hide>/C<-hidel> feature default definition to be used with C<ddfShow>.
-See source code.
-
-
-=item ddfRFD (-option=>value,...) -> {record file directory default field declaration}
-
-C<User Interface>.
-Returns list may be used as C<-field> description for C<Record File Attachments>.
-See source code.
-
-
-=item ddfRRE (?'version') -> {Record References View default field definition}
-
-C<Default Data Definitions>.
-Default definition for field with embedded 'reference' view.
-See source code.
-See also C<ddvRRV>
-
-
-=item ddfRVE (?'reference') -> {Record Versions View default field definition}
-
-C<Default Data Definitions>.
-Default definition for field with embedded 'version' view.
-See source code.
-See also C<ddvRVV>
-
-
-=item ddfShow (?'button name', ?[detail fields], ?'html pattern') -> C<-lblhtml> definition
-
-C<Default Data Definitions>.
-Show empty details default feature (button) definition for C<-lblhtml>.
-See source code.
-See also C<ddfHide>
-
-
-=item ddoRVC (-option=>value,...) -> (Record Version Control default options definition)
-
-C<Default Data Definitions>.
-Default table description slots and values for record version control.
-See source code.
-
-
-=item ddvAll () -> (All predefined Views default definitions)
-
-C<Default Data Definitions>.
-Default definitions for all predefined materialized views.
-See source code.
-
-
-=item ddvFTQuery () -> (Full-text search default view definition)
-
-C<Default Data Definitions>.
-Default definition for Full-text search page.
-See inplementation for limitations and details.
-
-
-=item ddvIndex () -> (Index page default view definition)
-
-C<Default Data Definitions>.
-Default definition for Index page enumerating all C<-menuchs> entries.
-
-
-
-
-=item ddvRHV (?[fields definitions] ||undef, -option=>value,...) -> {Record History View default view definition}
-
-C<Default Data Definitions>.
-Default definition for 'history' materialized view.
-See source code.
-
-
-=item ddvRRV (?[fields definitions] ||undef, -option=>value,...) -> {Record References View default view definition}
-
-C<Default Data Definitions>.
-Default definition for 'reference' materialized view.
-See source code.
-
-
-=item ddvRVV (?[fields definitions] ||undef, -option=>value,...) -> {Record Versions View default view definition}
-
-C<Default Data Definitions>.
-Default definition for 'version' materialized view.
-See source code.
 
 
 =item die (message string) -> failure exception
@@ -2109,14 +2098,6 @@ Minimum of two numbers given.
 
 C<Creation and Setup>.
 Creates new DBIx::Web object. Calls C<initialize>(-option=>value,...).
-
-
-=item ns () -> {default naming set}
-
-=item ns (metaname) -> default name
-
-C<Default Data Definitions>.
-Default naming set (C<-ns>) interface.
 
 
 =item orarg (L<-X|perlfunc>, argument,...) -> first succeeded argument
@@ -2522,6 +2503,118 @@ Converts stringified with C<strtime> time string to seconds form
 with L<POSIX::mktime|POSIX>
 
 
+=item tfdRFD (-option=>value,...) -> {record file directory field template}
+
+C<User Interface>.
+Template Field Description for Record File Directory field.
+May be used as C<-field> description for C<Record File Attachments>.
+See source code.
+
+
+=item tfoHide (?'button name') -> sub{C<-hide> definition}
+
+C<Templates>.
+Template Field Condition for C<-hide>/C<-hidel> details absent,
+to be used with C<tfoShow>.
+See source code.
+
+
+=item tfoShow (?'button name', ?[detail fields], ?'html pattern') -> sub{C<-lblhtml> show detail definition}
+
+C<Templates>.
+Template Field Button for '-lblhtml' to Show all details absent.
+See source code.
+See also C<tfoHide>
+
+
+=item tfsAll () -> (all generally used fields templates)
+
+C<Templates>.
+Template Fields Set for All generally used fields,
+may be added to the end of C<-field> form layout.
+See source code.
+
+
+=item tfvReferences (?[fields definitions] ||undef, -option=>value,...) -> sub{records references embedded view template}
+
+C<Templates>.
+Template for Field with embedded View of References to records;
+embedded 'references' view default definition.
+See source code.
+See also C<tvmReferences>
+
+
+=item tfvVersions (?[fields definitions] ||undef, -option=>value,...) -> sub{records versions embedded view template}
+
+C<Templates>.
+Template for Field with embedded View of Versions of records;
+embedded 'versions' view default definition.
+See source code.
+See also C<tvmVersions>
+
+
+=item tn () -> {template naming set}
+
+=item tn (metaname) -> default name
+
+C<Templates>.
+Template or default naming (C<-tn>) interface.
+
+
+=item ttoRVC (-option=>value,...) -> (record version control table template options)
+
+C<Templates>.
+Template Table Options (slots and values) for Record Version Control.
+See source code.
+
+
+=item ttsAll () -> (all generally used materialized views templates)
+
+C<Default Data Definitions>.
+Template Tables Set of All generally used materialized views,
+may be added to the end of C<-table> list.
+See source code.
+
+
+=item tvdFTQuery (-option=>value,...) -> (full-text search page view template)
+
+C<Templates>.
+Template View Definition for Full-Text Query page.
+See inplementation for limitations and details.
+
+
+=item tvdIndex (-option=>value,...) -> (Index page view template)
+
+C<Templates>.
+Template View Definition for Index page,
+'index' view default definition,
+enumerating all C<-menuchs> entries.
+
+
+=item tvmHistory (?[fields definitions] ||undef, -option=>value,...) -> (database history materialized view template)
+
+C<Templates>.
+Template for Materialized View of database History (or news);
+'history' materialized view default definition.
+See source code.
+
+
+=item tvmReferences (?[fields definitions] ||undef, -option=>value,...) -> (records references materialized view template)
+
+C<Templates>.
+Template for Materialized View of References to records,
+'references' materialized view default definition.
+See source code.
+
+
+=item tvmVersions (?[fields definitions] ||undef, -option=>value,...) -> (records versions materialized view template)
+
+C<Templates>.
+Template for Materialized View of Versions of records, 
+'versions' materialized view default definition.
+See source code.
+
+
 =item uadmin () -> is current user an admin?
 
 C<User Identification>.
@@ -2529,12 +2622,20 @@ Returns true if current user is a member of C<-racAdmin>,
 just C<ugmember>(C<-racAdmin>).
 
 
-=item uglist (? '-ug', ? [] || {}) -> [user and group names]
+=item uadmrdr () -> can current user read almost all records?
 
 C<User Identification>.
-Returns user ('-u') and group ('-g') names in array ([]) or hash ({}) ref.
+Returns true if current user is a member of C<-racAdmRdr>,
+just C<ugmember>(C<-racAdmRdr>).
+
+
+=item uglist (? '-ug<>', ? [] || {}) -> [user and group names]
+
+C<User Identification>.
+Returns user ('-u') and group ('-g') names in array ([]) or hash ({}) ref;
+'<>' option forces comment notation for hash ref.
 Default is both ('-ug') in array ref ([]).
-Uses C<-AuthUserFile> and C<-AuthGroupFile>, or L<Win32API::Net|Win32API/Net>.
+Uses C<-AuthUserFile> and C<-AuthGroupFile>, or C<w32agf>.
 
 
 =item ugmember (group name strings or array refs) -> is current user a member?
@@ -2640,13 +2741,19 @@ LOCK_EX is used.
 File will be locked until C<end> call.
 
 
+=item w32adhi () -> Active Directory Host Info object
+
+C<User Identification>.
+Returns 'ADSystemInfo' OLE object.
+
+
 =item w32agf () -> success
 
 C<User Identification>.
 Creates or periodically updates user group files using Microsoft Windows system catalogue.
-C<pthForm>('var','usergroup') file is useful for C<ugroups>.
-C<pthForm>('var','authgroup') file may be used as Apache's 'AuthGroupFile'.
-C<-AuthGroupFile> should not be set to C<pthForm>('var','authgroup'),
+C<pthForm>('var','ualist') file is for C<uglist>.
+C<pthForm>('var','uagroup') file may be used as Apache's 'AuthGroupFile'.
+C<-AuthGroupFile> should not be set to C<pthForm>('var','uagroup'),
 it should be set only to externally controlled file!
 
 
@@ -2763,6 +2870,49 @@ C<psEval> method executes perl script file by parsing, compiling into sub{}, eva
 =over
 
 
+=head2 2004-10-25 - Development Version 0.54
+
+Doubts found reviewed since C<2004-06-26> position.
+This should not be used yet...
+
+
+=head2 2004-10-13
+
+New C<-urm> feature.
+
+
+=head2 2004-10-09
+
+'Default Data Definitions' methods redesigned to C<Tempates>. 
+Templates specifications and examples changed.
+
+
+=head2 2004-09-21
+
+C<-unflt> and C<-ugflt> slots added to filter user and group names.
+
+
+=head2 2004-09-14
+
+C<-end0>, C<-end1>, C<-endh> triggers created, C<-endh> used by C<w32agf>.
+C<w32agf> rewritten with C<ugroups> and C<uglist> using Windows ADSI,
+L<Win32API::Net|Win32API/Net> excluded at all.
+
+L<Win32::OLE|Win32/OLE>->Option("Warn"=>0) used anywere.
+
+C<cgiAction>: Edit mode switched off when record save.
+
+C<-racAdmin> can read only permitted records, but update all can read.
+C<-racAdmRdr> slot added.
+
+
+=head2 2004-08-28
+
+C<w32adhi> created.
+
+C<w32domain> corrected.
+
+
 =head2 2004-06-26 - Development Version 0.53
 
 XML presentation.
@@ -2777,7 +2927,7 @@ This should not be used yet...
 
 =head2 2004-06-13 - Development Version 0.52
 
-C<ddvFTQuery> created.
+C<tvdFTQuery> created.
 Log more readable.
 Some corrections.
 This should not be used yet...
@@ -2786,7 +2936,7 @@ This should not be used yet...
 =head2 2004-06-06 - Development Version 0.51
 
 CSS support. 
-C<ddvIndex> created.
+C<tvdIndex> created.
 Some error corrections.
 This should not be used yet...
 
@@ -2835,7 +2985,7 @@ C<Database Options>		39.5
 
 C<User Interface>		43.7
 
-C<Default Data Definitions>	3.4
+C<Templates>	3.4
 
 
 

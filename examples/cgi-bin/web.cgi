@@ -1,8 +1,4 @@
 #!perl -w
-#http://localhost/cgi-bin/web.cgi
-BEGIN {
- push @INC, $1 .'sitel/lib' if !(grep /sitel/i, @INC) && ($INC[0] =~/(.+?[\\\/])lib$/i)
-}
 use DBIx::Web;
 my $w =DBIx::Web->new(-serial=>2, -debug=>2);
 my ($r, $c);
@@ -13,30 +9,30 @@ $w->set(-table=>{
 		,-field		=>[
 			 {-fld=>'id'
 				,-flg=>'kwq'
-				,-lblhtml=>$w->ddfShow('id_',['idrm','idpr'])
+				,-lblhtml=>$w->tfoShow('id_',['idrm','idpr'])
 				}, ''
-			,{-fld=>$w->ns('-rvcActPtr')
+			,{-fld=>$w->tn('-rvcActPtr')
 				,-flg=>'q'
-				,-hidel=>$w->ddfHide('id_')
+				,-hidel=>$w->tfoHide('id_')
 				}
 			,{-fld=>'idrm'
 				,-flg=>'euq'
-				,-hidel=>$w->ddfHide('id_')
+				,-hidel=>$w->tfoHide('id_')
 				}, ''
 			,{-fld=>'idpr'
 				,-flg=>'euq'
-				,-hidel=>$w->ddfHide('id_')
+				,-hidel=>$w->tfoHide('id_')
 				}
-			,{-fld=>$w->ns('-rvcInsWhen')
+			,{-fld=>$w->tn('-rvcInsWhen')
 				,-flg=>'q'
 				}, ''
-			,{-fld=>$w->ns('-rvcInsBy')
+			,{-fld=>$w->tn('-rvcInsBy')
 				,-flg=>'q'
 				}
-			,{-fld=>$w->ns('-rvcUpdWhen')
+			,{-fld=>$w->tn('-rvcUpdWhen')
 				,-flg=>'wql'
 				}, ''
-			,{-fld=>$w->ns('-rvcUpdBy')
+			,{-fld=>$w->tn('-rvcUpdBy')
 				,-edit=>0
 				,-flg=>'wql'
 				}
@@ -49,8 +45,8 @@ $w->set(-table=>{
 			,-flg=>'euq'
 			,-ddlb=>sub{$_[0]->uglist({})}
 				 }
-			,{-fld=>$w->ns('-rvcState')
-			,-inp=>{-values=>$w->ns('-rvcAllState')}
+			,{-fld=>$w->tn('-rvcState')
+			,-inp=>{-values=>$w->tn('-rvcAllState')}
 			,-flg=>'euql'
 				}, ''
 			,{-fld=>'subject'
@@ -64,23 +60,23 @@ $w->set(-table=>{
 			,-lblhtml=>'<b>$_</b><br />'
 			,-inp=>{-htmlopt=>1, -hrefs=>1, -arows=>5, -cols=>70}
 				 }
-			,$w->ddfAll()
+			,$w->tfsAll()
 		]
-		,$w->ddoRVC()
+		,$w->ttoRVC()
 		,-racReader	=>[qw(readers)]
-		,-racWriter	=>[$w->ns('-rvcUpdBy'), $w->ns('-rvcInsBy'), 'authors']
+		,-racWriter	=>[$w->tn('-rvcUpdBy'), $w->tn('-rvcInsBy'), 'authors']
 		,-ridRef	=>[qw(idrm idpr comment)]
 		,-rfa		=>1
 		,-query		=>{-order=>'-dall'}
 		,-dbd		=>'dbm'
 	}
-	,$w->ddvAll()
+	,$w->ttsAll()
 	});
 
 $w->set(-form=>{
 	 'default'	=>{-subst=>'index'}
-	,'index'	=>{$w->ddvIndex()}
-	,'fulltext'	=>{$w->ddvFTQuery()}
+	,$w->tvdIndex()
+	,$w->tvdFTQuery()
 	,'notehier'	=>{
 		 -lbl		=>'Notes hierarchy'
 		,-cmt		=>'Notes hierarchy'
