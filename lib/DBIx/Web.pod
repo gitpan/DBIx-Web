@@ -439,7 +439,7 @@ C<-login>;
 C<-cgvXXX>;
 
 C<cgiRun>, C<cgiParse>, C<cgiQuery>; C<psParse>, C<psEval>; 
-C<htmlStart>, C<htmlHidden>, C<htmlMenu>, 
+C<htmlStart>, C<htmlEnd>, C<htmlHidden>, C<htmlMenu>, 
 C<cgiForm> (and also C<htmlField>, C<cgiDDLB>, C<ddfRVE>, C<ddfRFD>, C<ddfRRE>),
 C<cgiList>, 
 C<cgiFooter>.
@@ -2009,6 +2009,13 @@ The list structure will not be documented.
 See also C<xmlsTag>, C<outhtm>
 
 
+=item htmlEnd () -> http and html final string
+
+C<User Interface>.
+Generates http and html final string
+to C<output> by C<cgiRun>
+
+
 =item htmlEscape (strings) -> escaped
 
 =item htmlUnescape (string) -> unecaped
@@ -2754,6 +2761,18 @@ C<psEval> method executes perl script file by parsing, compiling into sub{}, eva
 =head1 VERSION
 
 =over
+
+
+=head2 2004-06-26 - Development Version 0.53
+
+XML presentation.
+Menu listboxes behaviour improved.
+'dbmSeek' string condition parser improved.
+'DHTML Editing Component' used.
+Temporary files dir environment variables usage reviewed.
+Default query conditions display.
+Some another reviews and corrections.
+This should not be used yet...
 
 
 =head2 2004-06-13 - Development Version 0.52
