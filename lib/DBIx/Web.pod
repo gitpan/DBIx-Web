@@ -219,7 +219,8 @@ Slot names begin with '-' sign.
 
 C<new>, C<initialize>, C<class>, C<set>;
 C<start>, C<end>, C<-end0>, C<-endh>, C<-end1>;
-C<setup>, C<-setup>
+C<setup>, C<-setup>;
+C<-cgibus>
 
 =item Error Processing
 
@@ -270,7 +271,7 @@ C<logOpen>, C<logLock>, C<logRec>
 
 =item SubObjects
 
-C<-dbi>, C<-dbiarg>, C<-cgi>, C<-output>;
+C<-dbi>, C<-dbiarg>, C<-dbiph>; C<-cgi>; C<-output>;
 
 C<dbi>, C<cgi>;
 C<hfNew>, C<dbmNew>, C<dbmTable>, C<ccbNew>;
@@ -316,9 +317,10 @@ Some slots (like C<-field>, C<-wkey>, C<Triggers>, C<User Interface>) are common
 Some slots may appear at database level also.
 
 
-C<-table>;
+C<-table>, C<-form>;
+C<-lbl>, C<-cmt>, C<-expr>;
 C<-field> (C<Field Description>);
-C<-key>, C<-keycmp>, C<-wkey>, C<-urm>;
+C<-key>, C<-keycmp>, C<-wkey>, C<-urm>, C<-null>;
 C<-ixcnd>, C<-ixrec>;
 C<-optrec>;
 C<-dbd>;
@@ -335,8 +337,8 @@ descriptions (hash refs) and formatting strings.
 C<-fld>, C<-expr>, C<-lbl>, C<-lblhtml>, C<-cmt>, C<-flg>;
 C<-hide>, C<-hidel>, C<-edit>, C<-null>;
 C<-inp>, C<-inphtml>, C<-ddlb>, C<-ddlbmult>, C<-ddlbtgt>;
-C<-colspan>, C<-colwidth>;
-C<-lsthtml>
+C<-colspan>, C<-fhclass>, C<-fhstyle>, C<-fhprop>, C<-fdstyle>, C<-fdclass>, C<-fdprop>;
+C<-lsthtml>, C<-lhclass>, C<-lhstyle>, C<-lhprop>, C<-ldclass>, C<-ldstyle>, C<-ldprop>
 
 
 =item Record level Access Control
@@ -350,7 +352,7 @@ C<-editable>
 =item Record level Version Control
 
 C<-rvcInsBy>, C<-rvcInsWhen>, C<-rvcUpdBy>, C<-rvcUpdWhen>,
-C<-rvcActPtr>, C<-rvcFinState>, C<-rvcCkoState>, C<-rvcDelState>.
+C<-rvcActPtr>, C<-rvcChgState>, C<-rvcCkoState>, C<-rvcDelState>.
 
 See also C<ttoRVC>
 
@@ -455,9 +457,9 @@ See also C<Perl Script Pages>, C<Templates>.
 
 C<cgiRun> (C<-cgcXXX>, C<-subst>, C<-qlist> vs C<-recList>, C<-recXXX>, C<-cgvXXX>);
 
-C<cgiForm> (C<-field>, C<-query> C<-data>, C<-table> C<-field>);
+C<cgiForm> (C<-field>, C<-query> C<-data>, C<-table>, C<-field>);
 
-C<cgiList> (C<-query> C<-data>, C<-field>, C<-table> C<-field>)
+C<cgiList> (C<-query> C<-data>, C<-field>, C<-table>, C<-field>)
 
 See also C<User Interface>.
 
@@ -560,6 +562,15 @@ See C<-cgvXXX> for external implementation of presentation only.
 CGI object, if used, created and available via C<cgi> call
 
 
+item -cgibus
+
+	=> not exists || CGI::Bus::tm file attachments path
+
+(C<Creation and Setup>)
+Switch to L<CGI::Bus::tm|CGI/Bus/tm> example applications behaviour,
+may be useful about redesign and migration.
+
+
 =item -cgvXXX
 
 	=> not exists || sub{}($self, 'name', {metadata}, $s->{-pcmd}, $s->{-pdta}) || 'filename.psp' || 'perl filename'
@@ -582,10 +593,10 @@ Application's charset, see also C<-locale>
 
 =item -cmt
 
-	=> not exists || field comment
+	=> not exists || comment text
 
-(C<Field Description>)
-Text of field description to display to users.
+(C<Table Description>, C<Form Description>, C<Field Description>)
+Text of object description to display to users.
 See also C<-lbl>
 
 
@@ -638,6 +649,15 @@ DBI object, if used, created and available via C<dbi> call, using C<-dbiarg> to 
 
 (C<SubObjects>)
 DBI connection arguments string or array, used in C<dbi> call
+
+
+=item -dbiph
+
+	=> not exists || boolean
+
+(C<SubObjects>)
+Placeholders ('?') usage switch for arguments of DBI commands.
+Default behaviour is embedding values quoted as hinted via C<-flg> or analysed.
 
 
 =item -ddlb
@@ -721,12 +741,31 @@ C<-end1> - after cleanup.
 
 =item -expr
 
-	=> not exists || database field name or formula
+	=> not exists || database name or formula
+
+(C<Table/Form Description>, C<Field Description>)
+Table or Field name as used inside SQL database engine,
+or SQL expression.
+Table name for application is explained as C<-table> key.
+Field name for application is explained as C<-fld>.
+
+
+=item -fdclass
 
 (C<Field Description>)
-Field name as used inside SQL database engine,
-or SQL expression.
-Field name for application is explained as C<-fld>
+Form data ('td') HTML tag class
+
+
+=item -fdstyle
+
+(C<Field Description>)
+Form data ('td') HTML tag style
+
+
+=item -fdprop
+
+(C<Field Description>)
+Form data ('td') HTML tag additional properties
 
 
 =item -fetched
@@ -737,20 +776,40 @@ May be C<-limited> by C<-limit>.
 Distinguish from C<-affected>
 
 
+=item -fhclass
+
+(C<Field Description>)
+Form label ('th') HTML tag class
+
+
+=item -fhstyle
+
+(C<Field Description>)
+Form label ('th') HTML tag style
+
+
+=item -fhprop
+
+(C<Field Description>)
+Form label ('th') HTML tag additional properties
+
+
 =item -field
 
-	=> [{field},..., ''||"\t"||"\n"||"\f"||'text'||sub{},..., {field}]
+	=> [{field},..., ''||"\n"||"\t"||"\f"||'</table>'||'text'||sub{},..., {field}]
 
 	=> {name => {attributes}} # deprecated
 
 (C<Table/Form Description> - C<Field Description>)
 Array ref contains field descriptions as a hash refs.
-Another type entries are for screen formatting.
 Text or result of sub{} evaluation will be outputted.
-'' continues labels and fields output in the current row.
-"\t" skips one table cell.
-"\n" continues on the next row.
-"\f" finishes tabular form layout, passes to simple rows. 
+Another type entries are tabular form layout hints:
+'' continues labels and fields in the current row,
+"\n" continues on next row(s),
+"\t" skips cell(s),
+"\f" finishes tabular layout,
+'</table>' finishes tabular layout and labels of the fields.
+See also C<-colspan> and C<-rowspan>.
 
 
 =item -file
@@ -779,7 +838,7 @@ Database field name or expression may be explained by C<-expr>.
 (C<Field Description>)
 Flags of the field:
 
-'a'll operation below, except 'k'ey and 'w'key, default
+'a'll operation below, except 'k'ey, 'w'key, quoting, default
 
 'k'ey - primary key, C<-key> preffered
 
@@ -792,6 +851,10 @@ Flags of the field:
 'q'uery form, may be used to form query condition
 
 'l'istable, may be used in lists of records
+
+'n'umeric quoting
+
+'"' string quoting
 
 
 =item -form
@@ -988,11 +1051,11 @@ Application's language, see also C<-locale>
 
 =item -lbl
 
-	=> not exists || field label
+	=> not exists || label text
 
-(C<Field Description>)
-Label or external name of the field to be displayed to user.
-See also C<-lblhtml>, C<-inp>, C<-inphtml>
+(C<Table Description>, C<Form Description>, C<Field Description>)
+Label or external name of the object to be displayed to user.
+See also C<-cmt>, C<-lblhtml>, C<-inp>, C<-inphtml>
 
 
 
@@ -1004,6 +1067,41 @@ See also C<-lblhtml>, C<-inp>, C<-inphtml>
 HTML presentation of field label, use it together with C<-lbl>.
 Sub{} will be evaluated to produce HTML string.
 '$_' in HTML will be replaced with C<-lbl>.
+
+
+=item -ldclass
+
+(C<Field Description>)
+List data ('<td>') HTML tag class
+
+
+=item -ldstyle
+
+(C<Field Description>)
+List data ('<td>') HTML tag style
+
+=item -ldprop
+
+(C<Field Description>)
+List data ('<td>') HTML tag additional properties
+
+
+=item -lhclass
+
+(C<Field Description>)
+List heading ('<th>') HTML tag class
+
+
+=item -lhstyle
+
+(C<Field Description>)
+List heading ('<th>') HTML tag style
+
+
+=item -lhstyle
+
+(C<Field Description>)
+List heading ('<th>') HTML tag additional properties
 
 
 =item -limit
@@ -1125,7 +1223,8 @@ New record sign, stamped in C<recNew>, considered in C<recForm>.
 
 	=> null value
 
-(C<Field Description>)
+(C<Field Description>, C<Form Description>, C<Table Description>)
+
 Field value to be converted to undef, used by C<cgiDBData>.
 
 
@@ -1555,7 +1654,7 @@ Check-out state of record: Field name and state value.
 If record is check out, old version will not be created at record update.
 And file attachments may be edited.
 Check-out record may be checked-in C<-rvcActPtr> record.
-Distinguish from C<-rvcFinState>, which could not be checked-in.
+Distinguish from C<-rvcChgState>, which could not be checked-in.
 
 
 =item -rvcDelState
@@ -1566,13 +1665,13 @@ Distinguish from C<-rvcFinState>, which could not be checked-in.
 Deleted state of record: Field name and state value.
 
 
-=item -rvcFinState
+=item -rvcChgState
 
 	=> not exists || [field name => state,...]	
 
 (C<Database Description>, C<Table/Form Description> - C<Record level Version Control>)
-Field name to store record's state and list of the final state values.
-When record is not in final state, old version will not be created at record update.
+Field name to store record's state and list of the change state values.
+When record is in change state, old version will not be created at record update.
 And file attachments may be edited.
 Distinguish from C<-rvcCkoState>, which may be checked-in.
 
@@ -1831,7 +1930,10 @@ Use C<cgiList> and C<-field> for embedded views.
 C<User Interface>.
 Lists data rows via C<output>, used by C<cgiRun> for C<cgiQuery> results.
 '!h' option turns off table header.
-See C<Table/Form Description> for query and list specifications.
+See C<Table/Form Description> for query and list specifications,
+additional query/list clauses are 
+C<-field> to use instead of C<-data>,
+and C<-display> to use instead of C<-flg> vaules of C<-field>.
 
 
 =item cgiParse ()
@@ -1848,7 +1950,7 @@ Used internally by C<cgiRun>.
 C<User Interface>.
 Forms and starts query using C<recSel>. Returns cursor.
 Used by C<cgiRun>, with C<cgiList> follows.
-See C<Table/Form Description> for query and list specifications.
+See C<Table/Form Description> and C<cgiList> for query and list specifications.
 
 
 =item cgiRun () -> success
@@ -2400,7 +2502,7 @@ provided by C<Database Operation>.
 =item rfdEdmd (table name ||{command}, {rec data}) -> attachments edit allowed?
 
 C<Record File Attachments>.
-Record's state (C<-rvcFinState>) permits editing of file attachments
+Record's state (C<-rvcChgState>) permits editing of file attachments
 
 
 =item rfdGlobn ({rec data} ||(table name, {rec data}), ?subdirectory,...) -> list of file attachments
@@ -2648,11 +2750,11 @@ a string with the list of group names,
 a reference to array of variants above.
 
 
-=item ugnames () -> [current user and group names]
+=item ugnames (?user) -> [user and group names]
 
 C<User Identification>.
-Returns reference to array with names of current user (C<unames>) 
-and groups current user belongs to (C<ugroups>).
+Returns reference to array with names of given or current user (C<unames>) 
+and groups given or current user belongs to (C<ugroups>).
 
 
 =item ugrexp () -> sub{}('user,user,...') matching C<ugnames>
@@ -2661,10 +2763,10 @@ C<User Identification>.
 Returns sub{} to match string with user names list against C<ugnames>
 
 
-=item ugroups () -> [current user group names]
+=item ugroups (?user) -> [user group names]
 
 C<User Identification>.
-Returns reference to array with names of groups current user belongs to.
+Returns reference to array with names of groups given or current user belongs to.
 Uses C<-ugroups> sub{} or value.
 Default is using C<-AuthGroupFile> or C<w32agf> generated files.
 
@@ -2869,6 +2971,31 @@ C<psEval> method executes perl script file by parsing, compiling into sub{}, eva
 
 =over
 
+=head2 2005-03-15 - Development Version 0.55
+
+Under construction yet...
+
+SQL subsystem seems working.
+
+C<-rvcFinState> redesigned to C<-rvcChgState>.
+
+C<-flg> field quoting hints added.
+
+C<-fhclass>, C<-fhstyle>, C<-fhprop>, C<-fdclass>, C<-fdstyle>, C<-fdprop>, C<-lhclass>, C<-lhstyle>, C<-lhprop>, C<-ldclass>, C<-ldstyle>, C<-ldprop> new field descriptions.
+
+C<-dbiph>, C<-keyqn> new options/slots.
+
+C<-cgibus> new slot, 
+Starting 'webus.cgi' remake of L<CGI::Bus|CGI/Bus> example,
+Attempting SQL subsystem.
+
+Some improvements in behaviour.
+
+C<ugroups>(?user) variant in addition to C<ugnames>(?user)
+'<?XML' tag 'encoding' attribute corrected.
+HTML style usage corrected.
+ 
+
 
 =head2 2004-10-25 - Development Version 0.54
 
@@ -3019,7 +3146,7 @@ bureaucracy and vertical functionary structures.
 =head1 AUTHOR
 
 Andrew V Makarow <makarow@mail.com>
-with aid of 
+with aids of 
 Anton Uemlyanin
 
 =cut

@@ -1,6 +1,17 @@
 #!perl -w
+#http://localhost/cgi-bin/web.cgi
+BEGIN {
+ push @INC, $1 .'sitel/lib' if !(grep /sitel/i, @INC) && ($INC[0] =~/(.+?[\\\/])lib$/i)
+}
 use DBIx::Web;
-my $w =DBIx::Web->new(-serial=>2, -debug=>2);
+my $w =DBIx::Web->new(
+	 -serial	=>2
+	,-debug		=>2
+	,-dbiarg	=>undef
+	#,-path		=>"$ENV{DOCUMENT_ROOT}/dbix-web"
+	#,-url		=>'/cgi-bus'
+	,-urf		=>'-path'
+	);
 my ($r, $c);
 $w->set(-table=>{
 	'note'=>{
@@ -44,17 +55,19 @@ $w->set(-table=>{
 			,{-fld=>'readers'
 			,-flg=>'euq'
 			,-ddlb=>sub{$_[0]->uglist({})}
+			,-ddlbtgt=>[[undef,undef,','],['authors',undef,',']]
 				 }
 			,{-fld=>$w->tn('-rvcState')
 			,-inp=>{-values=>$w->tn('-rvcAllState')}
 			,-flg=>'euql'
-				}, ''
+				}
 			,{-fld=>'subject'
 			,-flg=>'euql'
+			,-colspan=>4
 			,-inp=>{-asize=>60}
-			,-ddlb=>[[1,'one'],2,3,'qw']
+			# ,-ddlb=>[[1,'one'],2,3,'qw']	# test
 				 }
-			,"\f"
+			,"</table>"
 			,{-fld=>'comment'
 			,-flg=>'eu'
 			,-lblhtml=>'<b>$_</b><br />'
@@ -81,7 +94,7 @@ $w->set(-form=>{
 		 -lbl		=>'Notes hierarchy'
 		,-cmt		=>'Notes hierarchy'
 		,-table		=>'note'
-		,-query		=>{-order=>'-dall'} # -key=>{'idrm'=>''}
+		,-query		=>{-order=>'-dall'} # -key=>{'idrm'=>undef}
 		,-qfilter	=>sub{!$_[4]->{'idrm'}}
 		}
 	});

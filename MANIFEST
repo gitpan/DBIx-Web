@@ -5,6 +5,9 @@ test.pl
 
 examples/cgi-bin/web.cgi
 
+examples/webus-sql.pl
+examples/cgi-bin/webus.cgi
+
 lib/DBIx/Web.pm
 lib/DBIx/Web.pod
 
