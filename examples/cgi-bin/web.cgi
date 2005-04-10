@@ -1,16 +1,18 @@
 #!perl -w
 #http://localhost/cgi-bin/web.cgi
 BEGIN {
- push @INC, $1 .'sitel/lib' if !(grep /sitel/i, @INC) && ($INC[0] =~/(.+?[\\\/])lib$/i)
+# push @INC, $1 .'sitel/lib' if !(grep /sitel/i, @INC) && ($INC[0] =~/(.+?[\\\/])lib$/i)
 }
 use DBIx::Web;
 my $w =DBIx::Web->new(
-	 -serial	=>2
-	,-debug		=>2
-	,-dbiarg	=>undef
+	  -serial	=>2
+	 ,-debug	=>2
+	 ,-dbiarg	=>undef
 	#,-path		=>"$ENV{DOCUMENT_ROOT}/dbix-web"
 	#,-url		=>'/cgi-bus'
-	,-urf		=>'-path'
+	 ,-urf		=>'-path'
+	#,-racAdmRdr	=>''
+	#,-racAdmWtr	=>''
 	);
 my ($r, $c);
 $w->set(-table=>{

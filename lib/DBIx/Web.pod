@@ -285,8 +285,8 @@ C<-user>, C<-unames>, C<-ugroups>;
 C<-AuthUserFile>, C<-AuthGroupFile>;
 C<-udflt>, C<-unflt>, C<-ugflt>;
 
-C<user>, C<userln>, C<uguest>, C<unames>, C<ugroups>, C<ugnames>, C<uglist>;
-C<ugrexp>, C<ugmember>, C<uadmin>, C<uadmrdr>;
+C<user>, C<userln>, C<unames>, C<ugroups>, C<ugnames>, C<udisp>, C<uglist>;
+C<ugrexp>, C<ugmember>, C<uguest>, C<uadmrdr>, C<uadmwtr>, C<uadmin>;
 C<w32IISdpsn>, C<w32adhi>, C<w32agf>
 
 
@@ -326,7 +326,7 @@ C<-optrec>;
 C<-dbd>;
 C<Triggers>;
 C<User Interface> (C<-cgcXXX>; C<-subst>, C<-recXXX>, C<-recRead>, C<-qlist>;
-C<-query>, C<-qfilter>, C<-qhref>, C<-qhrcol>, C<-qfetch>, C<-limit>; C<-cgvXXX>)
+C<-frmOpt>, C<-query>, C<-qfilter>, C<-qhref>, C<-qhrcol>, C<-qfetch>, C<-limit>; C<-cgvXXX>)
 
 
 =item Field Description
@@ -334,7 +334,7 @@ C<-query>, C<-qfilter>, C<-qhref>, C<-qhrcol>, C<-qfetch>, C<-limit>; C<-cgvXXX>
 C<-field> C<Table/Form Description> slot contains array ref of field
 descriptions (hash refs) and formatting strings.
 
-C<-fld>, C<-expr>, C<-lbl>, C<-lblhtml>, C<-cmt>, C<-flg>;
+C<-fld>, C<-expr>, C<-lbl>, C<-lblhtml>, C<-form>, C<-cmt>, C<-flg>;
 C<-hide>, C<-hidel>, C<-edit>, C<-null>;
 C<-inp>, C<-inphtml>, C<-ddlb>, C<-ddlbmult>, C<-ddlbtgt>;
 C<-colspan>, C<-fhclass>, C<-fhstyle>, C<-fhprop>, C<-fdstyle>, C<-fdclass>, C<-fdprop>;
@@ -344,7 +344,7 @@ C<-lsthtml>, C<-lhclass>, C<-lhstyle>, C<-lhprop>, C<-ldclass>, C<-ldstyle>, C<-
 =item Record level Access Control
 
 C<-rac>; 
-C<-racAdmin>, C<-racAdmRdr>, C<-racReader>, C<-racWriter>; 
+C<-racAdmRdr>, C<-racAdmWtr>, C<-racReader>, C<-racWriter>; 
 C<-racActor>, C<-racPrincipal>;
 C<-editable>
 
@@ -360,7 +360,7 @@ See also C<ttoRVC>
 =item Record File Attachments
 
 C<-rfa>, C<-rfdName>;
-C<-file>;
+C<-file>, C<-fupd>;
 
 C<rfdPath>, C<rfdEdmd>, C<rfdGlobn>, C<rfdRm>;
 C<rfaUpload>, C<rfaRm>
@@ -426,7 +426,7 @@ Record's hash ref returned from C<Database Operation> calls contains
 data fields and values. 
 But some fields are specially computed to describe record:
 
-C<-new>, C<-file>, C<-editable>
+C<-new>, C<-file>, C<-fupd>, C<-editable>
 
 
 =item User Interface
@@ -662,7 +662,7 @@ Default behaviour is embedding values quoted as hinted via C<-flg> or analysed.
 
 =item -ddlb
 
-	=> not exists || sub{}(self, {field}) -> ddlb || [value,...[value=>labels],...] || {value=>label,..., value=>[labels],...} || cursor
+	=> not exists || form name || sub{}(self, {field}) -> ddlb || [value,...[value=>labels],...] || {value=>label,..., value=>[labels],...} || cursor
 
 (C<Field Description>)
 Drop-down list box with editable input and produced on button press selection list.
@@ -833,12 +833,14 @@ Database field name or expression may be explained by C<-expr>.
 
 =item -flg
 
-	=> not exists || 'akweuql'
+	=> not exists || 'ahkweuqln"'
 
 (C<Field Description>)
 Flags of the field:
 
-'a'll operation below, except 'k'ey, 'w'key, quoting, default
+'a'll operation below, except 'h'yperlink, 'k'ey, 'w'key, quoting; default
+
+'h'yperlink hint
 
 'k'ey - primary key, C<-key> preffered
 
@@ -861,8 +863,24 @@ Flags of the field:
 
 	=> not exists || {form name => {form description} }
 
+	=> not exists || form name to display records || true
+
 (C<Form Description>, C<User Interface>)
 User Interface forms descriptions.
+
+(C<Field Description>, C<User Interface>)
+Form to display records by field value.
+
+
+=item -frmOpt
+
+	=> not exists || boolean || [options list] || sub{}
+	sub{}(self, name, meta) -> [list]
+	sub{}(self, name, meta, option) -> proceed
+
+(C<Table/Form Description> - C<User Interface>)
+C<htmlMenu> form query options, default provided by C<cgiQuery>
+as C<-urole> C<recSel> clause.
 
 
 =item -fsrdr
@@ -888,6 +906,15 @@ File Store Writers - users names
 (C<Table/Form Description>)
 Fields for full-text search.
 Default is all fields of record.
+
+
+=item -fupd
+
+	=> not exists || record file attachments updatable sign
+
+(C<Data Record Special fields>, C<Record File Attachments>)
+Record file attachments updatable sign.
+Stamped by C<Database Operation> calls along with C<-file>.
 
 
 =item -hide
@@ -1098,7 +1125,7 @@ List heading ('<th>') HTML tag class
 List heading ('<th>') HTML tag style
 
 
-=item -lhstyle
+=item -lhprop
 
 (C<Field Description>)
 List heading ('<th>') HTML tag additional properties
@@ -1346,6 +1373,11 @@ See also C<-recXXX>, C<recForm>, C<-subst> redirections.
 Default specification of data records to be retrieved by C<cgiQuery>
 and listed for user by C<cgiList>.
 
+Additional C<-qwhere> query clause is used as C<recQBF> default,
+because all C<-query> clauses may be overwritten via C<recQBF> 
+except C<-where> and C<-key> catenation.
+
+Additional C<-qfrmOpt> and C<-qurole> options may be used as default C<-frmOpt> selection.
 
 
 =item -rac
@@ -1356,23 +1388,24 @@ and listed for user by C<cgiList>.
 Record level Access Control switch
 
 
-=item -racAdmin
+=item -racAdmRdr
+
+	=> 'Administrators,root'
+
+(C<Database Description>)
+Users, can read any record.
+Format of this value is alike containing list of user names string field.
+See also C<uadmrdr>, C<-racAdmWtr>.
+
+
+=item -racAdmWtr
 
 	=> 'Administrators,root'
 
 (C<Database Description>)
 Users, can edit any record.
 Format of this value is alike containing list of user names string field.
-See also C<uadmin>, C<-racAdmRdr>.
-
-
-=item -racAdmRdr
-
-	=> not exists || 'user,...'
-
-(C<Database Description>)
-Users, can read any record.
-See also C<uadmrdr>, C<-racAdmin>.
+See also C<uadmwtr>, C<-racAdmRdr>.
 
 
 =item -racActor
@@ -2717,11 +2750,10 @@ Template for Materialized View of Versions of records,
 See source code.
 
 
-=item uadmin () -> is current user an admin?
+=item uadmin () -> C<uadmwtr>
 
 C<User Identification>.
-Returns true if current user is a member of C<-racAdmin>,
-just C<ugmember>(C<-racAdmin>).
+Alias of C<uadmwtr>
 
 
 =item uadmrdr () -> can current user read almost all records?
@@ -2729,6 +2761,20 @@ just C<ugmember>(C<-racAdmin>).
 C<User Identification>.
 Returns true if current user is a member of C<-racAdmRdr>,
 just C<ugmember>(C<-racAdmRdr>).
+
+
+=item uadmwtr () -> can current user edit any record?
+
+C<User Identification>.
+Returns true if current user is a member of C<-racAdmWtr>,
+just C<ugmember>(C<-racAdmWtr>).
+
+
+=item udisp (username) -> display name
+
+C<User Identification>.
+Returns display name for user or group name given.
+Returns name given if cannot translate.
 
 
 =item uglist (? '-ug<>', ? [] || {}) -> [user and group names]
@@ -2971,6 +3017,20 @@ C<psEval> method executes perl script file by parsing, compiling into sub{}, eva
 
 =over
 
+=head2 2005-04-11 - Development Version 0.56
+
+It seems, it works...
+
+Fields hyperlinking development, 
+display of windows users names implemented, 
+new C<uadmwtr>,
+C<lng> improvement,
+new C<-frmOpt>,
+new C<-qwhere>,
+C<htmlRFD> correction via new C<-fupd>,
+C<datastr>/C<strdata> correction.
+
+
 =head2 2005-03-15 - Development Version 0.55
 
 Under construction yet...
@@ -3029,7 +3089,7 @@ L<Win32::OLE|Win32/OLE>->Option("Warn"=>0) used anywere.
 
 C<cgiAction>: Edit mode switched off when record save.
 
-C<-racAdmin> can read only permitted records, but update all can read.
+C<-racAdmWtr> can read only permitted records, but update all can read.
 C<-racAdmRdr> slot added.
 
 

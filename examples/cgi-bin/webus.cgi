@@ -14,6 +14,8 @@ my $w =DBIx::Web->new(
  ,-cgibus	=>"$ENV{DOCUMENT_ROOT}/cgi-bus"
  ,-url		=>'/cgi-bus'
  ,-urf		=>'-path'
+#,-racAdmRdr	=>''
+#,-racAdmWtr	=>''
 #,-setall	=>1		# full features - under development
  );
 
@@ -65,7 +67,7 @@ $w->set(
 			,-colspan=>3
 			 }
 		,$w->{-setall}
-		? {-fld=>'mailto'
+		? {-fld=>'mailto'	# !!! unimplemented yet
 			,-flg=>'euq'
 			,-ddlb=>sub{$_[0]->uglist({})}
 			 }
@@ -174,12 +176,12 @@ $w->set(
 			 }
 		,$w->{-setall}
 		?(''
-		 ,{-fld=>'mailto'
+		 ,{-fld=>'mailto'	# !!! unimplemented yet
 			,-flg=>'euq'
 			,-ddlb=>sub{$_[0]->uglist({})}
 			,-ddlbtgt=>[[undef,undef,',']]
 			 }, ''
-		 ,{-fld=>'period'
+		 ,{-fld=>'period'	# !!! unimplemented yet
 			,-flg=>'euq'
 			 })
 		: ()
@@ -204,16 +206,19 @@ $w->set(
 			}, ''
 		,{-fld=>'object'
 			,-flg=>'euql'
-			,-ddlb=>sub{$_[0]->cgiQuery('gwoobj')}
+			,-ddlb=>'gwoobj'	# sub{$_[0]->cgiQuery('gwoobj')}
+		#	,-form=>'gwo'
 			}
 		,$w->{-setall}
 		?(''
 		 ,{-fld=>'doctype'
 			,-flg=>'euq'
+			,-ddlb=>'gwodoc'
 			}
 		 ,"\n\t\t"
 		 ,{-fld=>'project'
 			,-flg=>'euq'
+			,-ddlb=>'gwoprj'
 			}, ''
 		 ,{-fld=>'cost'
 			,-flg=>'euq'
@@ -231,8 +236,11 @@ $w->set(
 			,-inp=>{-htmlopt=>1, -hrefs=>1, -arows=>5, -cols=>70}
 			}
 		,$w->tfsAll()
+		# !!! sorting computed fields
 		]
 		,$w->ttoRVC()
+		,-racPrincipal	=>['puser', 'prole']
+		,-racActor	=>['auser', 'arole']
 		,-racReader	=>[qw(rrole)]
 		,-racWriter	=>[$w->tn('-rvcUpdBy'), $w->tn('-rvcInsBy'), 'puser', 'prole', 'auser', 'arole']
 		,-ridRef	=>[qw(idrm idpr comment)]
@@ -242,16 +250,20 @@ $w->set(
 						next if !$_[3]->{$n};
 						$_[2]->{$n} =$_[3]->{$n};
 					}
+					foreach my $n (qw(puser auser)) {
+						$_[2]->{$n} =$_[0]->user()
+							if !$_[2]->{$n}
+					}
 					$_[2]->{'stime'} =$_[0]->strtime();
 				}
 		,-query		=>{-keyord=>'-dall'
-				, -order=>'utime desc'
+				, -order=>'etime desc'
 				, -data=>[qw(etime status auser arole object subject id)]
 				, -display=>[qw(etime status object subject auser arole)]
 				}
 		,-dbd		=>'dbi'
 	}
-	,!$w->{-cgibus} ? $w->ttsAll() : ()
+	,!$w->{-cgibus} ? $w->ttsAll() : () # materialized views not used in cgi-bus
 	});
 
 $w->set(
@@ -270,7 +282,7 @@ $w->set(
 		 -lbl		=>'Organizer hierarchy'
 		,-cmt		=>'Groupware organizer hierarchy'
 		,-table		=>'gwo'
-		,-query		=>{-keyord=>'-dall', -key=>{'idrm'=>undef}, -order=>'utime desc'}
+		,-query		=>{-keyord=>'-dall', -key=>{'idrm'=>undef}, -order=>'etime desc'}
 		}
 	,'gwoobj'	=>{
 		 -lbl		=>'Organizer objects'
@@ -284,6 +296,34 @@ $w->set(
 					}
 		,-qhref		=>{-key=>['object'], -form=>'gwo', -cmd=>'recList'}
 		}
+	,$w->{-setall}
+	?('gwodoc'	=>{
+		 -lbl		=>'Organizer doctypes'
+		,-cmt		=>'Groupware organizer document types'
+		,-table		=>'gwo'
+		,-query		=>{-data	=>['doctype']
+				  ,-display	=>['doctype']
+				  ,-order	=>'doctype'
+				  ,-group	=>'doctype'
+				  ,-keyord	=>'-aall'
+					}
+		,-qhref		=>{-key=>['doctype'], -form=>'gwo', -cmd=>'recList'}
+		})
+	: ()
+	,$w->{-setall}
+	?('gwoprj'	=>{
+		 -lbl		=>'Organizer projects'
+		,-cmt		=>'Groupware organizer projects'
+		,-table		=>'gwo'
+		,-query		=>{-data	=>['project']
+				  ,-display	=>['project']
+				  ,-order	=>'project'
+				  ,-group	=>'project'
+				  ,-keyord	=>'-aall'
+					}
+		,-qhref		=>{-key=>['project'], -form=>'gwo', -cmd=>'recList'}
+		})
+	: ()
 	});
 
 #$w->set(-index=>1);
