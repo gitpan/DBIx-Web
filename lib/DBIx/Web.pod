@@ -271,7 +271,7 @@ C<logOpen>, C<logLock>, C<logRec>
 
 =item SubObjects
 
-C<-dbi>, C<-dbiarg>, C<-dbiph>; C<-cgi>; C<-output>;
+C<-dbi>, C<-dbiarg>, C<-dbiph>, C<-dbiACLike>; C<-cgi>; C<-output>;
 
 C<dbi>, C<cgi>;
 C<hfNew>, C<dbmNew>, C<dbmTable>, C<ccbNew>;
@@ -283,6 +283,7 @@ C<output>, C<outhtm>, C<outhtml>, C<outxml>
 
 C<-user>, C<-unames>, C<-ugroups>; 
 C<-AuthUserFile>, C<-AuthGroupFile>;
+C<-userln>, C<-usernt>;
 C<-udflt>, C<-unflt>, C<-ugflt>;
 
 C<user>, C<userln>, C<unames>, C<ugroups>, C<ugnames>, C<udisp>, C<uglist>;
@@ -326,7 +327,7 @@ C<-optrec>;
 C<-dbd>;
 C<Triggers>;
 C<User Interface> (C<-cgcXXX>; C<-subst>, C<-recXXX>, C<-recRead>, C<-qlist>;
-C<-frmOpt>, C<-query>, C<-qfilter>, C<-qhref>, C<-qhrcol>, C<-qfetch>, C<-limit>; C<-cgvXXX>)
+C<-frmLso>, C<-query>, C<-qfilter>, C<-qhref>, C<-qhrcol>, C<-qfetch>, C<-limit>; C<-cgvXXX>)
 
 
 =item Field Description
@@ -343,9 +344,9 @@ C<-lsthtml>, C<-lhclass>, C<-lhstyle>, C<-lhprop>, C<-ldclass>, C<-ldstyle>, C<-
 
 =item Record level Access Control
 
-C<-rac>; 
+C<-rac>, C<-dbiACLike>; 
 C<-racAdmRdr>, C<-racAdmWtr>, C<-racReader>, C<-racWriter>; 
-C<-racActor>, C<-racPrincipal>;
+C<-racActor>, C<-racPrincipal>, C<racUser>;
 C<-editable>
 
 
@@ -396,15 +397,15 @@ as new values in '1R' triggers and
 also in '1C' triggers of single-row operations.
 
 C<-end0>, C<-endh>, C<-end1>,
-C<-recNew0R>, C<-recNew1C>;
-C<-recForm1R>, C<-recForm1C>;
-C<-recIns0C>, C<-recIns0R>, C<-recInsID>, C<-recIns1R>, C<-recIns1C>;
+C<-recTrim0A>, C<-recChg0A>, C<-recChg1A>;
+C<-recForm0C>, C<-recForm1C>;
+C<-recNew0C>, C<-recNew1C>;
+C<-recIns0R>, C<-recInsID>, C<-recIns1R>;
 C<-recUpd0C>, C<-recUpd0R>, C<-recUpd1C>;
 C<-recDel0C>, C<-recDel0R>, C<-recDel1C>;
 C<-recIndex0R>;
 C<-recSel0C>;
-C<-recRead0C>, C<-recRead0R>, C<-recRead1R>, C<-recRead1C>;
-C<-recJoint1R>
+C<-recRead0C>, C<-recRead1C>
 
 
 =item Database Operation
@@ -414,7 +415,7 @@ C<recCommit>, C<recRollback>;
 
 C<recNew>, C<recForm>, C<recIns>, C<recUpd>, C<recDel>;
 C<recSel>, C<recList>, C<recRead>, C<recQBF>;
-
+C<recLast>;
 C<recFields>, C<recValues>, C<recData>, C<recKey>, C<recWKey>.
 
 See also C<Database Engines>.
@@ -439,12 +440,15 @@ C<-form>;
 C<-cgcXXX>;
 C<-subst>, C<-qlist>;
 C<-recXXX> (C<-recNew>, C<-recForm>, C<-recIns>, C<-recUpd>, C<-recDel>, C<-recRead>, C<-recList>,...);
+C<-recX#A> (C<-recTrim0A>, C<-recChg0A>, C<-recChg1A>);
 C<-httpheader>, C<-htmlstart>;
 C<-logo>, C<-icons>, C<-menuchs>, C<-menuchs1>;
 C<-login>;
 C<-cgvXXX>;
 
-C<cgiRun>, C<cgiParse>, C<cgiQuery>; C<psParse>, C<psEval>; 
+C<cgiRun>, C<cgiParse>, C<cgiQuery>; 
+C<urlAuth>, C<urlOpt>;
+C<psParse>, C<psEval>; 
 C<htmlStart>, C<htmlEnd>, C<htmlHidden>, C<htmlMenu>, 
 C<cgiForm> (and also C<htmlField>, C<cgiDDLB>, C<tfvVersions>, C<tfdRFD>, C<tfvReferences>),
 C<cgiList>, 
@@ -548,7 +552,7 @@ Internal cache for computed values
 
 (C<Table/Form Description> - C<User Interface>)
 Redirects C<cgiRun> to execute full external implementation of request or screen alike
-C<recNew>, C<recForm>, C<recIns>, C<recUpd>, C<recDel>, C<recRead>, C<recList>, C<recCall>.
+C<recNew>, C<recForm>, C<recIns>, C<recUpd>, C<recDel>, C<recRead>, C<recList>.
 See C<Perl Script Pages> for '*.psp' files description.
 See C<-recXXX>, C<-subst>, C<-table> for redirections of request to another form or table.
 See C<-cgvXXX> for external implementation of presentation only.
@@ -577,7 +581,7 @@ may be useful about redesign and migration.
 
 (C<Table/Form Description> - C<User Interface>)
 Redirects C<cgiRun> to execute presentation external implementation of request or screen alike
-C<recNew>, C<recForm>, C<recIns>, C<recUpd>, C<recDel>, C<recRead>, C<recList>, C<recCall>.
+C<recNew>, C<recForm>, C<recIns>, C<recUpd>, C<recDel>, C<recRead>, C<recList>.
 See C<Perl Script Pages> for '*.psp' files description.
 See C<-recXXX> for redirections of request to another form or table.
 See C<-cgcXXX> for full external implementation.
@@ -641,6 +645,22 @@ See also C<Database Engines>.
 
 (C<SubObjects>)
 DBI object, if used, created and available via C<dbi> call, using C<-dbiarg> to create
+
+
+=item -dbiACLike
+
+	=> not exists || '' || rlike regexp ~* similar regexp_like like eq|=; lc; filter|sub
+
+(C<SubObjects>, C<Record level Access Control>)
+DBI LIKE operation options for access control fields comparation.
+There may be MySQL 'rlike' or 'regexp' operator, 
+PostgreSQL '~*' operator, 
+Oracle 'regexp_like' function name,
+SQL'99 'similar to' operator,
+widely known but problematical 'like' and '=' operators.
+Additional 'lc' or 'lower' word involves lowercase conversion.
+Additional 'filter' or 'sub' word involves C<-filter>ing to ensure 'like' case.
+Default operation depends on database driver name.
 
 
 =item -dbiarg
@@ -872,15 +892,41 @@ User Interface forms descriptions.
 Form to display records by field value.
 
 
-=item -frmOpt
+=item -frmLso
 
-	=> not exists || boolean || [options list] || sub{}
-	sub{}(self, name, meta) -> [list]
-	sub{}(self, name, meta, option) -> proceed
+=item -frmLsoAdd
+
+	=> not exists || boolean 
+	=> [[option, title, ? sub{} || {'-pcmd' options}],...] 
+	=> sub{}(self, name, meta, command, option) -> [list]
+
+=item -frmLso0A
+
+	=> not exists || sub{}(self, name, meta, {'-pcmd' options}, option)
+
+=item -frmLso0C
+
+	=> not exists || sub{}(self, name, meta, command, option)
+
+=item -frmLso1C
+
+	=> not exists || sub{}(self, name, meta, command, option, comment) -> html
+
+=item -frmLso2C
+
+	=> not exists || sub{}(self, name, meta, command, option) -> html
 
 (C<Table/Form Description> - C<User Interface>)
 C<htmlMenu> form query options, default provided by C<cgiQuery>
 as C<-urole> C<recSel> clause.
+
+C<-frmLso0A> trigger may be used to change C<-pcmd> 
+emulating user defined query parameters.
+C<-frmLso0C> trigger may be used to modify immediate C<cgiSel> arguments.
+
+C<-frmLso1C> and C<-frmLso2C> triggers may be used to modify 
+C<htmlMenu> comment and C<cgiList> first column header.
+C<urlOpt> method may be useful.
 
 
 =item -fsrdr
@@ -1294,7 +1340,7 @@ See also C<-url>, C<-urf>.
 	=> not exists || {}
 
 (C<User Interface>)
-User data input parsed, see C<cgiRun>, C<cgiParse>
+User data input parsed, local inside see C<cgiRun>, parsed by C<cgiParse>
 
 
 =item -pcmd
@@ -1302,7 +1348,7 @@ User data input parsed, see C<cgiRun>, C<cgiParse>
 	=> not exists || {}
 
 (C<User Interface>)
-User command input / output, see C<cgiRun>, C<cgiParse>
+User command input / output, local inside C<cgiRun>, parsed by C<cgiParse>
 
 
 =item -pout
@@ -1310,7 +1356,7 @@ User command input / output, see C<cgiRun>, C<cgiParse>
 	=> not exists || {}
 
 (C<User Interface>)
-User data output, see C<cgiRun>, C<cgiParse>
+User data output, local inside C<cgiRun>, filled by C<cgiRun> or C<cgiAction>
 
 
 =item -qfetch
@@ -1377,7 +1423,7 @@ Additional C<-qwhere> query clause is used as C<recQBF> default,
 because all C<-query> clauses may be overwritten via C<recQBF> 
 except C<-where> and C<-key> catenation.
 
-Additional C<-qfrmOpt> and C<-qurole> options may be used as default C<-frmOpt> selection.
+Additional C<-qfrmLso> and C<-qurole> options may be used as default C<-frmLso> selection(s).
 
 
 =item -rac
@@ -1414,6 +1460,7 @@ See also C<uadmwtr>, C<-racAdmRdr>.
 
 (C<Database Description>, C<Table/Form Description> - C<Record level Access Control>, C<Templates>)
 Field(s) to store names of user(s) to be considered as actors of record.
+Used for C<-urole> clause of C<recSel>.
 Default is about C<-rvcUpdBy>.
 
 
@@ -1423,6 +1470,7 @@ Default is about C<-rvcUpdBy>.
 
 (C<Database Description>, C<Table/Form Description> - C<Record level Access Control>, C<Templates>)
 Field(s) to store names of user(s) to be considered as principals of record.
+Used for C<-urole> clause of C<recSel>.
 Default is about C<-rvcInsBy>.
 
 
@@ -1432,6 +1480,16 @@ Default is about C<-rvcInsBy>.
 
 (C<Database Description>, C<Table Description>) 
 Readers of record - fieldnames with usernames.
+
+
+=item -racUser
+
+	=> not exists || ['field name',...]
+
+(C<Database Description>, C<Table/Form Description> - C<Record level Access Control>, C<Templates>)
+Field(s) to store names of user(s) to be considered as users of record.
+Used for C<-urole> clause of C<recSel>.
+Default is about C<-racPrincipal>.
 
 
 =item -racWriter
@@ -1470,6 +1528,28 @@ Embedded into text references are considered as '_key=table//id' or '_key=id%3Dt
 See also C<tvmReferences>, C<tfvReferences>.
 
 
+
+=item -recChg0A
+
+	=> not exists || sub{}($self, {UI command}, data {field => value})
+
+=item -recChg1A
+
+	=> not exists || sub{}($self, {UI command}, source {field => value}, result {field => value})
+
+(C<User Interface>: C<Database Description>, C<Table Description>, C<Form Description> - all executed)
+
+Record changing triggers before ('0A') and after ('1A') record data actions.
+Called by C<User Interface>.
+C<-recChg0A> called after C<-recTrim0A>, C<recNew>, C<recRead>,
+and before 
+C<recForm>, C<recIns>, C<recUpd>, C<recDel>.
+C<-recChg1A> called after 
+C<recNew>, C<recForm>, C<recIns>, C<recUpd>, C<recRead>.
+May be used to provide interactivelly computed values.
+
+
+
 =item -recDel
 
 	=> not exists || 'form name' || sub{}($self, 'name', {metadata}, $s->{-pcmd}, $s->{-pdta}) -> $s->{-pout}
@@ -1505,15 +1585,23 @@ C<-qlist> to redirect from C<recQBF> to C<recList> transition,
 C<-recXXX> for particular redirections.
 
 
-=item -recForm1R
 
-=item -recForm1C		
+=item -recForm0C
+
+	=> not exists || sub{}($self, {command}, data {field => value})
+
+=item -recForm1C
 
 	=> not exists || sub{}($self, {command}, source {field => value}, result {field => value})
 
 (C<Database Description>, C<Table Description>, C<Form Description>; all executed)
-C<recForm> triggers after each row ('1R') and after command ('1C').
-C<recRead> triggers will be executed before, to produce result values.
+C<recForm> triggers before ('0C') and after command ('1C').
+C<-recForm0C> is executed starting any record data manipulation,
+after C<-recNew0C>, C<-recIns0C>, C<-recUpd0C>, C<-recDel0C>;
+may be used for some kind of computed values.
+C<-recForm1C> is executed ending any single-record data operation
+alike C<recNew>, C<recForm>, C<recIns>, C<recUpd>, C<recRead>;
+may be used to provide values for display only fields.
 
 
 =item -recIndex0R
@@ -1534,7 +1622,7 @@ Old values hash will be undefined in C<recIns>.
 C<recIns> operation UI implementation
 
 
-=item -recIns0C	
+=item -recIns0C
 
 =item -recIns0R
 
@@ -1545,10 +1633,10 @@ C<recIns> operation UI implementation
 	=> not exists || sub{}($self, {command}, source {field => value}, result {field => value})
 
 (C<Database Description>, C<Table Description>, C<Form Description>; all executed)
-C<recIns> triggers before command ('0C'), before each row ('0R'), after each row ('1R'), after command ('1C').
-Result values are not available in '0R' and 'C' triggers.
-C<-recForm1R> will be executed before C<-recIns0R>;
-C<-recInsID> - after.
+C<recIns> triggers before before command ('0C'), before row ('0R'),
+after row ('1R'), after command ('1C').
+Result values are not available in '0R' triggers.
+See also C<-recInsID>.
 
 
 =item -recInsID
@@ -1558,17 +1646,7 @@ C<-recInsID> - after.
 (C<Database Description>, C<Table Description>; nearest executed)
 C<recIns> row ID generation trigger.
 Default operation exists in C<Database Description>.
-
-
-=item -recJoint1R
-
-	=> not exists || sub{}($self, {command}, source {field => value}, result {field => value})
-
-(C<Database Description>, C<Table Description>, C<Form Description>; all executed)
-Executed after any single-record operation '1R' trigger,
-in C<recNew>, C<recForm>, C<recIns>, C<recUpd>, C<recRead>.
-May be used to add some calculated fields to record's hash ref will be returned.
-Distinguish from C<-recRead> UI implementation hash ref form.
+C<-recInsID> is executed after C<-recIns0R>.
 
 
 =item -recList
@@ -1587,17 +1665,17 @@ C<recList> operation UI implementation
 C<recNew> operation UI implementation
 
 
-=item -recNew0R
+=item -recNew0C
 
 	=> not exists || sub{}($self, {command}, record {field => value}, sample {field => value})
 
 =item -recNew1C		
 
-	=> not exists || sub{}($self, {command})
+	=> not exists || sub{}($self, {command}, source {field => value}, result {field => value})
 
 (C<Database Description>, C<Table Description>, C<Form Description>; all executed)
-C<recNew> triggers before each row ('0R'), after command ('1C').
-Newly created record's hash ref is available in '0R' trigger, which
+C<recNew> triggers before ('0') and after command ('1C').
+Newly created record's hash ref is available in '0C' trigger, which
 may add some sample field values.
 
 
@@ -1609,22 +1687,18 @@ may add some sample field values.
 C<recRead> operation UI implementation.
 Distinguish hash ref form, 
 will be executed in C<cgiRun> after any single-record C<User Interface> operation,
-from C<-recJoint1R> trigger inside C<Database Operation>.
+from C<-recForm1C> trigger inside C<Database Operation>.
 
 
 =item -recRead0C
-
-=item -recRead0R
-
-=item -recRead1R
 
 =item -recRead1C
 
 	=> not exists || sub{}($self, {command}, source {field => value}, result {field => value})
 
 (C<Database Description>, C<Table Description>, C<Form Description>; all executed)
-C<recRead> triggers before command ('0C'), before each row ('0R'), after each row ('1R'), after command ('1C').
-Result values are not available in '0R' and 'C' triggers.
+C<recRead> triggers before ('0')  and after ('1') row read.
+Result values are not available in before triggers.
 Source values should be ignored.
 
 
@@ -1634,6 +1708,18 @@ Source values should be ignored.
 
 (C<Database Description>, C<Table Description>, C<Form Description>; all executed)
 C<recSel> before command trigger.
+
+
+=item -recTrim0A
+
+	=> not exists || sub{}($self, {command}, data {field => value})
+
+(C<User Interface>: C<Database Description>, C<Table Description>, C<Form Description> - all executed)
+
+The first trigger executed before ('0A') record data action
+by C<User Interface>
+to trim starting and ending spaces from field values
+before C<-recChg0A>.
 
 
 =item -recUpd
@@ -1878,6 +1964,22 @@ C<-wkey> used if not defined.
 
 (C<User Identification>)
 User name sub{} or value
+
+
+=item -userln
+
+	=> true || false
+
+(C<User Identification>)
+Short local usernames switch
+
+
+=item -usernt
+
+	=> false || true
+
+(C<User Identification>)
+Windows NT style usernames ('domain\\username') switch
 
 
 =item -var
@@ -2374,9 +2476,9 @@ See also C<recValues>
 
 C<Database Operation>.
 Recalculates record, new or existing in database.
-Original field values will be obtained via C<recRead>(-table=>name, -key=>{original C<recKey>})
-and added to new data given if not exists.
-C<-recForm1R>, C<-recForm1C> triggers will be executed.
+Original field values obtained via C<recRead>(-table=>name, -key=>{original C<recKey>})
+and added to new data given if not exists;
+C<-recForm0C> and C<-recForm1C> triggers executed.
 
 
 =item recIndex (index table name, key {field=>value}, ? data {field=>value})
@@ -2398,9 +2500,9 @@ prototype record via C<recRead>(-table=>name, -key=>{original C<recKey>}),
 or C<recSel> cursor.
 Then, given field values will be applied;
 C<-rvcInsBy> C<-rvcUpdBy>, C<-rvcInsWhen>, C<-rvcUpdWhen> filled;
-C<-recForm1R>, C<-recIns0R>, C<-recInsID> executed;
+C<-recForm0C>, C<-recIns0R>, C<-recInsID> executed;
 record inserted into database;
-<-recIns1R>, C<-recJoint1R>, C<-recIns1C> executed.
+<-recIns1R>, C<-recForm1C> executed.
 Returns record inserted, or command hash ref when insertion from cursor.
 See also C<recNew> and C<recForm>, but they are not required to prepare data to be inserted.
 
@@ -2410,6 +2512,16 @@ See also C<recNew> and C<recForm>, but they are not required to prepare data to 
 C<Database Operation>.
 Obtains Key fields names and values from record's data hash ref using C<-key>.
 See also C<recData>, C<recWKey>
+
+
+=item recLast (table name||command, data {field=>value,...}, lookup [field name,...],... target [field name,...] || sub{}(self, data) || undef) -> record {field=>value,...}
+
+C<Database Operation>.
+Reads newest record from database according to field names described and record data given.
+Attempts including lookup arguments from last.
+Supplies target with values fetched, returns record fetched.
+Useful for fetching default field values.
+May be not implemented for non-sql C<Database Engines>.
 
 
 =item recList () -> C<recSel>(@_)
@@ -2424,11 +2536,11 @@ Passes all work to C<recSel> now, may be redesigned.
 C<Database Operation>.
 Creates a new data record to be inserted into database.
 Prototype's field values obtained via C<recRead>(-table=>name, -key=>{prototype C<recKey>}),
-but not used instead of C<-recNew0R>.
-Given field values used to initiate new record's hash ref,
-C<-recNew0R> executed,
-C<-rvcInsBy> C<-rvcUpdBy>, C<-rvcInsWhen>, C<-rvcUpdWhen> filled,
-C<-recNew1R>, C<-recJoint1R>, C<-recNew1C> executed.
+but not used instead of C<-recNew0C>.
+Given field values used to initiate new record's hash ref;
+C<-rvcInsBy> C<-rvcUpdBy>, C<-rvcInsWhen>, C<-rvcUpdWhen> filled;
+C<-recNew0C> and C<-recForm0C> executed;
+C<-recNew1C> and C<-recForm1C> executed.
 The following calls may be C<recForm> and C<recIns>.
 
 
@@ -2452,7 +2564,7 @@ implemented within C<cgiRun> and C<cgiForm>
 C<Database Operation>.
 Reads single record from database using C<recSel>, 
 returns this record as a hash ref (with C<-file>, C<-editable> slots if applicable).
-Executes C<-recRead1R>, C<-recJoint1R>, C<-recRead1C>.
+Executes C<-recRead0C>, C<-recRead1C>, C<-recForm1C>.
 
 
 =item recReindex (clear?, ?index names) -> success
@@ -2476,7 +2588,7 @@ See also C<recCommit>.
 ? -data => [field, [field => alias], {-fld => alias, -expr => formula,..},...],
 ? -key => {field name => value,...},
 ? -where => 'where clause' || ['where clause',...],
-? -urole => 'author'||'authors'||'actors'||'principals',
+? -urole => 'author'||'authors'||'actors'||'principals'||'user'||'users',
 ? -uname => 'role username'
 ? -ftext => 'full-text search string',
 ? -version => false ||true,
@@ -2500,7 +2612,7 @@ C<Database Operation>.
 Updates record(s) into database, under '-key' or '-where' conditions.
 With '-optrec', record will be inserted if not present.
 Returns record updated if one only, or command hash ref if zero or more then one record updated.
-See also C<-recUpd0C>, C<-recUpd0R>, C<-recJoint1R>, C<-recUpd1C>.
+See also C<-recUpd0C>, C<-recForm0C>, C<-recUpd0R>, C<-recUpd1C>, C<-recForm1C>.
 
 
 =item recValues ({-keyword ||fieldname => value,...}) -> field values
@@ -2777,10 +2889,12 @@ Returns display name for user or group name given.
 Returns name given if cannot translate.
 
 
-=item uglist (? '-ug<>', ? [] || {}) -> [user and group names]
+=item uglist (? '-ug<>', ? filter username || groupname || sub{}(self,name), ? container [] || {}) -> [user and group names]
 
 C<User Identification>.
-Returns user ('-u') and group ('-g') names in array ([]) or hash ({}) ref;
+Returns user ('-u') and group ('-g') names 
+using filter given 
+in array ([]) or hash ({}) ref;
 '<>' option forces comment notation for hash ref.
 Default is both ('-ug') in array ref ([]).
 Uses C<-AuthUserFile> and C<-AuthGroupFile>, or C<w32agf>.
@@ -2831,6 +2945,12 @@ Uses C<-unames> sub{} or value.
 Default is [C<user>] with C<userln> and 'domain\\user' form added if applicable and not met.
 
 
+=item urlAuth () -> login URL
+
+C<User Interface>.
+URL to self script authenticated.
+
+
 =item urlCat (url, name=>value,...) -> escaped URL
 
 =item urlEscape (strings) -> escaped
@@ -2841,6 +2961,11 @@ C<Misc Data methods>.
 Escapes and unescapes to and from URL format.
 See also C<htmlEscape>.
 
+
+=item urlOpt (option => value,...) -> invokation URL
+
+C<User Interface>.
+Self URL using C<-pcmd> values with options given added / replaced.
 
 
 =item user () -> current user name
@@ -3017,6 +3142,31 @@ C<psEval> method executes perl script file by parsing, compiling into sub{}, eva
 
 =over
 
+=head2 2005-05-29 - Development Version 0.57
+
+It seems, it works again...
+
+New C<-racUser>.
+
+Renamed C<-frmOpt> to C<-frmLso>.
+
+Changed C<uglist> - filter argument added to get users of group or groups of user.
+
+New C<-userln>, C<-usernt>.
+
+New C<recLast>.
+
+Removed C<-recRead0R>, C<-recRead1R>.
+
+Renamed C<-recForm1R> -&gt; C<-recForm0C>, C<-recNew0R> -&gt; C<-recNew0C>.
+
+New C<-recTrim0A>, C<-recChg0A>, C<-recChg1A>.
+
+Examples settings extended and documented.
+
+New C<-dbiACLike> slot to switch ACL 'RLIKE' dialects of MySQL, PosgreSQL, SQL99...
+
+
 =head2 2005-04-11 - Development Version 0.56
 
 It seems, it works...
@@ -3025,7 +3175,7 @@ Fields hyperlinking development,
 display of windows users names implemented, 
 new C<uadmwtr>,
 C<lng> improvement,
-new C<-frmOpt>,
+new C<-frmLso>,
 new C<-qwhere>,
 C<htmlRFD> correction via new C<-fupd>,
 C<datastr>/C<strdata> correction.

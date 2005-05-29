@@ -5,15 +5,30 @@ BEGIN {
 }
 use DBIx::Web;
 my $w =DBIx::Web->new(
-	  -serial	=>2
-	 ,-debug	=>2
-	 ,-dbiarg	=>undef
-	#,-path		=>"$ENV{DOCUMENT_ROOT}/dbix-web"
-	#,-url		=>'/cgi-bus'
-	 ,-urf		=>'-path'
-	#,-racAdmRdr	=>''
-	#,-racAdmWtr	=>''
+  -title	=>'DBIx-Web'	# title of application
+#,-logo		=>''		# logo html/image
+ ,-debug	=>2		# debug level
+ ,-serial	=>2		# serial operation level
+ ,-dbiarg	=>undef
+#,-dbiph	=>1		# dbi placeholders usage
+#,-dbiACLike	=>'eq lc'	# dbi access control comparation
+ ,-keyqn	=>1		# key query null comparation
+#,-path		=>"$ENV{DOCUMENT_ROOT}/dbix-web"
+#,-url		=>'/cgi-bus'	# filestore URL
+ ,-urf		=>'-path'	# filestore filesystem URL
+#,-fswtr	=>''		# filesystem writers (default is process account)
+#,-AuthUserFile	=>''		# apache users file
+#,-AuthGroupFile=>''		# apache groups file
+#,-login	=>/cgi-bin/ntlm/# login URL
+#,-userln	=>0		# short local usernames (0==off, 1==default)
+#,-rac		=>0		# record access control (0==off, 1==default)
+#,-racAdmRdr	=>''		# record access control admin reader
+#,-racAdmWtr	=>''		# record access control admin writer
+#,-rfa		=>0		# record file attachments (0==off, 1==default)
+#,-httpheader	=>{}		# http header arguments
+#,-htmlstart	=>{}		# html start arguments
 	);
+
 my ($r, $c);
 $w->set(-table=>{
 	'note'=>{

@@ -5,17 +5,29 @@ BEGIN {
 }
 use DBIx::Web;
 my $w =DBIx::Web->new(
-  -debug	=>2
- ,-serial	=>2
- ,-dbiarg	=>["DBI:mysql:cgibus","cgibus","********"]
- ,-keyqn	=>1
-#,-dbiph	=>1
- ,-path		=>"$ENV{DOCUMENT_ROOT}/dbix-web"
- ,-cgibus	=>"$ENV{DOCUMENT_ROOT}/cgi-bus"
- ,-url		=>'/cgi-bus'
- ,-urf		=>'-path'
-#,-racAdmRdr	=>''
-#,-racAdmWtr	=>''
+  -title	=>'DBIx-WeBus'	# title of application
+#,-logo		=>'<img src="/icons/p.gif" border="0" />'
+ ,-debug	=>2		# debug level
+ ,-serial	=>2		# serial operation level
+ ,-dbiarg	=>["DBI:mysql:cgibus","cgibus","************"]
+#,-dbiph	=>1		# dbi placeholders usage
+#,-dbiACLike	=>'eq lc'	# dbi access control comparation
+ ,-keyqn	=>1		# key query null comparation
+ ,-path		=>"$ENV{DOCUMENT_ROOT}/dbix-web"	# datastore path
+ ,-cgibus	=>"$ENV{DOCUMENT_ROOT}/cgi-bus"		# legacy mode
+ ,-url		=>'/cgi-bus'	# filestore URL
+ ,-urf		=>'-path'	# filestore filesystem URL
+#,-fswtr	=>''		# filesystem writers (default is process account)
+#,-AuthUserFile	=>''		# apache users file
+#,-AuthGroupFile=>''		# apache groups file
+#,-login	=>/cgi-bin/ntlm/# login URL
+#,-userln	=>0		# short local usernames (0==off, 1==default)
+#,-rac		=>0		# record access control (0==off, 1==default)
+#,-racAdmRdr	=>''		# record access control admin reader
+#,-racAdmWtr	=>''		# record access control admin writer
+#,-rfa		=>0		# record file attachments (0==off, 1==default)
+#,-httpheader	=>{}		# http header arguments
+#,-htmlstart	=>{}		# html start arguments
 #,-setall	=>1		# full features - under development
  );
 
@@ -96,13 +108,22 @@ $w->set(
 		,-racWriter	=>[$w->tn('-rvcUpdBy'), $w->tn('-rvcInsBy'), 'prole']
 		,-ridRef	=>[qw(idrm comment)]
 		,-rfa		=>1
-		,-recNew0R	=>sub{	$_[2]->{'idrm'} =$_[3]->{'id'}||'';
+		,-recNew0C	=>sub{	$_[2]->{'idrm'} =$_[3]->{'id'}||'';
 					foreach my $n (qw(prole rrole)) {
-						next if !$_[3]->{$n};
-						$_[2]->{$n} =$_[3]->{$n};
+						$_[2]->{$n} =$_[3]->{$n} 
+							if $_[3]->{$n};
+						$_[0]->recLast($_[1],$_[2],['uuser'],[$n])
+							if !$_[2]->{$n};
 					}
+					$_[2]->{'status'} ='ok';
 				}
-		,-query		=>{-keyord=>'-dall', -order=>'utime desc'}
+		,-query		=>{	 -keyord=>'-dall'
+					,-order=>'utime desc'
+				#	,-qfrmLso=>['author','hierarchy']
+					}
+		,-frmLsoAdd	=>
+				[['hierarchy',undef,{-qkeyadd=>{'idrm'=>undef}}]
+				]
 		,-dbd		=>'dbi'
 	}
   ,'gwo'=>{
@@ -150,22 +171,26 @@ $w->set(
 		,{-fld=>'puser'
 			,-flg=>'euq'
 			,-ddlb=>sub{$_[0]->uglist({})}
+			#,-ddlb=>sub{$_[0]->uglist('-ug',$_[0]->{-pdta}->{'prole'},{})}
 			,-ddlbtgt=>[undef,['prole'],['auser'],['arole'],['rrole'],['mailto',undef,',']]
 			}, ''
 		,{-fld=>'prole'
 			,-flg=>'euq'
 			,-ddlb=>sub{$_[0]->uglist({})}
+			#,-ddlb=>sub{$_[0]->uglist('-g',$_[0]->{-pdta}->{'puser'},{})}
 			,-ddlbtgt=>[undef,['puser'],['auser'],['arole'],['rrole'],['mailto',undef,',']]
 			,-colspan=>3
 			}
 		,{-fld=>'auser'
 			,-flg=>'euql'
 			,-ddlb=>sub{$_[0]->uglist({})}
+			#,-ddlb=>sub{$_[0]->uglist('-ug',$_[0]->{-pdta}->{'arole'},{})}
 			,-ddlbtgt=>[undef,['puser'],['prole'],['arole'],['rrole'],['mailto',undef,',']]
 			}, ''
 		,{-fld=>'arole'
 			,-flg=>'euql'
 			,-ddlb=>sub{$_[0]->uglist({})}
+			#,-ddlb=>sub{$_[0]->uglist('-g',$_[0]->{-pdta}->{'auser'},{})}
 			,-ddlbtgt=>[undef,['puser'],['prole'],['auser'],['rrole'],['mailto',undef,',']]
 			,-colspan=>3
 			}
@@ -245,22 +270,39 @@ $w->set(
 		,-racWriter	=>[$w->tn('-rvcUpdBy'), $w->tn('-rvcInsBy'), 'puser', 'prole', 'auser', 'arole']
 		,-ridRef	=>[qw(idrm idpr comment)]
 		,-rfa		=>1
-		,-recNew0R	=>sub{	$_[2]->{'idrm'} =$_[3]->{'id'}||'';
+		,-recNew0C	=>sub{	$_[2]->{'idrm'} =$_[3]->{'id'}||'';
 					foreach my $n (qw(puser prole auser arole rrole object)) {
-						next if !$_[3]->{$n};
-						$_[2]->{$n} =$_[3]->{$n};
+						$_[2]->{$n} =$_[3]->{$n}
+							if $_[3]->{$n};
 					}
 					foreach my $n (qw(puser auser)) {
 						$_[2]->{$n} =$_[0]->user()
 							if !$_[2]->{$n}
 					}
+					$_[0]->recLast($_[1],$_[2],['auser'],['rrole'])
+						if !$_[2]->{'rrole'};
+					$_[2]->{'status'}='ok';
 					$_[2]->{'stime'} =$_[0]->strtime();
 				}
+		,-recChg0A	=> sub{ # $_[0]->logRec('recForm0A',@_[1..$#_]);
+					if (	$_[1]->{-cmd} eq 'recNew'
+					||	$_[2]->{'puser__L'}
+					||	$_[2]->{'auser__L'}) {
+						$_[0]->recLast($_[1],$_[2],['puser'],['prole']);
+						$_[0]->recLast($_[1],$_[2],['auser'],['arole']);
+					}
+		}
 		,-query		=>{-keyord=>'-dall'
 				, -order=>'etime desc'
 				, -data=>[qw(etime status auser arole object subject id)]
 				, -display=>[qw(etime status object subject auser arole)]
+			#	, -qfrmLso=>['author','hierarchy']
 				}
+		,-frmLsoAdd	=>
+				[['hierarchy',undef,{-qkeyadd=>{'idrm'=>undef}}]
+				,['news',undef,{-qorder=>'utime desc'}]
+				]
+		#,-frmLso2C	=>sub{$_[0]->cgi->a({-href=>$_[0]->urlOpt(-frmLso=>'news')}, 'by News')}
 		,-dbd		=>'dbi'
 	}
 	,!$w->{-cgibus} ? $w->ttsAll() : () # materialized views not used in cgi-bus
