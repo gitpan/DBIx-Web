@@ -218,6 +218,7 @@ Slot names begin with '-' sign.
 =item Creation and Setup
 
 C<new>, C<initialize>, C<class>, C<set>;
+C<-env>;
 C<start>, C<end>, C<-end0>, C<-endh>, C<-end1>;
 C<setup>, C<-setup>;
 C<-cgibus>
@@ -233,7 +234,7 @@ C<die>, C<warn>
 
 C<-locale>, C<-lang>, C<-charset>, C<-lng>;
 
-C<lng>
+C<lng>, C<lnghash>
 
 
 =item Misc Data methods
@@ -326,8 +327,10 @@ C<-ixcnd>, C<-ixrec>;
 C<-optrec>;
 C<-dbd>;
 C<Triggers>;
-C<User Interface> (C<-cgcXXX>; C<-subst>, C<-recXXX>, C<-recRead>, C<-qlist>;
-C<-frmLso>, C<-query>, C<-qfilter>, C<-qhref>, C<-qhrcol>, C<-qfetch>, C<-limit>; C<-cgvXXX>)
+C<User Interface> (C<-cgcXXX>; C<-subst>, C<-recXXX>;
+C<-query>, C<-frmLso>, C<-frmLsc>; 
+C<-qfilter>, C<-qhref>, C<-qhrcol>, C<-qfetch>, C<-limit>; 
+C<-cgvXXX>)
 
 
 =item Field Description
@@ -438,11 +441,11 @@ C<Table/Form Description>;
 C<-pcmd>, C<-pdta>, C<-pout>;
 C<-form>;
 C<-cgcXXX>;
-C<-subst>, C<-qlist>;
+C<-subst>,
 C<-recXXX> (C<-recNew>, C<-recForm>, C<-recIns>, C<-recUpd>, C<-recDel>, C<-recRead>, C<-recList>,...);
 C<-recX#A> (C<-recTrim0A>, C<-recChg0A>, C<-recChg1A>);
 C<-httpheader>, C<-htmlstart>;
-C<-logo>, C<-icons>, C<-menuchs>, C<-menuchs1>;
+C<-logo>, C<-icons>, C<-menuchs>, C<-menuchs1>, C<-frmLso>, C<-frmLsc>;
 C<-login>;
 C<-cgvXXX>;
 
@@ -459,11 +462,11 @@ See also C<Perl Script Pages>, C<Templates>.
 
 =item UI Substitutions
 
-C<cgiRun> (C<-cgcXXX>, C<-subst>, C<-qlist> vs C<-recList>, C<-recXXX>, C<-cgvXXX>);
+C<cgiRun> (C<-cgcXXX>, C<-subst>, C<-recXXX>, C<-cgvXXX>);
 
-C<cgiForm> (C<-field>, C<-query> C<-data>, C<-table>, C<-field>);
+C<cgiForm> (C<-field>, C<-query> C<-data>, C<-table> C<-field>);
 
-C<cgiList> (C<-query> C<-data>, C<-field>, C<-table>, C<-field>)
+C<cgiList> (C<-query> C<-data> C<-display>, C<-field>, C<-table> C<-field>)
 
 See also C<User Interface>.
 
@@ -597,10 +600,13 @@ Application's charset, see also C<-locale>
 
 =item -cmt
 
-	=> not exists || comment text
+=item -cmt_LL
+
+	=> not exists || comment text || sub{}(self) -> comment text
 
 (C<Table Description>, C<Form Description>, C<Field Description>)
-Text of object description to display to users.
+Text of object description to display to users,
+default (international) or user language specific.
 See also C<-lbl>
 
 
@@ -759,6 +765,14 @@ C<-endh> - delayed commands, cleaned after execution.
 C<-end1> - after cleanup.
 
 
+=item -env
+
+	=> not exists || {env var=>value,...}
+
+(C<Creation and Setup>)
+Assignment or deletion of environment variables within C<set>.
+
+
 =item -expr
 
 	=> not exists || database name or formula
@@ -892,13 +906,30 @@ User Interface forms descriptions.
 Form to display records by field value.
 
 
+=item -frmLsc
+
+	=> not exists
+	|| [{-val=>option, ? -lbl=>title
+			, ? -cmd=> {'cgiList' options} 
+				|| sub{}(self, name, {metadata}, {query}, option)}
+		|| [option, ? title, ? {'cgiList' options} || sub{}],...]
+
+(C<Table/Form Description> - C<User Interface>)
+C<cgiQuery> / C<cgiList> display options 
+alike column sets (C<-data>, C<-display>), 
+sorting and grouping orders (C<-order>, C<-group>).
+
+
 =item -frmLso
 
 =item -frmLsoAdd
 
 	=> not exists || boolean 
-	=> [[option, title, ? sub{} || {'-pcmd' options}],...] 
-	=> sub{}(self, name, meta, command, option) -> [list]
+	|| [{-val=>option, ? -lbl=>title
+			, ? -cmd=> {'-pcmd' options}
+				|| sub{}(self, name, {metadata}, {query}, option)}
+		|| [option, ? title, ? {'-pcmd' options} || sub{}],...]
+	|| sub{}(self, name, meta, command, option) -> [list]
 
 =item -frmLso0A
 
@@ -1056,6 +1087,8 @@ not exists		# text field
 
 -labels	=> sub{}(self) ||{value=>label,...}	# list box, see C<-ddlb> for editable features
 
+-labels_LL...					# ... user language specific
+
 -values	=> sub{}(self) ||[value,...]		# list box, optional if '-labels'
 
 -rfd	=> boolean	# record file attachments widget
@@ -1124,10 +1157,13 @@ Application's language, see also C<-locale>
 
 =item -lbl
 
-	=> not exists || label text
+=item -lbl_LL
+
+	=> not exists || label text || sub{}(self) -> label text
 
 (C<Table Description>, C<Form Description>, C<Field Description>)
-Label or external name of the object to be displayed to user.
+Label or external name of the object to be displayed to user,
+default (international) or user language specific.
 See also C<-cmt>, C<-lblhtml>, C<-inp>, C<-inphtml>
 
 
@@ -1401,29 +1437,33 @@ Keywords are:
 '-formfld' => not exists || 'field name' - field name to store form name to open via URL.
 
 
-=item -qlist
-
-	=> not exists || table or form name
-
-(C<Table/Form Description> - C<User Interface>)
-Substitutes another object name to process C<recList> request from
-C<recQBF> screen in C<cgiRun>.
-See also C<-recXXX>, C<recForm>, C<-subst> redirections.
-
-
 =item -query
 
-	=> not exists || {C<recSel> arguments}
+	=> not exists || {'recSel' and 'cgiQuery' arguments}
 
 (C<Table/Form Description> - C<User Interface>)
-Default specification of data records to be retrieved by C<cgiQuery>
-and listed for user by C<cgiList>.
+Default specification of data records to be retrieved by C<cgiQuery>/C<recSel>
+and listed for user by C<cgiList>. 
+Additional to C<recSel> clauses or options may be used:
 
-Additional C<-qwhere> query clause is used as C<recQBF> default,
+C<-data> and C<-display> arrays of field names or C<-field> 
+- for C<cgiQuery> and C<cgiList>
+instead of C<-field> C<-flg> values from C<-table> or C<-form>.
+
+C<-frmLso> value, array or sub
+- in C<cgiQuery> as default C<-frmLso> selection(s) 
+before C<-query>-&gt;{C<-urole>}.
+
+C<-qkey> and C<-qwhere> values or subs
+- as C<recQBF> defaults,
 because all C<-query> clauses may be overwritten via C<recQBF> 
-except C<-where> and C<-key> catenation.
+except C<-key> and C<-where> catenations.
 
-Additional C<-qfrmLso> and C<-qurole> options may be used as default C<-frmLso> selection(s).
+Consider also separate from C<-query> C<Table/Form Description>
+slots C<-qhref>, C<-qhrcol>, C<-qfetch>, C<-qfilter>
+for C<cgiList> specification;
+C<-frmLso> and C<-frmLsc> for C<cgiQuery> specifications.
+
 
 
 =item -rac
@@ -1580,9 +1620,8 @@ When record versioning, update triggers will be executed too, within.
 (C<Table/Form Description> - C<User Interface>)
 C<recForm> operation UI implementation.
 Used also for C<recNew>, C<recRead>, C<recDel>, C<recQBF> operation.
-See also C<-subst> redirection for all operations,
-C<-qlist> to redirect from C<recQBF> to C<recList> transition,
-C<-recXXX> for particular redirections.
+See also C<-subst> substitution for all operations and 
+C<-recXXX> for particular substitutions.
 
 
 
@@ -1679,6 +1718,27 @@ Newly created record's hash ref is available in '0C' trigger, which
 may add some sample field values.
 
 
+=item -recQBF
+
+	=> not exists || 'form name' || sub{}($self, 'name', {metadata}, $s->{-pcmd}, $s->{-pdta}) -> $s->{-pout}
+
+(C<Table/Form Description> - C<User Interface>)
+C<recQBF> operation UI implementation used in C<cgiRun>.
+See also C<-subst> substitution for all operations and 
+C<-recXXX> for particular substitutions.
+
+
+=item -recQBFl
+
+	=> not exists || table or form name
+
+(C<Table/Form Description> - C<User Interface>)
+Substitutes another object name to process C<recList> request from
+C<recQBF> screen in C<cgiRun>.
+Distinguish from C<-recList>.
+See also C<-recXXX>, C<recForm>, C<-subst> substitutions.
+
+
 =item -recRead
 
 	=> not exists || 'form name' || sub{}($self, 'name', {metadata}, $s->{-pcmd}, $s->{-pdta})  -> $s->{-pout} || {'recRead' args}
@@ -1740,7 +1800,7 @@ C<recUpd> operation UI implementation
 
 (C<Database Description>, C<Table Description>, C<Form Description>; all executed)
 C<recUpd> triggers before command ('0C'), before each row ('0R'), after command ('1C').
-Old values are not available in 'C' triggers.
+Old values are not available in 'C'ommand triggers.
 
 
 =item -recXXX
@@ -1748,9 +1808,11 @@ Old values are not available in 'C' triggers.
 	=> not exists || 'form name' || sub{}($self, 'name', {metadata}, $s->{-pcmd}, $s->{-pdta})  -> $s->{-pout} || {'recXXX' args}
 
 (C<Table/Form Description> - C<User Interface>)
-C<-recNew>, C<-recForm>, C<-recIns>, C<-recUpd>, C<-recDel>, C<-recRead>, C<-recList>, C<-recQBF>
+C<-recNew>, C<-recForm>, C<-recIns>, C<-recUpd>, C<-recDel>, C<-recRead>, 
+C<-recList>, C<-recQBF>, C<-recQBFl>
 operation UI implementation.
-See also C<-subst> redirection for all operations and C<-qlist> to redirect from C<recQBF> to C<recList> transition.
+See also C<-subst> substitution for all operations and 
+C<-recForm> for several.
 
 
 
@@ -1850,7 +1912,7 @@ Allows automatic C<setup> when C<main::DATA> last modify time later C<varStore>d
 
 (C<Table/Form Description> - C<User Interface>)
 Substitutes another object name to process request in C<cgiRun>.
-See also C<-recXXX>, C<-recForm>, C<-qlist> redirections for particular operations.
+See also C<-recXXX> and C<-recForm> substitutions for particular operations.
 
 
 =item -table
@@ -2065,10 +2127,10 @@ Use C<cgiList> and C<-field> for embedded views.
 C<User Interface>.
 Lists data rows via C<output>, used by C<cgiRun> for C<cgiQuery> results.
 '!h' option turns off table header.
-See C<Table/Form Description> for query and list specifications,
+See C<Table/Form Description>, C<-query>, C<recSel> for query and list specifications,
 additional query/list clauses are 
 C<-field> to use instead of C<-data>,
-and C<-display> to use instead of C<-flg> vaules of C<-field>.
+and C<-display> to use instead of C<-flg> values of C<-field>.
 
 
 =item cgiParse ()
@@ -2085,7 +2147,7 @@ Used internally by C<cgiRun>.
 C<User Interface>.
 Forms and starts query using C<recSel>. Returns cursor.
 Used by C<cgiRun>, with C<cgiList> follows.
-See C<Table/Form Description> and C<cgiList> for query and list specifications.
+See C<Table/Form Description>, C<-query>, C<cgiList> and C<recSel> for query and list specifications.
 
 
 =item cgiRun () -> success
@@ -2098,7 +2160,7 @@ Accepts and parses input parameters with C<cgiParse>
 into C<-pcmd> and C<-pdta>.
 Logins if needed (cgi redirection to C<-login>).
 Determines required action, form and table using
-C<-cgcXXX>, C<-subst>, C<-qlist>, C<-recXXX>, C<-table>.
+C<-cgcXXX>, C<-subst>, C<-recXXX>, C<-table>.
 If external implementation found, invokes it and returns.
 Invokes action required (stores result in C<-pout>): C<Database Operation> or C<cgiQuery> or embedded implementation.
 Reassigns C<-form> if found inside C<-pout>.
@@ -2110,7 +2172,7 @@ screen footer (C<cgiFooter>),
 form and html footers.
 
 Also implements '-reindex' (run C<recReindex>(1)) and '-setup' (run C<setup>)
-service command line options.
+service command line options, see also C<Command Line>.
 
 
 =item class () -> class name
@@ -2294,6 +2356,16 @@ Looks string given like HTML code?
 
 
 =item lng (index, 'string', ?additional values) -> user language specific string
+
+=item lnghash () -> {user language translation hash}
+
+=item lnghash (index, ['string',...]) -> {'string'=>'user language translation',...}
+
+C<Locale>.
+Returns user language specific variant of string given, short (index=0)
+or long (index=1).
+See language translations in '$LNG' hash ref in the source code.
+
 
 C<Locale>.
 Returns user language specific variant of string given, short (index=0)
@@ -3138,9 +3210,38 @@ C<psEval> method executes perl script file by parsing, compiling into sub{}, eva
 =back
 
 
+=head1 Command Line
+
+=over
+
+=item Command Line
+
+CGI scripts may provide service operations on database from shell command line,
+i.e. "web.cgi -reindex" or "web.cgi -setup".
+Several command line options are implemented within C<cgiRun> method,
+another options may be implemented within script itself.
+
+
+=back
+
+
 =head1 VERSION
 
 =over
+
+=head2 2005-06-19 - Development Version 0.58
+
+It seems, it works again...
+
+Respecifications about C<-query>.
+
+Localization and sample translation development (C<-lbl_LL>, C<-cmt_LL>, C<-labels_LL>).
+
+New C<-frmLsc>, Developed C<-frmLso>.
+
+Development of C<dbiSel>, C<cgiForm>, C<lng>.
+
+
 
 =head2 2005-05-29 - Development Version 0.57
 

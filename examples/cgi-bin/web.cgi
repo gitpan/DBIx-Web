@@ -1,8 +1,10 @@
 #!perl -w
 #http://localhost/cgi-bin/web.cgi
 BEGIN {
-# push @INC, $1 .'sitel/lib' if !(grep /sitel/i, @INC) && ($INC[0] =~/(.+?[\\\/])lib$/i)
+#push @INC, $1 .'sitel/lib' if !(grep /sitel/i, @INC) && ($INC[0] =~/(.+?[\\\/])lib$/i)
+#$ENV{DOCUMENT_ROOT} ='c:/Inetub' if !$ENV{DOCUMENT_ROOT};
 }
+#$ENV{HTTP_ACCEPT_LANGUAGE} ='';
 use DBIx::Web;
 my $w =DBIx::Web->new(
   -title	=>'DBIx-Web'	# title of application
@@ -14,7 +16,7 @@ my $w =DBIx::Web->new(
 #,-dbiACLike	=>'eq lc'	# dbi access control comparation
  ,-keyqn	=>1		# key query null comparation
 #,-path		=>"$ENV{DOCUMENT_ROOT}/dbix-web"
-#,-url		=>'/cgi-bus'	# filestore URL
+#,-url		=>'/dbix-web'	# filestore URL
  ,-urf		=>'-path'	# filestore filesystem URL
 #,-fswtr	=>''		# filesystem writers (default is process account)
 #,-AuthUserFile	=>''		# apache users file
@@ -34,6 +36,8 @@ $w->set(-table=>{
 	'note'=>{
 		 -lbl		=>'Notes'
 		,-cmt		=>'Notes'
+		,-lbl_ru	=>'Заметки'
+		,-cmt_ru	=>'Заметки'
 		,-field		=>[
 			 {-fld=>'id'
 				,-flg=>'kwq'
@@ -76,7 +80,7 @@ $w->set(-table=>{
 				 }
 			,{-fld=>$w->tn('-rvcState')
 			,-inp=>{-values=>$w->tn('-rvcAllState')}
-			,-flg=>'euql'
+			,-flg=>'euql', -null=>undef
 				}
 			,{-fld=>'subject'
 			,-flg=>'euql'
@@ -97,7 +101,21 @@ $w->set(-table=>{
 		,-racWriter	=>[$w->tn('-rvcUpdBy'), $w->tn('-rvcInsBy'), 'authors']
 		,-ridRef	=>[qw(idrm idpr comment)]
 		,-rfa		=>1
-		,-query		=>{-order=>'-dall'}
+		,-recNew0C	=>sub{	$_[2]->{'idrm'} =$_[3]->{'id'}||'';
+					foreach my $n (qw(authors readers)) {
+						$_[2]->{$n} =$_[3]->{$n} 
+							if $_[3]->{$n};
+						$_[0]->recLast($_[1],$_[2],[$_[0]->tn('-rvcUpdBy')],[$n])
+							if !$_[2]->{$n};
+					}
+					$_[2]->{$_[0]->tn('-rvcState')} ='ok';
+					$_[0]
+				}
+		,-query		=>{-order=>'-dall'
+				# ,-frmLso=>['author','hierarchy']
+				  }
+		,-frmLsoAdd	=>[['hierarchy',undef,{-qkeyadd=>{'idrm'=>undef}}]
+				  ]
 		,-dbd		=>'dbm'
 	}
 	,$w->ttsAll()
@@ -107,13 +125,16 @@ $w->set(-form=>{
 	 'default'	=>{-subst=>'index'}
 	,$w->tvdIndex()
 	,$w->tvdFTQuery()
-	,'notehier'	=>{
+	,1 ? ('notehier'	=>{
 		 -lbl		=>'Notes hierarchy'
 		,-cmt		=>'Notes hierarchy'
+		,-lbl_ru	=>'Заметки иерархически'
+		,-cmt_ru	=>'Иерархия заметок'
 		,-table		=>'note'
 		,-query		=>{-order=>'-dall'} # -key=>{'idrm'=>undef}
 		,-qfilter	=>sub{!$_[4]->{'idrm'}}
-		}
+		,-frmLsoAdd	=>undef
+		}) : ()
 	});
 $w->set(-index=>1);
 $w->set(-setup=>1);
