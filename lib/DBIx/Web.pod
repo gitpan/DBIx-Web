@@ -244,8 +244,9 @@ C<strpad>, C<strquot>; C<strdata>, C<strdatah>, C<datastr>;
 C<dsdClone>, C<dsdMk>, C<dsdParse>;
 C<strtime>, C<timestr>, C<timeadd>;
 C<cptran>;
+C<dbiLikesc>, C<dbiQuote>;
 C<ishtml>, C<htmlEscape>, C<htmlUnescape>, C<urlEscape>, C<urlUnescape>, C<urlCat>, C<htlsTag>;
-C<xmlEscape>, C<xmlAttrEscape>, C<xmlTagEscape>, C<xmlUnescape>, C<xmlsTag>
+C<xmlEscape>, C<xmlAttrEscape>, C<xmlTagEscape>, C<xmlUnescape>, C<xmlsTag>;
 
 
 =item File Store
@@ -2199,6 +2200,18 @@ C<SubObjects>. Returns L<DBI|DBI> connection object,
 creates it if not exists using C<-dbiarg> and C<-autocommit>
 
 
+=item dbiLikesc (text) -> escaped
+
+C<Misc Data methods>.
+Escapes value to use within SQL LIKE '' ESCAPE '\'.
+
+
+=item dbiQuote (text) -> escaped
+
+C<Misc Data methods>.
+Quotes value to use within SQL statements.
+
+
 =item dbmNew (file name) -> new isam data file object
 
 =item dbmNew (-option=>value,...) -> new isam data file object
@@ -3229,6 +3242,9 @@ another options may be implemented within script itself.
 
 =over
 
+=head2 2005-11-25 - Development Version 0.59
+
+
 =head2 2005-06-19 - Development Version 0.58
 
 It seems, it works again...
@@ -3456,7 +3472,7 @@ bureaucracy and vertical functionary structures.
 
 =head1 AUTHOR
 
-Andrew V Makarow <makarow@mail.com>
+Andrew V Makarow <makarow at mail.com>
 with aids of 
 Anton Uemlyanin
 

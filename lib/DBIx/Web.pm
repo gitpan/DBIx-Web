@@ -22,6 +22,8 @@
 # - test/debug 'webus.cgi'&'web.cgi': behaviour, versioning, checkouts, attachments, triggers transformation
 #
 # Done:
+# 2005-11-22 New 'dbiLikesc' and 'dbiQuote' methods; considering SQL LIKE escaping.
+# 2005-08-29 styles/classes improved, default stylesheet implemented
 # 2005-06-18 cgiQuery: -query respecification
 # 2005-06-18 cgiQuery: reoganized -qfrmLso -> -frmLso
 # 2005-06-18 cgiParse: recQBF -qlist -> recList -form
@@ -218,7 +220,7 @@ use Fcntl qw(:DEFAULT :flock :seek :mode);
 
 use vars qw($VERSION @ISA @EXPORT @EXPORT_OK %EXPORT_TAGS $AUTOLOAD $SELF $CACHE $LNG $IMG);
 
-	$VERSION= '0.58';
+	$VERSION= '0.59';
 	$SELF   =undef;				# current object pointer
 	$CACHE	={};				# cache for pointers to subobjects
 	*isa    = \&UNIVERSAL::isa; isa('','');	# isa function
@@ -933,11 +935,13 @@ sub start {	# start session
  $s->{-limited} =0;
  $s->{-affected}=0;
  $s->w32IISdpsn()	if (($ENV{SERVER_SOFTWARE}||'') =~/IIS/) 
-			&& $ENV{REMOTE_USER}
 			&& !$s->cgi->param('_qftwhere');
- $s->varLoad($s->{-serial} >2 ? LOCK_EX : $s->{-serial} >1 ? LOCK_SH : 0);
- $s->logOpen if $s->{-log} && !ref($s->{-log});
- $s->{-log}->lock(0) if ref($s->{-log});
+ unless ((($ENV{SERVER_SOFTWARE}||'') =~/IIS/)
+	&& $s->cgi->param('_qftwhere')) {
+	 $s->varLoad($s->{-serial} >2 ? LOCK_EX : $s->{-serial} >1 ? LOCK_SH : 0);
+	 $s->logOpen if $s->{-log} && !ref($s->{-log});
+	 $s->{-log}->lock(0) if ref($s->{-log});
+ }
  $s->set(@_);
  $s
 }
@@ -1500,6 +1504,16 @@ sub dbi {       # DBI connection object
 		|| &{$_[0]->{-die}}($_[0]->lng(0,'dbi') .": DBI::conect() -> failure\n");
  $_[0]->{-dbi}->{AutoCommit} =$_[0]->{-autocommit};
  $_[0]->{-dbi}
+}
+
+
+sub dbiQuote {	# DBI quote string
+ $_[0]->dbi->quote(@_[1..$#_])
+}
+
+
+sub dbiLikesc {	# DBI escape 'like'
+ join('', map {my $v =$_; $v =~s/([\\%_])/\\$1/g; $v} @_[1..$#_])
 }
 
 
@@ -2255,8 +2269,8 @@ sub w32IISdpsn {# deimpersonate Microsoft IIS impersonated process
 		# http://www.cpan.org/modules/by-module/FCGI/
  return(undef)	if $^O ne 'MSWin32'
 		|| !(($ENV{SERVER_SOFTWARE}||'') =~/IIS/)
-		|| !$ENV{REMOTE_USER}
-		|| $ENV{'GATEWAY_INTERFACE'}
+	#	|| !$ENV{REMOTE_USER}
+	#	|| $ENV{'GATEWAY_INTERFACE'}
 		|| $ENV{'FCGI_SERVER_VERSION'}
 		|| $_[0]->{-c}->{-RevertToSelf};
  $_[0]->user();
@@ -3831,8 +3845,12 @@ sub dbiACLike {	# SQL Access Control LIKE / RLIKE
  my $l	= !$e || ($o =~/\b(?:like|eq|=)\b/i)
 	? $_[4]
 	: ($e eq 'SIMILAR TO'
-	  ? $_[0]->dbi->quote('%[[:<:]](' .join('|', @{$_[4]}) .')[[:>:]]%')
-	  : $_[0]->dbi->quote( '[[:<:]](' .join('|', @{$_[4]}) .')[[:>:]]')
+	  ? $_[0]->dbi->quote('%[[:<:]](' 
+		.join('|', map {$_[0]->dbiLikesc($_)} @{$_[4]}) 
+		.')[[:>:]]%')
+	  : $_[0]->dbi->quote( '[[:<:]](' 
+		.join('|', map {$_[0]->dbiLikesc($_)} @{$_[4]}) 
+		.')[[:>:]]')
 	  );
     $l	= ref($l)
 	? (!$o || ($o =~/\b(?:lc|lower)\b/i) ? [map {lc($_)} @$l] : $l)
@@ -3884,7 +3902,7 @@ sub dbiACLike {	# SQL Access Control LIKE / RLIKE
 		 : join(' OR ', map {$_ .$l} @{$_[3]})
 		) .')'
 	: $o =~/\b(?:eq|=)\b/i
-	? '(' .join(' OR '			
+	? '(' .join(' OR '
 		, map {	my $f =($o =~/\b(?:lc|lower)\b/i ? 'LOWER(' .$_ .')' : $_);
 			map {$f .'=' .$_[0]->dbi->quote($_)
 				} @$l
@@ -4897,6 +4915,18 @@ sub htmlStart {	# HTTP/HTML/Form headers
  my ($s,$on)=@_;
  $on =$s->{-pcmd}->{-form} ||$s->{-pcmd}->{-table} ||'default'
 	if !$on;
+ my $cs	= $s->{-c}->{-htmlclass}
+	= $s->{-pcmd}->{-xml}
+	? undef
+	: ref($s->{-htmlstart}) && $s->{-htmlstart}->{-class}
+	? $s->{-htmlstart}->{-class}
+	: $s->cgiHook('recOp')
+	? 'Form' .($on ? ' ' .$on : '')
+	: $s->cgiHook('recFormQ')
+	? 'Form' .($on ? ' ' .$on : '') .' QBF' .($on ? ' ' .$on .'__QBF' : '')
+	: $s->cgiHook('recHelp')
+	? 'Form Help' .($on ? ' ' .$on .'__Help' : '')
+	: 'Form' .($on ? ' ' .$on : '') .' List' .($on ? ' ' .$on .'__List' : '');
  my $r	=join(""
 	, $s->{-c}->{-httpheader} =$s->cgi->header(
 		-charset => $s->{-charset}, -expires => 'now'
@@ -4927,17 +4957,12 @@ sub htmlStart {	# HTTP/HTML/Form headers
 			 -head	=> '<meta http-equiv="Content-Type" content="text/html; charset=' .$s->{-charset} .'">'
 				.($s->{-pcmd}->{-refresh} ? '<meta http-equiv="refresh" content=' .$s->{-pcmd}->{-refresh} .'>' : '')
 			,-lang	=> $s->{-lang}
+			,-style	=> ".Form {margin-top:0px; font-size: 8pt; font-family: Verdana, Helvetica, Arial, sans-serif; }\n"
+				.".MenuButton {background-color: buttonface; color: black; text-decoration:none; font-size: 7pt}"
+				#."td.MenuButton {background-color: activeborder;}\n"
+				#.".MenuArea {background-color: navy; color: white; text-decoration:none; font-size: 7pt}"
 			,-title	=> $s->{-title} ||$s->cgi->server_name()
-			,-class	=> (	  $s->cgiHook('recOp')
-					? 'Form' .($on ? ' ' .$on : '')
-					: $s->cgiHook('recFormQ')
-					? 'Form' .($on ? ' ' .$on : '') 
-						 .' QBF' .($on ? ' ' .$on .'__QBF' : '')
-					: $s->cgiHook('recHelp')
-					? 'Form Help'
-						 .($on ? ' ' .$on .'__Help' : '')
-					: 'Form' .($on ? ' ' .$on : '') 
-						 .' List' .($on ? ' ' .$on .'__List' : ''))
+			,-class	=> $cs
 			,ref($s->{-htmlstart}) 
 			? %{$s->{-htmlstart}} 
 			: ()
@@ -4954,7 +4979,9 @@ sub htmlStart {	# HTTP/HTML/Form headers
 				} sort keys %{$s->{-pcmd}})
 			, 'xmlns'=>$s->cgi->url
 			, '0')
-		: $s->cgi()->start_multipart_form(-method=>($s->{-pcmd}->{-refresh} ? 'get' : 'post'))) ."\n";
+		: $s->cgi()->start_multipart_form(-method=>($s->{-pcmd}->{-refresh} ? 'get' : 'post')
+			,-class	=> $cs
+			)) ."\n";
  eval{warningsToBrowser(1)} if *warningsToBrowser;
  $r;
 }
@@ -5005,6 +5032,8 @@ sub htmlMenu {	# Screen menu bar
  my $e =$c->{-edit};
  my $d =$s->{-pdta};
  my $n =$d->{-new} ||($c->{-cmg} eq 'recNew');
+ my $cs=($s->{-c}->{-htmlclass} ? $s->htmlEscape($s->{-c}->{-htmlclass}) .' ' : '')
+	.'MenuArea';
  my @r =();
  if	(1) {				# 'back' js button
 	push @r, htmlMB($s, 'back', $s->cgi->url, ($c->{-backc}||1));
@@ -5026,7 +5055,7 @@ sub htmlMenu {	# Screen menu bar
 				? &{$om->{-frmLso}}($s, $on, $om, $c, exists($c->{-frmLso}) ? $c->{-frmLso} ||'' : ())
 				: $om->{-frmLso})
 			if $om->{-frmLso};
-	push @r, htmlMB($s,  htmlField($s, '_qftext', lng($s,1,'-qftext'), {-asize=>5, -class=>'MenuButton'}, $s->{-pcmd}->{-qftext}))
+	push @r, htmlMB($s,  htmlField($s, '_qftext', lng($s,1,'-qftext'), {-asize=>5, -class=>$cs .' MenuInput'}, $s->{-pcmd}->{-qftext}))
 							if $s->{-menuchs};
 	push @r, htmlML($s, 'frmName1', $s->{-menuchs1})if $s->{-menuchs1};
 	push @r, htmlMB($s, 'frmCall',	'')		if $s->{-menuchs};
@@ -5099,23 +5128,23 @@ sub htmlMenu {	# Screen menu bar
     $mc = ($g eq 'recList') && ($om->{-frmLso1C} ||($ot->{-frmLso1C} && !exists($om->{-frmLso1C})))
 	? &{$om->{-frmLso1C}||$ot->{-frmLso1C}}($s,$on,$om,$c,$c->{-frmLso},$mc)
 	: $mc;
-
+	
  !$s->{-icons}
- ?  "\n<span class=\"MenuArea\">" .join("\n", @r, $mi, '<br />', $mh, '<br />', $mc ? ($mc, '<br />') : ()) ."</span>\n\n"
- : ("\n<table class=\"MenuArea\" cellpadding=0><tr>\n"
+ ?  "\n<div class=\"$cs\">" .join("\n", @r, $mi, '<br />', $mh, '<br />', $mc ? ($mc, '<br />') : ()) ."</div>\n\n"
+ : ("\n<div class=\"$cs\"><table class=\"$cs\" cellpadding=0><tr>\n"
 	# style=\"position: absolute; top: 0; left: 0;\"
 	# <br /><br />
 	# scrollHeight
 	.join("\n", @r)
-	."\n" .'<td class="MenuCell" valign="middle"><nobr>'
+	."\n" .'<td class="' .$cs .' MenuCell" valign="middle"><nobr>'
 	. $mi .'</nobr></td></tr>'
-	."\n" .'<tr><th class="MenuHeader" align="left" valign="top" colspan=20>' 
+	."\n" .'<tr><th class="' .$cs .' MenuHeader" align="left" valign="top" colspan=20>' 
 	.$mh .'</th></tr>'
 	.(!$mc 	? ''
-		: ("\n" .'<tr><td class="MenuComment" align="left" valign="top" colspan=20>' 
+		: ("\n" .'<tr><td class="' .$cs .' MenuComment" align="left" valign="top" colspan=20>' 
 			.$mc 
 			.'</td></tr>'))
-	."\n</table>\n"
+	."\n</table></div>\n"
 	.(!$c->{-refresh} 
 	? '<script for="window" event="onload">{var w=window.document.getElementsByTagName(\'table\')[' .($e ? 1 : 0) .']; if(w){w.focus()}}</script>' ."\n" 
 	: '')
@@ -5128,10 +5157,10 @@ sub htmlMenu {	# Screen menu bar
 
 sub htmlMB {	# CGI menu bar button
 		# self, command, url, back|
- my $td0='<td class="MenuButton" valign="middle" style="border-width: thin; border-style: outset; background-color: activeborder;" '; 
-							# buttonface
+ my $cs =($_[0]->{-c}->{-htmlclass} ? $_[0]->htmlEscape($_[0]->{-c}->{-htmlclass}) .' ' : '')
+	.'MenuArea MenuButton';
+ my $td0='<td class="' .$cs .'" valign="middle" style="border-width: thin; border-style: outset;" '; 
  my $tdb=' onmousedown="if(window.event.button==1){this.style.borderStyle=&quot;inset&quot;}" onmouseup="this.style.borderStyle=&quot;outset&quot;" onmouseout="this.style.borderStyle=&quot;outset&quot;" onmousein="this.style.cursor=&quot;hand&quot"';
-  # $tdb='' if ($ENV{HTTP_USER_AGENT}||'') !~/MSIE/;
 
  if (!$_[0]->{-icons}) {
 	if ($_[1] =~/^</) {
@@ -5146,7 +5175,7 @@ sub htmlMB {	# CGI menu bar button
 		$_[1]
 	}
 	elsif ($_[1] eq 'back') {
-		 '<input type="submit" class="MenuButton" name="_' .$_[1] .'" '
+		 '<input type="submit" class="' .$cs .'" name="_' .$_[1] .'" '
 		.' value="' .htmlEscape($_[0],lng($_[0], 0, $_[1])) .'" '
 		.' onclick="{'
 		.(!$_[3] ||$_[3] <2
@@ -5156,7 +5185,7 @@ sub htmlMB {	# CGI menu bar button
 		.' title="' .htmlEscape($_[0],lng($_[0], 1, $_[1])) .'" />'
 	}
 	else {
-		 '<input type="submit" class="MenuButton" name="_' .$_[1] .'" '
+		 '<input type="submit" class="' .$cs .'" name="_' .$_[1] .'" '
 		.' value="' .htmlEscape($_[0],lng($_[0], 0, $_[1])) .'" '
 		.' title="' .htmlEscape($_[0],lng($_[0], 1, $_[1])) .'" />'
 	}
@@ -5176,14 +5205,14 @@ sub htmlMB {	# CGI menu bar button
 		.'&quot;); return(false)}" ';
 	my $tl =htmlEscape($_[0], lng($_[0], 1, 'login'));
 	$td0  .' title="' .$tl .'"'
-	.($tdb ? $tdb .$jc : '') ."><nobr><font size=-1>\n"
+	.($tdb ? $tdb .$jc : '') ."><nobr>\n"
 	.'<a href="' .$_[2] .'" '
 	.' title="' .$tl .'" '
-	.' class="MenuButton" style="color: black;" '
+	.' class="' .$cs .'" '
 	.($tdb ? '' : $jc)
 	.' ><img src="' .$_[0]->{-icons} .'/' .$IMG->{'login'} 
-	.'" border=0  align="bottom" height="22" class="MenuButton" />'
-	.htmlEscape($_[0], lng($_[0], 0, 'login')) ."</a>\n</font></nobr></td>"
+	.'" border=0  align="bottom" height="22" class="' .$cs .'" />'
+	.htmlEscape($_[0], lng($_[0], 0, 'login')) ."</a>\n</nobr></td>"
  }
  elsif ($_[1] eq 'back') {
 	my $jc =' onclick="{'
@@ -5194,12 +5223,12 @@ sub htmlMB {	# CGI menu bar button
 		.'; return(false)}" ';
 	my $tl =htmlEscape($_[0], lng($_[0], 1, 'back', ($_[3]||1)));
 	$td0 .' title="' .$tl .'"'
-	.($tdb ? $tdb .$jc : '') ."><nobr><font size=-1>\n"
+	.($tdb ? $tdb .$jc : '') ."><nobr>\n"
 	.'<a href="' .($_[2]||$_[0]->cgi->url) .'" ' 
 	.($tdb ? '' : $jc)
 	.' title="' .$tl .'"'
-	.' class="MenuButton"><img src="' .$_[0]->{-icons} .'/' .$IMG->{'back'} .'" border=0 align="bottom" height="22" class="MenuButton" '
-	.' /></a>' ."\n</font></nobr></td>"
+	.' class="' .$cs .'"><img src="' .$_[0]->{-icons} .'/' .$IMG->{'back'} .'" border=0 align="bottom" height="22" class="' .$cs .'" '
+	.' /></a>' ."\n</nobr></td>"
  }
  else {
 	my $jc =' onclick="{_cmd.value=&quot;' .$_[1] .'&quot;; submit(); return(false)}" ';
@@ -5208,24 +5237,26 @@ sub htmlMB {	# CGI menu bar button
 	.($tdb ? $tdb .$jc : '') ."><nobr>\n"
 	.'<input type="image" name="_' .$_[1] .'" '
 	.' src="' .$_[0]->{-icons} .'/' .($IMG->{$_[1]}||'none') .'" '
-	.' align="bottom" title="' .$tl .'" class="MenuButton" /><font size=-1>'
+	.' align="bottom" title="' .$tl .'" class="' .$cs .'" style="cursor:default;"/>'
 	.(defined($_[2]) && !$_[2]
-	?('<span class="MenuButton" style="color: black; cursor:default; "'
+	?('<span class="' .$cs .'" style="cursor:default;"'
 	 .' title="' .$tl .'">' .htmlEscape($_[0],lng($_[0], 0, $_[1])) .'</span>')
 	 .($tdb ? '' : $jc)
 	:('<a tabindex=-1 href="' .urlCat($_[0], !$_[2] ? ('', '_form'=>$_[0]->{-pcmd}->{-form},'_cmd'=>$_[1]) : ref($_[2]) ? @{$_[2]} : $_[2]) .'"'
-	 .' class="MenuButton" style="color: black;"' #{text-decoration:none;color:black}
+	 .' class="' .$cs .'" '
 	 .($tdb ? '' : $jc)
 	 .' title="' .$tl .'">'
 	 .htmlEscape($_[0],lng($_[0], 0, $_[1]))
 	 .'</a>'))
-	."\n</font></nobr></td>"
+	."\n</nobr></td>"
  }
 }
 
 
 sub htmlML {	# CGI menu bar list
  use locale;
+ my $cs =($_[0]->{-c}->{-htmlclass} ? $_[0]->htmlEscape($_[0]->{-c}->{-htmlclass}) .' ' : '')
+	.'MenuArea';
  my $i =  $_[1] eq 'frmName'
 	? $_[0]->cgi->param('_'  .$_[1]) 
 	||$_[0]->{-pcmd}->{'-' .$_[1]}
@@ -5233,11 +5264,14 @@ sub htmlML {	# CGI menu bar list
 	: $_[1] eq 'frmLso'
 	? $_[0]->{-pcmd}->{'-' .$_[1]} ||''
 	: '';
- ($_[0]->{-icons} ? '<td class="MenuButton" valign="middle" title="'
-	.$_[0]->htmlEscape(lng($_[0], 1, $_[1]))
-	.'" style="border-width: thin; border-style: outset; background-color: buttonface;" >' : '')
+ ($_[0]->{-icons} 
+	? '<td class="' .$cs .' MenuButton" valign="middle" title="'
+		.$_[0]->htmlEscape(lng($_[0], 1, $_[1]))
+		.'" style="border-width: thin; border-style: outset;" >' 
+	: '')
+ .do{$cs .=' MenuInput'; ''}
  .'<select name="_' .$_[1]
- .'" class="MenuButton" onchange="{'
+ .'" class="' .$cs .'" onchange="{'
  .( $_[1] eq 'frmLso'
   ? 'if (_frmLso.value==&quot;recQBF&quot;) {_cmd.value=_frmLso.value; _frmLso.value=&quot;' .$_[0]->htmlEscape($i) .'&quot;; submit(); return(true);} else {_cmd.value=&quot;frmCall&quot;; submit(); return(false);}}">'
   : 1 && ($_[1] eq 'frmName1')
@@ -5259,8 +5293,8 @@ sub htmlML {	# CGI menu bar list
 			? do{$i =''; 'selected'}
 			: '') 
 		.(($n eq '') || ($l =~/^[-]+/)
-		 ? ' class="MenuButton MenuSeparator"' 
-		 : ' class="MenuButton"')
+		 ?(' class="' .$cs .' MenuInputSeparator"')
+		 :(' class="' .$cs .'"'))
 		.' value="' 
 		.htmlEscape($_[0], $n)
 		.'">' 
@@ -5270,13 +5304,13 @@ sub htmlML {	# CGI menu bar list
 	)
  .($i eq ''
   ? ''
-  : '<option selected class="MenuButton'
+  :('<option selected class="' .$cs
 	.(($i eq '') || ($i =~/^[-]+/)
 	 ? ' MenuSeparator'
 	 : '')
 	.'" value="'
 	.htmlEscape($_[0], $i) .'">' .htmlEscape($_[0], $_[0]->lng(0, $i))
-	.'</option>')
+	.'</option>'))
  ."\n</select>"
  .($_[0]->{-icons} ? '</td>' : '')
 }
@@ -5296,7 +5330,7 @@ sub htmlMChs {	# Adjust CGI forms list
 		} keys %{$_[0]->{-table}}
  }
  @{$_[0]->{-menuchs}} =sort {lc(ref($a) && $a->[1] || $a) cmp lc(ref($b) && $b->[1] || $b)} @{$_[0]->{-menuchs}};
- if ($_[0]->{-menuchs}) {
+ if ($_[0]->{-menuchs} && !$_[0]->uguest()) {
 	my @a =( ['','--- ' .lng($_[0], 0, 'frmCallNew') .' ---']
 		, map {[$_->[0] .'+', $_->[1] .' ++']
 			} grep { my $m;
@@ -5634,7 +5668,7 @@ sub cgiForm {	# Print CGI screen form
 		, htmlField($s, '_qkeyord', lng($s,1,'-qkeyord')
 			, {-labels=>$qo}
 			, $s->{-pcmd}->{-qkeyord}||'')
-		, '<font size="-1" title="default">'
+		, '<font style="font-size: smaller;" title="default">'
 		, $q->{-keyord} || ($de eq 'dbm')
 		? htmlEscape($s, '(' .($q->{-keyord} && $qo->{$q->{-keyord}} ||$q->{-keyord} ||($de eq 'dbm' ? $qo->{$KSORD} ||$KSORD : '') ||'') .')')
 		: ()
@@ -5650,7 +5684,7 @@ sub cgiForm {	# Print CGI screen form
 			||($q &&( ref($q->{-qwhere}) eq 'CODE'
 				? &{$q->{-qwhere}}($s, $n, $m, $c)
 				: $q->{-qwhere})))
-		, '<font size="-1" title="additional">'
+		, '<font style="font-size: smaller;" title="additional">'
 		, !$q->{-where}
 		? ()
 		: ref($q->{-where}) eq 'ARRAY' 
@@ -5669,11 +5703,11 @@ sub cgiForm {	# Print CGI screen form
 		$s->output(&$th($s, '-qurole'), $td
 		, htmlField($s, '_qurole', lng($s,1,'-qurole'), {-values=>[$s->mdeRoles(0)]}, $s->{-pcmd}->{-qurole})
 		, $q->{-urole} 
-		? '<font size="-1" title="default">' .htmlEscape($s, '(' .$q->{-urole} .')') .'</font>' 
+		? '<font style="font-size: smaller;" title="default">' .htmlEscape($s, '(' .$q->{-urole} .')') .'</font>' 
 		: ()
 		, htmlField($s, '_quname', lng($s,1,'-quname'), undef, $s->{-pcmd}->{-quname})
 		, $q->{-uname} 
-		? '<font size="-1" title="default">' .htmlEscape($s, '(' .$q->{-uname} .')') .'</font>'
+		? '<font style="font-size: smaller;" title="default">' .htmlEscape($s, '(' .$q->{-uname} .')') .'</font>'
 		: ()
 		);
 		$s->cgiDDLB({-fld=>'_quname', -ddlb=>sub{$_[0]->uglist({})}});
@@ -5682,12 +5716,12 @@ sub cgiForm {	# Print CGI screen form
 	$s->output(&$th($s, '-qftext'), $td
 		, htmlField($s, '_qftext', lng($s,1,'-qftext'), {-size=>50}, $s->{-pcmd}->{-qftext})
 		, $q->{-ftext} 
-		? '<font size="-1" title="default">' .htmlEscape($s, '(' .$q->{-ftext} .')') .'</font>'
+		? '<font style="font-size: smaller;" title="default">' .htmlEscape($s, '(' .$q->{-ftext} .')') .'</font>'
 		: ()
 		, "</td></tr>\n");
 	$s->output(&$th($s, '-qversion'), $td
 		, htmlField($s, '_qversion', lng($s,1,'-qversion'), {-values=>['-','+']}, $s->{-pcmd}->{-qversion})
-		, '<font size="-1" title="default">('
+		, '<font style="font-size: smaller;" title="default">('
 		, $q->{-version} || '-', ')</font>'
 		, "</td></tr>\n");
 	$s->output(&$th($s, '-qorder'), $td
@@ -5696,7 +5730,7 @@ sub cgiForm {	# Print CGI screen form
 			  ? (-labels=>$qo)
 			  :(-asize=>50)}
 			, $s->{-pcmd}->{-qorder}||'')
-		, '<font size="-1" title="default">'
+		, '<font style="font-size: smaller;" title="default">'
 		, $q->{-order} 
 		? htmlEscape($s, '(' .($qo->{$q->{-order}} ||$q->{-order} ||$qo->{$q->{-keyord}} ||$q->{-keyord}) .')')
 		: $de eq 'dbm'
@@ -5709,7 +5743,7 @@ sub cgiForm {	# Print CGI screen form
 		, htmlField($s, '_qorder', lng($s,1,'-qorder')
 			, {-asize=>50}
 			, $s->{-pcmd}->{-qorder}||'')
-		, '<font size="-1" title="default">'
+		, '<font style="font-size: smaller;" title="default">'
 		, $q->{-order} 
 		? htmlEscape($s, '(' .($qo->{$q->{-order}} ||$q->{-order}) .')')
 		: ()
@@ -5720,7 +5754,7 @@ sub cgiForm {	# Print CGI screen form
 		, htmlField($s, '_qlimit', lng($s,1,'-qlimit')
 			, {-values=>[128,256,512,1024,2048,4096]}
 			, $s->{-pcmd}->{-qlimit}||'')
-		, '<font size="-1" title="default">('
+		, '<font style="font-size: smaller;" title="default">('
 		, $q->{-limit}||$m->{-limit}||$s->{-limit}||$LIMRS
 		, ')</font>'
 		, "</td></tr>\n");
@@ -5807,6 +5841,7 @@ sub htmlField {	# Generate field widget HTML
 		.'" title="'	.htmlEscape($s, $t)
 		.'" size="'	.$l
 		.'" value="'	.htmlEscape($s, $v)
+		.($s->{-c}->{-htmlclass} ? '" class="' .htmlEscape($s,$s->{-c}->{-htmlclass}) : '')
 		.'" />'
  }
  elsif (ref($m) eq 'HASH') {
@@ -5850,18 +5885,17 @@ sub htmlField {	# Generate field widget HTML
 			$wgp .='<br />' if $wgp;
 		}
 		$wgp .=$s->cgi->textarea(
-			(map {($_ =>	(ref($a->{$_}) eq 'CODE' 
+			 ($s->{-c}->{-htmlclass} ? (-class=>$s->{-c}->{-htmlclass}) : ())
+			,(map {($_ =>	(ref($a->{$_}) eq 'CODE' 
 					? &{$a->{$_}}($s,$a,local($_)=$v)
 					: $a->{$_}))} keys %$a)
 			,-name=>$n, -title=>$t, -default=>$v);
 		$wgp .="<input type=\"submit\" name=\"${n}__b\" value=\"R\" "
 		."title=\"Rich/Text edit: ^Bold, ^Italic, ^Underline, ^hyperlinK, Enter/shift-Enter, ^(shift)T ident, ^Z undo, ^Y redo.\" "
+		.($s->{-c}->{-htmlclass} ? 'class="' .htmlEscape($s,$s->{-c}->{-htmlclass}) .'" ': '')
 		."style=\"font-style: italic;\" "
-			# ; font-weight: bold; font-family: fantasy
 		."onclick=\"{if(${n}__b.value=='R') {${n}__b.value='T'; $n.style.display='none'; "
 		."\n var r; r =document.createElement('<span contenteditable=true id=&quot;${n}__r&quot; title=&quot;MSHTML Editing Component&quot; ondeactivate=&quot;{$n.value=${n}__r.innerHTML}&quot;></span>'); ${n}__b.parentNode.insertBefore(r, $n)\n"
-		# ${n}__b.parentNode.appendChild(r);
-		# r.execCommand('Font', 1)
 		."r.contentEditable='true'; r.style.borderStyle='inset'; r.style.borderWidth='thin'; r.normalize; r.innerHTML =!$n.value ? ' ' : $n.value; r.focus();}\n"
 		."else {${n}__b.value='R'; $n.value=!${n}__r.innerHTML ? '' : ${n}__r.innerHTML.substr(0,1)!='&lt;' && ${n}__r.innerHTML.indexOf('&lt;')>=0 ? '&lt;span&gt;&lt;/span&gt;' +${n}__r.innerHTML : ${n}__r.innerHTML; ${n}__r.removeNode(true); $n.style.display='inline'; $n.focus();};\n"
 				#${n}__r.innerHTML ? ${n}__r.innerHTML : ''; ${n}__r.removeNode(true); $n.style.display='inline'; $n.focus();};\n"
@@ -5871,7 +5905,8 @@ sub htmlField {	# Generate field widget HTML
 	}
 	elsif	(exists $m->{-asize}) {			# Textfield
 		$wgp  =$s->cgi->textfield(
-			(map {	  $_ ne '-asize'
+			 ($s->{-c}->{-htmlclass} ? (-class=>$s->{-c}->{-htmlclass}) : ())
+			,(map {	  $_ ne '-asize'
 				? ($_=>ref($m->{$_}) ne 'CODE' 
 					? $m->{$_} 
 					: &{$m->{$_}}($s,$m,local($_)=$v))
@@ -5901,7 +5936,8 @@ sub htmlField {	# Generate field widget HTML
 		unshift @$tv, $v if defined($v) && ($v ne '') && !grep {$_ eq $v} @$tv;
 		unshift @$tv, '' if $s->{-pcmd}->{-cmg} eq 'recQBF';
 		$wgp	=$s->cgi->popup_menu(
-			(map {($_ =>	(ref($m->{$_}) eq 'CODE'
+			 ($s->{-c}->{-htmlclass} ? (-class=>$s->{-c}->{-htmlclass}) : ())
+			,(map {($_ =>	(ref($m->{$_}) eq 'CODE'
 					? &{$m->{$_}}($s,$m,local($_)=$v)
 					: $m->{$_}))} keys %$m)
 			,-name=>$n, -title=>$t
@@ -5914,7 +5950,8 @@ sub htmlField {	# Generate field widget HTML
 	}
 	else {						# Textfield
 		$wgp =$s->cgi->textfield(
-			(map {($_ =>	(ref($m->{$_}) eq 'CODE' 
+			 ($s->{-c}->{-htmlclass} ? (-class=>$s->{-c}->{-htmlclass}) : ())
+			,(map {($_ =>	(ref($m->{$_}) eq 'CODE' 
 					? &{$m->{$_}}($s,$m,local($_)=$v)
 					: $m->{$_}))} keys %$m)
 			,-name=>$n,-title=>$t,-override=>1,-default=>$v)
@@ -5958,20 +5995,29 @@ sub htmlRFD {	# RFD widget html
  if ($edt) {				# Edit widget
 	my $fo =($s->cgi->param($fno)||$s->cgi->param($fnc))
 		&& $s->nfopens($pth,{});
-	$r .=$s->cgi->filefield(-name=>$fnu, -title=>$s->htmlEscape($s->lng(1,'rfauplfld')))
-	.$s->cgi->submit(-name=>$fnf, -value=>$s->lng(0,'rfaupdate'), -title=>$s->lng(1,'rfaupdate'))
+	$r .=$s->cgi->filefield(-name=>$fnu
+		,($s->{-c}->{-htmlclass} ? (-class=>$s->{-c}->{-htmlclass}) : ())
+		, -title=>$s->htmlEscape($s->lng(1,'rfauplfld')))
+	.$s->cgi->submit(-name=>$fnf
+		,($s->{-c}->{-htmlclass} ? (-class=>$s->{-c}->{-htmlclass}) : ())
+		, -value=>$s->lng(0,'rfaupdate')
+		, -title=>$s->lng(1,'rfaupdate'))
 	.(!$fo && $^O eq 'MSWin32'
-		? $s->cgi->submit(-name=>$fno, -value=>$s->lng(0,'rfaopen'), -title=>$s->lng(1,'rfaopen'))
+		? $s->cgi->submit(-name=>$fno
+			,($s->{-c}->{-htmlclass} ? (-class=>$s->{-c}->{-htmlclass}) : ())
+			, -value=>$s->lng(0,'rfaopen')
+			, -title=>$s->lng(1,'rfaopen'))
 		: '')
 	.($fo	? $s->cgi->scrolling_list(-name=>$fnc, -override=>1, -multiple=>'true'
 			, -title=>$s->lng(1,'rfaopen')
+			,($s->{-c}->{-htmlclass} ? (-class=>$s->{-c}->{-htmlclass}) : ())
 			, -values=>	['--- ' .$s->lng(0,'rfaclose') .' ---'
 					,ref($fo) eq 'HASH' ? sort keys %$fo : @$fo]
 			, ref($fo) eq 'HASH' ? (-labels=>$fo) : ())
 		: '');
 	if ($urf && $urf =~/^file:(.*)/i) {
 		my $fs =$1; $fs =~s/\//\\/g;
-		$r .="\n<font size=-1>[ <span "
+		$r .="\n<font style=\"font-size: smaller;\">[ <span "
 		# .' onclick="window.event.srcElement.select" '
 		# .' oncopy="{window.clipboardData.setData(\'Text\',\'' .$s->htmlEscape($fs) .'\'); return(false)}" '
 		# window.event.srcElement
@@ -5986,7 +6032,11 @@ sub htmlRFD {	# RFD widget html
 	$r .=join('; ', 
 		map {	my $f =$s->urlEscape($_);
 			$s->cgi->a({-href=>"$url/$f", -target=>'_blank'}
-			, $s->cgi->checkbox(-name=>$fnl, -value=>$_, -label=>$_, -title=>$s->lng(1,'rfadelm')))
+			, $s->cgi->checkbox(-name=>$fnl
+				,($s->{-c}->{-htmlclass} ? (-class=>$s->{-c}->{-htmlclass}) : ())
+				, -value=>$_
+				, -label=>$_
+				, -title=>$s->lng(1,'rfadelm')))
 		} $s->rfdGlobn($c, $d))
  }
  else	{				# View widget
@@ -6026,7 +6076,10 @@ sub cgiDDLB {	# CGI Drop-down list box
 	.'window.document.forms[0].' .$nf .'.focus();}</script>');
  }
  if	(!$s->{-pdta}->{$no}) {		# open button & exit
-	$s->output($s->cgi->submit(-name=>$no, -value=>$s->lng(0,'ddlbopen'), -title=>$s->lng(1,'ddlbopen')));
+	$s->output($s->cgi->submit(-name=>$no
+	,($s->{-c}->{-htmlclass} ? (-class=>$s->{-c}->{-htmlclass}) : ())
+	, -value=>$s->lng(0,'ddlbopen')
+	, -title=>$s->lng(1,'ddlbopen')));
 	return('');
  }
  my $fs =sub{
@@ -6057,8 +6110,13 @@ sub cgiDDLB {	# CGI Drop-down list box
 	.'}'};
  $s->output('<script for="' .$nf .'" event="onkeypress()" >' .&$fs(0) ."</script>")
 	if !$ml;
- $s->output($s->cgi->submit(-name=>$nc, -value=>$s->lng(0,'ddlbclose'), -title=>$s->lng(1,'ddlbclose')), "<br />\n");
+ $s->output($s->cgi->submit(-name=>$nc
+		,($s->{-c}->{-htmlclass} ? (-class=>$s->{-c}->{-htmlclass}) : ())
+		, -value=>$s->lng(0,'ddlbclose')
+		, -title=>$s->lng(1,'ddlbclose'))
+		, "<br />\n");
  my $sl='<select name="' .$nl . '" size="10"'
+	.($s->{-c}->{-htmlclass} ? ' class="' .htmlEscape($s, $s->{-c}->{-htmlclass}) .'"': '')
 	.' ondblclick="{' .($ml ? ($nl . '.nextSibling.nextSibling.click();') : !ref($tg) ? ($ne .'.focus();' .$ne .'.click();') : ($nl . '.nextSibling.nextSibling.click(); submit();')) .' return(true)}"'
 	.(!$ml ? ' onkeypress="' .&$fs(1) .'"' : '')
 	.'>';
@@ -6105,6 +6163,7 @@ sub cgiDDLB {	# CGI Drop-down list box
 		$s->output($s->cgi->button(
 		  -value=>$l
 		, -title=>$s->lng(1,'ddlbsubmit')
+		,($s->{-c}->{-htmlclass} ? (-class=>$s->{-c}->{-htmlclass}) : ())
 		, -onClick=>"{var fs =window.document.forms[0].$nl; "
 			."var ft =window.document.forms[0].$f; "
 			."var i  =fs.selectedIndex; i =i <0 ? 0 : i; "
@@ -6118,12 +6177,20 @@ sub cgiDDLB {	# CGI Drop-down list box
 	}
  }
  else {
-	$s->output($s->cgi->submit(-name=>$ne, -value=>$s->lng(0,'ddlbsubmit'), -title=>$s->lng(1,'ddlbsubmit')));
+	$s->output($s->cgi->submit(-name=>$ne
+		,($s->{-c}->{-htmlclass} ? (-class=>$s->{-c}->{-htmlclass}) : ())
+		, -value=>$s->lng(0,'ddlbsubmit')
+		, -title=>$s->lng(1,'ddlbsubmit')));
  }
- $s->output($s->cgi->button(-value=>$s->lng(0,'ddlbfind'), -title=>$s->lng(1,'ddlbfind')
+ $s->output($s->cgi->button(-value=>$s->lng(0,'ddlbfind')
+		,($s->{-c}->{-htmlclass} ? (-class=>$s->{-c}->{-htmlclass}) : ())
+		,-title=>$s->lng(1,'ddlbfind')
 		,-onClick=>&$fs(3)
 	));
- $s->output($s->cgi->submit(-name=>$nc, -value=>$s->lng(0,'ddlbclose'), -title=>$s->lng(1,'ddlbclose')),"\n");
+ $s->output($s->cgi->submit(-name=>$nc
+		,($s->{-c}->{-htmlclass} ? (-class=>$s->{-c}->{-htmlclass}) : ())
+		, -value=>$s->lng(0,'ddlbclose')
+		, -title=>$s->lng(1,'ddlbclose')),"\n");
  $s->output('<script for="window" event="onload">'
 	.(!$ml ? &$fs(4) : "{window.document.forms[0].$nl.focus()}")
 	."</script>\n");
@@ -6548,9 +6615,11 @@ sub cgiList {	# List queried records
  my $xml=$c->{-xml};
  my $mt =$m->{-table} && $s->mdeTable($m->{-table}) || $m;
  my $mf =  $c->{-field} || $m->{-field} || $mt->{-field};
- my $hstl  ='class="'
+ my $hcls  ='class="'
+ 		.($s->{-c}->{-htmlclass} ? $s->htmlEscape($s->{-c}->{-htmlclass}) .' ' : '')
 		.(!$b ? 'ListTable' : 'ListList')
-		.($s->{-uiclass} ? ' ' .$s->{-uiclass} : '')
+		.($s->{-uiclass} ? ' ' .$s->{-uiclass} : '');
+ my $hstl  =$hcls
 		.'"'
 		.($s->{-uistyle} ? ' style="' .$s->{-uistyle} .'"' : '');
  my $disp  =$c->{-qdisplay}	|| ($i && $i->{-query} && $i->{-query}->{-display})
@@ -6768,7 +6837,9 @@ sub cgiList {	# List queried records
 					||(ref($lsc->[0]) eq 'HASH' 
 						? $lsc->[0]->{-val} 
 						: $lsc->[0]->[0]);
-				"<select name=\"_frmLsc\" class=\"ListTable\" onchange=\"{_cmd.value='recList'; submit()}\">\n"
+				'<select name="_frmLsc" '
+				.$hstl
+				."onchange=\"{_cmd.value='recList'; submit()}\">\n"
 				.join('', map {	
 					my ($v,$l) =ref($_) eq 'HASH' 
 						? ($_->{-val}, $_[0]->lnglbl($_)) 
@@ -6779,7 +6850,8 @@ sub cgiList {	# List queried records
 						if !$l;
 					'<option'
 					.($v eq $lsq ? ' selected' : '')
-					.' class="ListTable" value="'
+					.' ' .$hstl
+					.'" value="'
 					.$_[0]->htmlEscape($v)
 					.'">'
 					.$_[0]->htmlEscape($l)
@@ -6793,7 +6865,7 @@ sub cgiList {	# List queried records
 			$tho->[2] =$m->{-frmLso2C} ||$mt->{-frmLso2C};
 		}
 		$s->output("<tr>\n"
-		, (map {('<th align="left" valign="top" class="ListTable'
+		, (map {('<th align="left" valign="top" ' .$hcls
 			.($_->[4]->{-lhclass} ? ' ' .$_->[4]->{-lhclass} .'"': '"')
 			.($_->[4]->{-lhstyle} ? ' style="' .$_->[4]->{-lhstyle} .'"' : '')
 			.' title="' .htmlEscape($s, lngcmt($s, $_->[4]) ||$s->lng(1, $_->[0]) ||$_->[2]) .'"'
@@ -6807,7 +6879,7 @@ sub cgiList {	# List queried records
 	}
 	elsif (0 && $b->[0] =~/<table/i) {	# Compatible empty header
 		$s->output("<tr>\n"	
-		, (map {('<th align="left" valign="top" class="ListTable'
+		, (map {('<th align="left" valign="top" ' .$hcls
 			.($_->[4]->{-lhclass} ? ' ' .$_->[4]->{-lhclass} .'"': '"')
 			.($_->[4]->{-lhstyle} ? ' style="' .$_->[4]->{-lhstyle} .'"' : '')
 			.($_->[4]->{-lhprop}  ? ' ' .$_->[4]->{-lhprop} : '')
@@ -6885,12 +6957,12 @@ sub cgiList {	# List queried records
 
 sub cgiFooter {	# Footer of CGI screen
  my ($s) =@_;
+ my $cs  =($s->{-c}->{-htmlclass} ? $s->htmlEscape($s->{-c}->{-htmlclass}) .' ' : '')
+		.'FooterArea';
  return(undef) if $s->{-pcmd}->{-xml} ||$s->{-pcmd}->{-print};
  $s->output("\n"
-#	,'<span class="FooterArea">'
-#	,'<hr class="FooterArea" onclick="{_FooterArea.style.display=(_FooterArea.style.display==\'none\' ? \'inline\' : \'none\')}" style="cursor: hand; " />'
-	,'<span class="FooterArea" onclick="{_FooterArea.style.display=(_FooterArea.style.display==\'none\' ? \'inline\' : \'none\')}" style="cursor: hand; ">'
-	,'<hr class="FooterArea" />'
+	,'<span class="', $cs, '" onclick="{_FooterArea.style.display=(_FooterArea.style.display==\'none\' ? \'inline\' : \'none\')}" style="cursor: hand; ">'
+	,'<hr class="', $cs, '" />'
 	,"\n"
 	,($s->cgiHook('recList') && defined($s->{-fetched})
 	? ('<b>',$s->{-limited} && ($s->{-limited} <=$s->{-fetched})
@@ -6900,15 +6972,17 @@ sub cgiFooter {	# Footer of CGI screen
 	: defined($s->{-affected})
 	? ('<b>',$s->{-affected}||0, ' ', $s->lng(1, '-affected'),"</b><br />\n")
 	: ())
-	, '<span id="_FooterArea" class="FooterArea" style="display: ' .($s->{-debug} && $s->{-debug} >1 ? 'inline' : 'none') .'; font-size: small; ">'
-	, $s->{-c}->{-logm} && $s->{-debug}
-	&& join(";<br />\n",
+	,"</span>\n"
+	,'<span id="_FooterArea" class="', $cs ,'" style="display: ' .($s->{-debug} && $s->{-debug} >1 ? 'inline' : 'none') .'; font-size: smaller; ">'
+	,"<br />\n"
+	,$s->{-c}->{-logm} && $s->{-debug}
+	&& join(";<br /><br />\n",
 		map {	$_ =~/^((?:WARN|WARNING|DIE|ERROR)[:.,\s]+)(.*)$/i
 			? '<strong class="FooterArea ErrorMessage">' .htmlEscape($s, $1) .'</strong>' .htmlEscape($s, $2)
 			: htmlEscape($s, $_)
 			} @{$s->{-c}->{-logm}}
 		)
-	,"</span></span>\n");
+	,"</span>\n");
 }
 
 
@@ -6935,6 +7009,7 @@ sub tfoShow {	# Template Field Option '-lblhtml' to Show all details absent
 	? $x
 	: ($x
 	  .'<input type="submit" name="' .($n||'tfoShow_')
+	  .($s->{-c}->{-htmlclass} ? '" class="' .$s->htmlEscape($s->{-c}->{-htmlclass}) : ())
 	  .'" value="' .$_[0]->lng(0,'ddlbopen') 
 	  .'" title="' .$_[0]->lng(1,'ddlbopen') 
 	  .'" />')
@@ -7061,7 +7136,7 @@ sub tfvVersions {	# Template for Field View of Versions of records
 	my $q =($_[0]->{-table}->{$_[0]->{-pcmd}->{-table}}->{-dbd} ||$_[0]->{-dbd}) eq 'dbi';
 	$v =$_[0]->{-pcmd}->{-table} if $q;
 	local $s->{-uiclass} ='tfvVersions';
-	local $s->{-uistyle} ='font-size: small';
+	local $s->{-uistyle} ='font-size: small' if 0;
 	$_[0]->cgiList('-!h'
 		,$v
 		,undef
