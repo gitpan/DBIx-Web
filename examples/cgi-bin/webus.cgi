@@ -1,22 +1,32 @@
 #!perl -w
 #http://localhost/cgi-bin/cgi-bus/webus.cgi
 BEGIN {
-#push @INC, $1 .'sitel/lib' if !(grep /sitel/i, @INC) && ($INC[0] =~/(.+?[\\\/])lib$/i)
-#$ENV{DOCUMENT_ROOT} ='c:/Inetub' if !$ENV{DOCUMENT_ROOT};
+#push @INC, $1 .'sitel/lib' if !(grep /sitel/i, @INC) && ($INC[0] =~/(.+?[\\\/])lib$/i);
 }
 #$ENV{HTTP_ACCEPT_LANGUAGE} ='';
+my $wsdir =$^O eq 'MSWin32' ? Win32::GetFullPathName($0) : $0;
+   $wsdir =~s/\\/\//g;
+   $wsdir =	  $wsdir =~/^(\w:\/inetpub)\//i
+		? $1
+		: $wsdir =~/\/cgi-bin\//i
+		? $`
+		: $ENV{DOCUMENT_ROOT} && $ENV{DOCUMENT_ROOT} =~/[\\\/]htdocs/i
+		? $`
+		: '../';
+   $wsdir =	  $wsdir =~/^(\w:\/inetpub)\//i ? "$wsdir/wwwroot" : "$wsdir/htdocs";
+
 use DBIx::Web;
 my $w =DBIx::Web->new(
   -title	=>'DBIx-WeBus'	# title of application
 #,-logo		=>'<img src="/icons/p.gif" border="0" />'
  ,-debug	=>2		# debug level
  ,-serial	=>2		# serial operation level
- ,-dbiarg	=>["DBI:mysql:cgibus","cgibus","************"]
+ ,-dbiarg	=>["DBI:mysql:cgibus","cgibus","d83nfmJR971Yv3gVI35"]
 #,-dbiph	=>1		# dbi placeholders usage
-#,-dbiACLike	=>'eq lc'	# dbi access control comparation
+ ,-dbiACLike	=>'eq'		# dbi access control comparation, i.e. 'eq lc'
  ,-keyqn	=>1		# key query null comparation
- ,-path		=>"$ENV{DOCUMENT_ROOT}/dbix-web"	# datastore path
- ,-cgibus	=>"$ENV{DOCUMENT_ROOT}/cgi-bus"		# legacy mode
+ ,-path		=>"$wsdir/dbix-web"	# datastore path
+ ,-cgibus	=>"$wsdir/cgi-bus"	# legacy mode
  ,-url		=>'/cgi-bus'	# filestore URL
  ,-urf		=>'-path'	# filestore filesystem URL
 #,-fswtr	=>''		# filesystem writers (default is process account)
@@ -24,6 +34,7 @@ my $w =DBIx::Web->new(
 #,-AuthGroupFile=>''		# apache groups file
 #,-login	=>/cgi-bin/ntlm/# login URL
 #,-userln	=>0		# short local usernames (0==off, 1==default)
+ ,-ugadd	=>['Everyone','Guests']		# additional user groups
 #,-rac		=>0		# record access control (0==off, 1==default)
 #,-racAdmRdr	=>''		# record access control admin reader
 #,-racAdmWtr	=>''		# record access control admin writer
@@ -63,7 +74,7 @@ $w->set(
 			},''
 		,{-fld=>$w->tn('-rvcUpdWhen')
 			,-flg=>'wql'
-			,-ldstyle=>'width: 20ex'
+			,-ldstyle=>'width: 25ex'
 			,-ldprop=>'nowrap=true'
 			},''
 		,{-fld=>$w->tn('-rvcUpdBy')
@@ -95,7 +106,7 @@ $w->set(
 			,-lhstyle=>'width: 5ex'
 			}, ''
 		,{-fld=>'subject'
-			,-flg=>'euql', -null=>undef
+			,-flg=>'euqlm', -null=>undef
 			,-inp=>{-asize=>60}
 			#,-ddlb=>[[1,'one'],2,3,'qw']
 			,-colspan=>3
@@ -113,7 +124,7 @@ $w->set(
 		,-racWriter	=>[$w->tn('-rvcUpdBy'), $w->tn('-rvcInsBy'), 'prole']
 		,-ridRef	=>[qw(idrm comment)]
 		,-rfa		=>1
-		,-recNew0C	=>sub{	$_[2]->{'idrm'} =$_[3]->{'id'}||'';
+		,-recNew0R	=>sub{	$_[2]->{'idrm'} =$_[3]->{'id'}||'';
 					foreach my $n (qw(prole rrole)) {
 						$_[2]->{$n} =$_[3]->{$n} 
 							if $_[3]->{$n};
@@ -149,12 +160,14 @@ $w->set(
 			}, ''
 		,{-fld=>$w->tn('-rvcInsWhen')
 			,-flg=>'q'
+			,-lhstyle=>'width: 25ex'
 			}, ''
 		,{-fld=>$w->tn('-rvcInsBy')
 			,-flg=>'q'
 			}, "\n\t\t"
 		,{-fld=>$w->tn('-rvcUpdWhen')
 			,-flg=>'wq'
+			,-lhstyle=>'width: 25ex'
 			},''
 		,{-fld=>$w->tn('-rvcUpdBy')
 			,-edit=>0
@@ -228,12 +241,13 @@ $w->set(
 			,-flg=>'euq'
 			,-lbl=>'Start', -cmt=>'Start time of record described by'
 			,-lbl_ru=>'Начало', -cmt_ru=>'Дата и время начала описываемого записью'
+			,-lhstyle=>'width: 25ex'
 			 }, ''
 		,{-fld=>'etime'
 			,-flg=>'euq'
 			,-lbl=>'Finish', -cmt=>'Finish time of record described by'
 			,-lbl_ru=>'Заверш', -cmt_ru=>'Дата и время завершения описываемого записью'
-			,-ldstyle=>'width: 20ex'
+			,-ldstyle=>'width: 25ex'
 			,-ldprop=>'nowrap=true'
 			 }
 		,{-fld=>'ftime'
@@ -241,7 +255,7 @@ $w->set(
 			,-expr=>'COALESCE(etime, utime)'
 			,-lbl=>'Final', -cmt=>'Finish or last updated time of record'
 			,-lbl_ru=>'Завершение', -cmt_ru=>'Дата-время завершения или последнего изменения записи'
-			,-ldstyle=>'width: 20ex'
+			,-ldstyle=>'width: 25ex'
 			,-ldprop=>'nowrap=true'
 			 }
 		,{-fld=>'record'
@@ -269,7 +283,7 @@ $w->set(
 			})
 		:()
 		,{-fld=>'subject'
-			,-flg=>'euql', -null=>undef
+			,-flg=>'euqlm', -null=>undef
 			,-inp=>{-asize=>60}
 			,-colspan=>6
 			}
@@ -288,50 +302,56 @@ $w->set(
 		,-racWriter	=>[$w->tn('-rvcUpdBy'), $w->tn('-rvcInsBy'), 'puser', 'prole', 'auser', 'arole']
 		,-ridRef	=>[qw(idrm idpr comment)]
 		,-rfa		=>1
-		,-recNew0C	=>sub{	$_[2]->{'idrm'} =$_[3]->{'id'}||'';
-					foreach my $n (qw(puser prole auser arole rrole object)) {
-						$_[2]->{$n} =$_[3]->{$n}
-							if $_[3]->{$n};
-					}
-					foreach my $n (qw(puser auser)) {
-						$_[2]->{$n} =$_[0]->user()
-							if !$_[2]->{$n}
-					}
-					$_[0]->recLast($_[1],$_[2],['auser'],['rrole'])
-						if !$_[2]->{'rrole'};
-					$_[2]->{'status'}='ok';
-					$_[2]->{'stime'} =$_[0]->strtime();
+		,-recNew0R	=>sub{
+				$_[2]->{'idrm'} =$_[3]->{'id'}||'';
+				foreach my $n (qw(puser prole auser arole rrole object)) {
+					$_[2]->{$n} =$_[3]->{$n}
+						if $_[3]->{$n};
 				}
-		,-recChg0A	=> sub{ # $_[0]->logRec('recForm0A',@_[1..$#_]);
-					if (	$_[1]->{-cmd} eq 'recNew'
-					||	$_[2]->{'puser__L'}
-					||	$_[2]->{'auser__L'}) {
-						$_[0]->recLast($_[1],$_[2],['puser'],['prole']);
-						$_[0]->recLast($_[1],$_[2],['auser'],['arole']);
-					}
-					$_[2]->{stime} =(length($3) <3 ? "20$3" : $3) .'-' .$2 .'-' .$1 .$4
-						if $_[2]->{stime} 
-						&& $_[2]->{stime} =~/^(\d+)\.(\d+)\.(\d+)(.*)/;
-					$_[2]->{etime} =(length($3) <3 ? "20$3" : $3) .'-' .$2 .'-' .$1 .$4
-						if $_[2]->{etime} 
-						&& $_[2]->{etime} =~/^(\d+)\.(\d+)\.(\d+)(.*)/;
-		}
+				foreach my $n (qw(puser auser)) {
+					$_[2]->{$n} =$_[0]->user()
+						if !$_[2]->{$n}
+				}
+				$_[0]->recLast($_[1],$_[2],['auser'],['rrole'])
+					if !$_[2]->{'rrole'};
+				$_[2]->{'status'}='ok';
+				$_[2]->{'stime'} =$_[0]->strtime();
+			}
+		,-recChg0A	=> sub{ # $_[0]->logRec('recChg0A',@_[1..$#_]);
+				if (	$_[1]->{-cmd} eq 'recNew'
+				||	$_[2]->{'puser__L'}
+				||	$_[2]->{'auser__L'}) {
+					$_[0]->recLast($_[1],$_[2],['puser'],['prole']);
+					$_[0]->recLast($_[1],$_[2],['auser'],['arole']);
+				}
+				$_[2]->{stime} =(length($3) <3 ? "20$3" : $3) .'-' .$2 .'-' .$1 .$4
+					if $_[2]->{stime} 
+					&& $_[2]->{stime} =~/^(\d+)\.(\d+)\.(\d+)(.*)/;
+				$_[2]->{etime} =(length($3) <3 ? "20$3" : $3) .'-' .$2 .'-' .$1 .$4
+					if $_[2]->{etime} 
+					&& $_[2]->{etime} =~/^(\d+)\.(\d+)\.(\d+)(.*)/;
+				($_[2]->{etime}, $_[2]->{stime})
+					= ($_[2]->{stime}, $_[2]->{etime})
+					if $_[2]->{etime}
+					&& $_[2]->{stime}
+					&& ($_[2]->{stime} gt $_[2]->{etime});					
+			}
 		,-recUpd0R	=>sub {	# $_[0]->logRec('recUpd0R',@_[1..$#_]);
-					return($_[0])	# non-periodical
-						if !$_[2]->{period}
-						|| ($_[2]->{$_[0]->tn('-rvcState')} 
-							ne 'ok');
+				if ($_[2]->{period}
+				&&  ('ok' eq $_[2]->{$_[0]->tn('-rvcState')})){
 					my $n ={%{$_[2]}};
-					$n->{stime} =$_[0]->strtime($_[0]->timeadd($_[0]->timestr($n->{stime}), split /,;\s/, $n->{period}))
+					$n->{stime}=$_[0]->strtime($_[0]->timeadd($_[0]->timestr($n->{stime}), split /,;\s/, $n->{period}))
 						if $n->{stime};
-					$n->{etime} =$_[0]->strtime($_[0]->timeadd($_[0]->timestr($n->{etime}), split /,;\s/, $n->{period}))
+					$n->{etime}=$_[0]->strtime($_[0]->timeadd($_[0]->timestr($n->{etime}), split /,;\s/, $n->{period}))
 						if $n->{etime};
 					$n->{$_[0]->tn('-rvcState')} ='do';
 					$n->{idpr} =$n->{id};
-					$_[0]->recIns(-table=>'gwo',-data=>$n);
+					$_[0]->recIns(-table=>'gwo'
+						,-data=>$n
+						,$_[1]->{-file} ? (-file=>$_[1]->{-file}) : ());
 					sleep(1) if $_[0]->{-cgibus};
-					$_[0]
 				}
+			}
 		,-query		=>{-keyord=>'-dall'
 				, -order=>'ftime'
 				, -data=>[qw(ftime status auser arole object subject id)]

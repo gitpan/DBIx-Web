@@ -2,12 +2,12 @@
 #
 # DBIx::Web - Active Web Database Layer
 #
-# makarow@mail.com, started 2003-09-16
+# makarow at mail.com, started 2003-09-16
 #
 # Future ToDo:
 # - development of cgi-bus remake
 # - smtp mailer
-# ? mandatory fields
+# - w32agf using ldap with search scopes and naming rooles
 # - htmlMenu scroll
 # - !!! review
 # - code review
@@ -18,12 +18,24 @@
 #
 #
 # ToDo:
-# - periodical trigger and chk-out state
 # - test/debug 'webus.cgi'&'web.cgi': behaviour, versioning, checkouts, attachments, triggers transformation
 #
 # Done:
+#
+# 2006-02-14 reposition of '-recNew0C' before cmd, use '-recNew0R' with sample
+# 2006-02-14 reposition of '-recForm1C' before any cmd, new '-recForm0R'
+# 2006-02-12 periodical trigger and chk-out state and file store
+# 2006-02-11 triggers redesign (nv,pv)
+# 2006-02-05 recUpd - update by row
+# 2006-02-04 recPrint rID refs exclude
+# 2006-01-19 improved 'rmiIndex' alike 'recUpd'/'dbiUpd'
+# 2006-01-19 new -chk field desc
+# 2006-01-17 new -recChg0R, -recForm1A, -recForm0A; redisposed -recForm0C, -recForm1C
+# 2006-01-15 mandatory fields: 'cgiDBData' and '-flg' extended
+# 2006-01-14 new -w32IISdpsn; "$0 -call w32agf 0 q"; -ugadd
+# 2005-11-27 file store improvement: late truncation and autoflush.
 # 2005-11-22 New 'dbiLikesc' and 'dbiQuote' methods; considering SQL LIKE escaping.
-# 2005-08-29 styles/classes improved, default stylesheet implemented
+# 2005-08-29 html styles/classes improved, default stylesheet implemented
 # 2005-06-18 cgiQuery: -query respecification
 # 2005-06-18 cgiQuery: reoganized -qfrmLso -> -frmLso
 # 2005-06-18 cgiParse: recQBF -qlist -> recList -form
@@ -220,7 +232,7 @@ use Fcntl qw(:DEFAULT :flock :seek :mode);
 
 use vars qw($VERSION @ISA @EXPORT @EXPORT_OK %EXPORT_TAGS $AUTOLOAD $SELF $CACHE $LNG $IMG);
 
-	$VERSION= '0.59';
+	$VERSION= '0.60';
 	$SELF   =undef;				# current object pointer
 	$CACHE	={};				# cache for pointers to subobjects
 	*isa    = \&UNIVERSAL::isa; isa('','');	# isa function
@@ -254,6 +266,8 @@ $LNG ={
 	,'recUpdVerStp'	=>['',		'Editing record\'s version prohibited']
 	,'recDelAclStp'	=>['',		'Record deletion prohibited to you']
 	,'recReadAclStp'=>['',		'Record reading prohibited to you']
+	,'fldReqStp'	=>['required',	'value required']
+	,'fldChkStp'	=>['constraint','constraint violated']
 
 	,'back'		=>['<',		'Back screen']
 	,'login'	=>['Login',	'Login as personated user']
@@ -349,7 +363,7 @@ $LNG ={
 	,-lang		=>['ru-RU',	'']
 	,-charset	=>['windows-1251','']
 
-	,-style		=>['Стиль'	,'Гиперссылка стилевой декорации HTML/XML']
+	,-style		=>['Стиль',	'Гиперссылка стилевой декорации HTML/XML']
 	,-affected	=>['затронуто',	'строк затронуто']
 	,-fetched	=>['выбрано',	'строк выбрано']
 	,'rfaUplEmpty'	=>['пусто',	'Пустой манипулятор файла']
@@ -357,6 +371,8 @@ $LNG ={
 	,'recUpdVerStp'	=>['',		'Изменение прежней версии записи запрещено']
 	,'recDelAclStp'	=>['',		'Удаление записи не разрешено полномочиями доступа пользователя']
 	,'recReadAclStp'=>['',		'Чтение записи не разрешено полномочиями доступа пользователя']
+	,'fldReqStp'	=>['требуется',	'значение требуется']
+	,'fldChkStp'	=>['ограничение','ограничение нарушено']
 
 	,'back'		=>['<',		'Предыдущая страница']
 	,'login'	=>['Войти',	'Открыть персонифицированный сеанс']
@@ -572,8 +588,9 @@ sub initialize {
  # ,-ugflt	=>sub{}		# User Groups	filter
  # ,-AuthUserFile		# Apache Users  file, optional
  # ,-AuthGroupFile		# Apache Groups file, optional
- # ,-fswtr	=>undef		# File Store Writers, default below
+ # ,-fswtr	=>undef		# File Store Writers, defaults in code
  # ,-fsrdr	=>undef		# File Store Readers
+   ,-w32IISdpsn	=>($ENV{SERVER_SOFTWARE}||'') =~/IIS/ ? 1 : 0 # MsIIS deimpersonation
 
  # ,&recXXX			# DML command keywords
 					# -table -form || record form class
@@ -739,10 +756,6 @@ sub initialize {
 	if !$s->{-host};
  $s->set(-user=>sub{$ENV{REMOTE_USER}||$ENV{USERNAME}||$s->{-tn}->{-guest}})
 	if !$s->{-user};
- $s->set(-fswtr=>$ENV{USERNAME} || $^O eq 'MSWin32' ? eval{Win32::LoginName} : `logname`) 
-	&& (chomp($s->{-fswtr})||1)
-	&& ($s->{-fswtr} =[$s->{-fswtr}])
-	if !$s->{-fswtr};
  $s->set(-recTrim0A=>sub{ # $self, {command}, {data}
 		foreach my $k (keys %{$_[2]}) {
 			next if !defined($_[2]->{$k});
@@ -915,6 +928,12 @@ sub lngcmt {	# localised comment (self, object,...)
 }
 
 
+sub charset {	# character set name
+ return($LNG->{''}->{-charset}->[0]) if !$_[0]->{-charset};
+ $_[0]->{-charset} =~/^\d/ ? 'windows-' .$_[0]->{-charset} : $_[0]->{-charset}
+}
+
+
 sub die {
  &{$_[0]->{-die}}(@_[1..$#_])
 }
@@ -934,7 +953,10 @@ sub start {	# start session
  $s->{-fetched} =0;
  $s->{-limited} =0;
  $s->{-affected}=0;
- $s->w32IISdpsn()	if (($ENV{SERVER_SOFTWARE}||'') =~/IIS/) 
+ $s->w32IISdpsn()	if (($ENV{SERVER_SOFTWARE}||'') =~/IIS/)
+			&& ((defined($s->{-w32IISdpsn})
+				? $s->{-w32IISdpsn} ||0
+				: 2) >1)
 			&& !$s->cgi->param('_qftwhere');
  unless ((($ENV{SERVER_SOFTWARE}||'') =~/IIS/)
 	&& $s->cgi->param('_qftwhere')) {
@@ -1002,10 +1024,12 @@ sub setup {	# Setup script execution
 		."#\t\tSSPIOfferBasic On\n"
 		."#\t</IfModule>\n"
 		.($s->{-AuthUserFile}
-		?"\tAuthUserFile " .$s->{-AuthUserFile} ."\n"
-		:"#\tAuthUserFile ???\n")
+		?("\tAuthUserFile " .$s->{-AuthUserFile} ."\n")
+		:("#\tAuthUserFile " .($pth ."/var/ualist") ."\n"))
 		."\tAuthGroupFile " .($s->{-AuthGroupFile} ||($pth ."/var/uagroup")) ."\n"
-		."</Directory>\n")
+		."</Directory>\n"
+		."#Alias /dbix-web/rfa/ \"$pth/\"\n"
+		)
 	->destroy;
  $s->pthForm('rfa');
 
@@ -1681,22 +1705,27 @@ sub pthForm_{
 	||($_[0]->{-cgibus} && ($_[1] eq 'rfa') && $_[0]->{-cgibus})
 	||join('/', $_[0]->{-path}, $_[1]));
  if (!-d $p) {
+	$_[0]->w32IISdpsn()	if $_[0]->{-w32IISdpsn} && !$_[0]->{-c}->{-RevertToSelf};
 	$_[0]->pthMk($p);
 	$_[0]->hfNew('+>', "$p/.htaccess")->lock(LOCK_EX)
 		->store("<Files * >\nOrder Deny,Allow\nDeny from All\n</Files>\n")
 		->destroy
 		if $_[1] ne 'rfa';
-	if ($ENV{OS} && $ENV{OS}=~/Windows_NT/i && ($_[1] ne 'rfa')) {
+	if ($ENV{OS} && $ENV{OS}=~/Windows_NT/i) {
 		$p =~s/\//\\/g;
-		$_[0]->osCmd('cacls', "\"$p\"", '/T','/C','/G'
+		$_[0]->osCmd('cacls'
+		,"\"$p\""
+		,'/T','/C'
+		,'/E'		# for 'rfa' or late $_[0]->{-w32IISdpsn}
+		,'/G'
 		,(map{(m/([^@]+)\@([^@]+)/ ? "$2\\$1" : $_) .':F'
 			} ref($_[0]->{-fswtr}) 
 			? (@{$_[0]->{-fswtr}}) 
-			: ($_[0]->{-fswtr}))
+			: ($_[0]->{-fswtr}||eval{Win32::LoginName}))
 		,sub{CORE::print "Y\n"})
 	}
  }
- $p
+ $_[0]->{-c}->{'-pth_' .$_[1]}
 }
 
 
@@ -1734,7 +1763,7 @@ sub pthGlob {  # Glob directory
      $msk =~s/\?/.?/g;
      local (*DIR, $_); 
      opendir(DIR, $pth eq '' ? './' : $pth) 
-           || return(&{$s->{-die}}($s->lng(0,'pthGlob') .": opendir('$pth') -> $!")||0);
+           || return(&{$s->{-die}}($s->lng(0,'pthGlob') .": opendir('$pth') -> $! ($^E)")||0);
      while(defined($_ =readdir(DIR))) {
        next if $_ eq '.' || $_ eq '..' || $_ !~/^$msk$/i;
        push @ret, "${pth}$_";
@@ -1918,8 +1947,11 @@ sub logEsc {	# Escape list for logging
 		? $v .','
 		: $v =~/^-\w+[\d\w]*$/
 		? $v .'=>'
-		: $v =~/^(select|insert|update|delete|drop|commit|rollback)\s+/i && $i ==2
+		: ($i ==2) &&($_[1] =~/^dbi/)
+		&&($v =~/^(?:select|insert|update|delete|drop|commit|rollback)\s+/i)
 		? $v .';'
+		: ($i ==2) &&($_[1] =~/^dbi/) &&($v =~/^(?:keDel|kePut|affected|single)\b/i)
+		? $v
 		: (strquot($s, $v) .',')) .$b
  }
  $r =~/^(.+?)[\s,;=>]*$/ ? $1 : $r
@@ -2003,9 +2035,7 @@ sub ugroups {	# current user groups
  my $fn=undef;
  my $rs='';
  if	((($fn =$s->{-AuthGroupFile}) 
-	 ||(($^O eq 'MSWin32')
-	  && $s->w32agf()
-	  &&($fn =$s->pthForm('var','uagroup')) 
+	 ||(($^O eq 'MSWin32') && $s->w32agf() &&($fn =$s->pthForm('var','uagroup')) 
 	))
 	&& -f $fn) {
 	my $fh=$s->hfNew('<', $fn)->lock(LOCK_SH);
@@ -2046,6 +2076,17 @@ sub ugroups {	# current user groups
 	my $fg =$s->{-ugflt};
 	$ug =[map {&$fg($s) ? ($_) : ()
 			} @$ug]
+ }
+ if ($s->{-ugadd}) {
+	local $_ =$ug;
+	my $ugadd=ref($s->{-ugadd}) eq 'CODE' ? &{$s->{-ugadd}}($s) : $s->{-ugadd};
+	foreach my $e (	  ref($ugadd) eq 'ARRAY'
+			? @{$ugadd}
+			: ref($ugadd) eq 'HASH'
+			? keys(%$ugadd)
+			: $ugadd){
+		push @$ug, $e if !grep /^\Q$e\E$/i, @$ug
+	}
  }
  $s->{-c}->{-ugroups} =$ug if !$_[1];
  $ug
@@ -2241,6 +2282,30 @@ sub uglist {	# User & Group List
  }
  else {
  }
+ if ($s->{-ugadd} && $r && ($o =~/g/)) {
+	local $_ =$r;
+	my $ugadd=ref($s->{-ugadd}) eq 'CODE' ? &{$s->{-ugadd}}($s) : $s->{-ugadd};
+	if ((ref($ugadd) eq 'HASH')
+	&&  (ref($r) eq 'HASH')) {
+		foreach my $e (keys(%$ugadd)) {
+			$r->{$e} =$ugadd->{$e} if !$r->{$e};
+		}
+	}
+	else {
+		foreach my $e (	  ref($ugadd) eq 'ARRAY'
+				? @{$ugadd}
+				: ref($ugadd) eq 'HASH'
+				? keys(%$ugadd)
+				: $ugadd){
+			if (ref($r) eq 'HASH') {
+				$r->{$e} =$e if !$r->{$e}
+			}
+			else {
+				push @$r, $e if !grep /^\Q$e\E$/i, @$r
+			}
+		}
+	}
+ }
  $r =do{use locale; [sort {lc($a) cmp lc($b)} @$r]} if ref($r) eq 'ARRAY';
  $r
 }
@@ -2267,17 +2332,20 @@ sub w32IISdpsn {# deimpersonate Microsoft IIS impersonated process
 		# http://php.weblogs.com/fastcgi_with_php_and_iis
 		# http://www.caraveo.com/fastcgi/
 		# http://www.cpan.org/modules/by-module/FCGI/
- return(undef)	if $^O ne 'MSWin32'
+ return(undef)	if (defined($_[0]->{-w32IISdpsn}) && !$_[0]->{-w32IISdpsn})
+		|| $_[0]->{-c}->{-RevertToSelf}
+		|| ($^O ne 'MSWin32')
 		|| !(($ENV{SERVER_SOFTWARE}||'') =~/IIS/)
 	#	|| !$ENV{REMOTE_USER}
 	#	|| $ENV{'GATEWAY_INTERFACE'}
-		|| $ENV{'FCGI_SERVER_VERSION'}
-		|| $_[0]->{-c}->{-RevertToSelf};
+		|| $ENV{'FCGI_SERVER_VERSION'};
  $_[0]->user();
  $_[0]->{-c}->{-RevertToSelf} =1;
  my $o =eval('use Win32::API; new Win32::API("advapi32.dll","RevertToSelf",[],"N")');
- $o	? $o->Call()
-	: &{$_[0]->{-die}}($_[0]->lng(0, 'w32IISdpsn') .": Win32::API('RevertToSelf') -> $@")
+ my $l =eval{Win32::LoginName()} ||'';
+ $o && $o->Call() && ($l ne (eval{Win32::LoginName()} ||''))
+ ? ($_[0]->{-debug}) && $_[0]->logRec('w32IISdpsn')
+ : &{$_[0]->{-die}}($_[0]->lng(0, 'w32IISdpsn') .": Win32::API('RevertToSelf') -> " .join('; ', map {$_ ? $_ : ()} $@,$!,$^E))
 }
 
 
@@ -2302,7 +2370,7 @@ sub w32agf {	# Win32 Apache 'AuthGroupFile' write/refresh
  my $fl =$fs .'/' .'ualist';				# file list
  return(1) 						# update frequency
 	if (-f $fg)
-	&& (time() -[stat($fg)]->[9] <60*60);
+	&& (time() -[stat($fg)]->[9] <60*60*4);
  if (!$mo) {						# check mode
 	if (!-f $fg) {			# immediate interactive
 		$s->logRec('w32agf','new',$fg);
@@ -2314,7 +2382,12 @@ sub w32agf {	# Win32 Apache 'AuthGroupFile' write/refresh
 	}
  }
  elsif ($mo eq 'q') {					# queued mode
-	if (1) {			# inline
+	if (ref($_[0])			# reverted reject
+	&&  $_[0]->{-w32IISdpsn} && ($_[0]->{-w32IISdpsn} <2)
+	&&  $_[0]->{-c}->{-RevertToSelf}) {
+		return(0)
+	}
+	elsif (1) {			# inline
 	}
 	elsif (eval("use Thread; 1")	# threads
 	&& ($mo =eval{Thread->new(sub{w32agf(undef,$fs,'t',$df)})})
@@ -2861,13 +2934,71 @@ sub rmlIdSplit {# Split record ID into table name and real ID
 sub rmiTrigger {# Execute trigger
 		# (record manipulation internal)
                 # self, {command}, {data}, {record}, trigger names
+ my $tbl =$_[1]->{-table} && $_[0]->{-table}->{$_[1]->{-table}};
+ my $frm =$_[1]->{-form} && $_[0]->{-form} && $_[0]->{-form}->{$_[1]->{-form}};
+ local $_[1]->{-cmdt} =$tbl || $frm;	# table metadata
+ local $_[1]->{-cmdf} =$frm || $tbl;	# form  metadata
+ local $_[1]->{-cmdv} ='';		# versioning transition
  local $_[0]->{-affect}	=undef;
  local $_[0]->{-rac}	=undef;
- my $tbl =$_[0]->{-table}->{$_[1]->{-table}};
- my $frm =$_[0]->{-form}->{$_[1]->{-form}} if $_[1]->{-form} && $_[0]->{-form};
  foreach my $t (@_[4..$#_]) {
-	&{$_[0]->{$t}}($_[0], $_[1], $_[2], $_[3]) if $_[0]->{$t} && !($t eq '-recInsID' && $tbl->{$t});
-	&{$tbl->{$t}} ($_[0], $_[1], $_[2], $_[3]) if $tbl->{$t};
+	if (!$_[1]->{-cmdv} 	# !!! undocumented, may be changed or excluded
+	&& (0 || $_[0]->{$t} || ($tbl && $tbl->{$t}) || ($frm && $frm->{$t}))) {
+		foreach my $d (@_[2..3]) {
+			$_[1]->{-cmdv} .=
+			  (!$_[1]->{-cmd} && 1	# && || 1
+			  ? ''
+			  : (	!$_[1]->{-cmdv}
+				? ( $_[1]->{-cmd} =~/^(?:recDel)$/
+				  ? do{$_[1]->{-cmdv} .='d'}	# deleted
+				  : '')
+				: (    ($_[2] && $_[2]->{-new})
+				    || ($_[1]->{-cmd} =~/^(?:recNew|recIns)$/)
+				  ? do{$_[1]->{-cmdv} .='n'}	# new
+				  : '')
+
+				))
+			? ''
+			: !defined($d)
+			? 'u'					# undefined
+			: do {	my $vc ='';
+				foreach my $vn (qw(-rvcDelState -rvcCkoState -rvcChgState)) {
+					my $vm =$_[1]->{-cmdt} && $_[1]->{-cmdt}->{$vn} ||$_[0]->{$vn};
+					if (!$vm) {
+						$vc ='f'	# final
+					}
+					elsif (!defined($d->{$vm->[0]})) {
+						$vc ='u'	# undefined
+					}
+					elsif (!grep {$_ eq $d->{$vm->[0]}
+							} @$vm[1..$#$vm]) {
+						$vc ='f'	# final
+					}
+					else {
+						$vc =
+						  $vn eq '-rvcCkoState'
+						? 'o'		# out-check
+						: $vn =~/^-rvc([DC])/
+						? lc($1)	# deleted, changing
+						: &{$_[0]->{-die}}("rmiTrigger '$vn' unmapped");
+						last
+					}
+				}
+				$_[1]->{-cmdv} .=($vc ||'f'); ''};
+		}
+		$_[0]->logRec('rmiTrigger'
+				, (caller(1))[3] =~/([^:]+)$/ ? $1 : (caller(1))[3]
+				, -cmd=>$_[1]->{-cmd} || 'undef'
+				, $tbl && $_[1]->{-table} ? (-table=>$_[1]->{-table}) : ()
+				, $frm && $_[1]->{-form}  ? (-form=>$_[1]->{-form}) : ()
+				, $_[1]->{-cmdv} ? (-cmdv=>$_[1]->{-cmdv}) : ()
+				, $_[1]->{-key} ? (-key=>$_[1]->{-key}) : ()
+			#	, $_[2] ? (-data=>$_[2]) : ()
+				, join(' ',@_[4..$#_])
+				) if 0;
+	}
+	&{$_[0]->{$t}}($_[0], $_[1], $_[2], $_[3]) if $_[0]->{$t} && !($t eq '-recInsID' && $tbl && $tbl->{$t});
+	&{$tbl->{$t}} ($_[0], $_[1], $_[2], $_[3]) if $tbl && $tbl->{$t};
 	&{$frm->{$t}} ($_[0], $_[1], $_[2], $_[3]) if $frm && $frm->{$t} && ($frm->{$t} ne $tbl->{$t});
  }
  $_[0]
@@ -2902,7 +3033,9 @@ sub rmiIndex {  # Index record
 			my $k =rmlKey($s, {-table=>$x}, $r);
 			$q->[1] eq '-'
 			? $s->dbiDel({-table=>$x, -key=>$k}, $r)
-			: $s->dbiUpd({-table=>$x, -key=>$k, -save=>1}, $r);
+			: 1 && eval{$s->dbiIns({-table=>$x, -key=>$k}, $r)}
+			? 0	# !!! dbiIns better, dbiUpd safer
+			: $s->dbiUpd({-table=>$x, -key=>$k, -save=>1}, $r, $d);
 		}
 	}
  }
@@ -3034,12 +3167,16 @@ sub rfdStamp {	# Stamp record with files directory name, create if needed
  my $r =$_[2];
  my $w =$_[3];
 
- $_[0]->pthMk($p) if $e;
+ if ($e && !-d $p) {
+	$_[0]->w32IISdpsn()	if $_[0]->{-w32IISdpsn} && !$_[0]->{-c}->{-RevertToSelf};
+	$_[0]->pthMk($p);
+ }	
 
  if (-d $p)	{ $r->{-file} =$d; $r->{-fupd} =$d if $e}
  else		{ delete $r->{-file}; delete $r->{-fupd}}
 
  if ($r->{-file} && $w) {	# set ACL
+	$_[0]->w32IISdpsn()	if $_[0]->{-w32IISdpsn} && !$_[0]->{-c}->{-RevertToSelf};
 	my $s =$_[0];
 	my $m =$s->{-table}->{ref($_[1]) ? $_[1]->{-table} : $_[1]};
 	my $wr=$m->{-racReader} ||$s->{-racReader};
@@ -3054,7 +3191,9 @@ sub rfdStamp {	# Stamp record with files directory name, create if needed
 				: $ld
 				? ($_, $ld .'\\' .$_, $_ .'@' .$ld)
 				: $_}
-			(map {ref($_) ? @$_ : ()} $s->{-fswtr}, $s->{-fsrdr}, $ww, $wr);
+			(map {!$_ ? () : ref($_) ? @$_ : ($_)
+				} $s->{-fswtr}, $s->{-fsrdr}, $ww, $wr);
+					# ||getlogin()
 		my $wf=$s->hfNew('+>',"$p/.htaccess");
 		$wf->store('<Files "*">', "\n"
 			,"require user\t"	.join(' ',@wa), "\n"
@@ -3067,7 +3206,7 @@ sub rfdStamp {	# Stamp record with files directory name, create if needed
 		$s->osCmd('cacls', "\"$p\"", '/T','/C','/G'
 		,(map { $_ =~/\s/ ? "\"$_\"" : $_
 			} map{(m/([^@]+)\@([^@]+)/ ? "$2\\$1" : $_) .':F'
-				} ref($s->{-fswtr}) ? (@{$s->{-fswtr}}) : ($s->{-fswtr}))
+				} ref($s->{-fswtr}) ? (@{$s->{-fswtr}}) : ($s->{-fswtr} ||eval{Win32::LoginName}))
 		,$s->{-fsrdr}
 		?(map { $_ =~/\s/ ? "\"$_\"" : $_
 			} map{(m/([^@]+)\@([^@]+)/ ? "$2\\$1" : $_) .':R'
@@ -3103,6 +3242,7 @@ sub rfdStamp {	# Stamp record with files directory name, create if needed
 
 sub rfdCp {	# Copy record's files directory to another record
 		# self, source {record} |rfdName, dest {command} |table, {record}
+ $_[0]->w32IISdpsn()	if $_[0]->{-w32IISdpsn} && !$_[0]->{-c}->{-RevertToSelf};
  my $fd =ref($_[1]) ? $_[1]->{-file} : $_[1];
     return(0) if !$fd;
  my $fp =rfdPath($_[0],-path=>$fd);
@@ -3116,6 +3256,7 @@ sub rfdCp {	# Copy record's files directory to another record
 
 sub rfdRm {	# Remove record's files directory
 		# self, rfdName |{record} |({command} |table, {record})
+ $_[0]->w32IISdpsn()	if $_[0]->{-w32IISdpsn} && !$_[0]->{-c}->{-RevertToSelf};
  my $p =rfdPath($_[0], -path=>ref($_[1]) && $_[1]->{-file} ? $_[1]->{-file} : @_[1..max($_[0], 2, $#_)]);
     $p =-d $p ? $_[0]->pthRm('-r', $p) && $_[0]->pthCln($p) : $p;
  delete $_[1]->{-file} if $p && ref($_[1]);
@@ -3125,6 +3266,7 @@ sub rfdRm {	# Remove record's files directory
 
 sub rfdCln {	# Clean record's files directory, delete if empty
 		# self, rfdName |{record} |({command} |table, {record})
+ $_[0]->w32IISdpsn()	if $_[0]->{-w32IISdpsn} && !$_[0]->{-c}->{-RevertToSelf};
  my $p =rfdPath($_[0], -path=>ref($_[1]) && $_[1]->{-file} ? $_[1]->{-file} : @_[1..max($_[0], 2, $#_)]);
     $p =$_[0]->pthCln($p);
  delete $_[1]->{-file} if $p && ref($_[1]) && !-d $p;
@@ -3140,6 +3282,7 @@ sub rfdGlobn {	# Glob record's files directory, return attachments names
 
 sub rfaRm {	# Delete named attachment(s) in record's files directory
 		# self, rfdName |{record} |({command} |table, {record}), attachment|[attachments]
+ $_[0]->w32IISdpsn()	if $_[0]->{-w32IISdpsn} && !$_[0]->{-c}->{-RevertToSelf};
  grep {$_[0]->pthRm('-r',$_[0]->rfdPath(-path=>@_[1..$#_-1], $_))
 	} ref($_[$#_]) ? @{$_[$#_]} : $_[$#_]
 }
@@ -3147,6 +3290,7 @@ sub rfaRm {	# Delete named attachment(s) in record's files directory
 
 sub rfaUpload {	# Upload named attachment into record's files directory
 		# self, rfdName |{record} |({command} |table, {record}), cgi file
+ $_[0]->w32IISdpsn()	if $_[0]->{-w32IISdpsn} && !$_[0]->{-c}->{-RevertToSelf};
  my $fn =$_[0]->cgi->param($_[$#_]);
     $fn =$fn =~/[\\\/]([^\\\/]+)$/ ? $1 : $fn;
     $fn =~s/([,;+:'"?*%])/uc sprintf("%%%02x",ord($1))/eg;
@@ -3167,9 +3311,11 @@ sub recNew {    # Create new record to be inserted into database
 	$s->logRec('recNew', @_[1..$#_]);
  my	$a =(@_< 3 && ref($_[1]) ? $_[1] : {@_[1..$#_]});
  my	$d =$a->{-data} ? {%{$a->{-data}}} : exists($a->{-data}) ? {} : $a;
- local	$a->{-table} =recType ($s, $a, $d);
- local	$a->{-key}   =rmlKey($s, $a, $d);
+ local  $a->{-cmd}  ='recNew';
+ local	$a->{-table}=recType ($s, $a, $d);
+ local	$a->{-key}  =rmlKey($s, $a, $d);
  my	$m =mdeTable($s,$a->{-table});
+ rmiTrigger($s, $a, $d, undef, qw(-recForm0C -recNew0C));
  my	$r ={%$d};
  my	$p =(grep {$_} values %{$a->{-key}}) ? $s->recRead(%$a, -data=>undef, -test=>1) : {};
  #	map {$r->{$_} =$p->{$_}} keys %$p;
@@ -3184,9 +3330,9 @@ sub recNew {    # Create new record to be inserted into database
  }
  $r->{-new} =$s->strtime();
  $r->{-editable} =$s->user() if $s->{-rac} && ($m->{-racWriter}||$s->{-racWriter});
- rmiTrigger($s, $a, $r, $p, qw(-recNew0C));
- rmiTrigger($s, $a, $r, undef, qw(-recForm0C));
- rmiTrigger($s, $a, $d, $r, qw(-recNew1R -recNew1C -recForm1C));
+ rmiTrigger($s, $a, $r, undef,	qw(-recForm0R));
+ rmiTrigger($s, $a, $r, $p,	qw(-recNew0R));
+ rmiTrigger($s, $a, $r, undef,	qw(-recNew1R -recNew1C -recForm1C));
  $r
 }
 
@@ -3196,19 +3342,20 @@ sub recForm {   # Recalculate record - new or existing
 		# -key=>original
  my	$s =$_[0];
 	# $s->logRec('recForm', @_[1..$#_]);
- my	$a =(@_< 3 && ref($_[1]) ? $_[1] : {@_[1..$#_]});
- my	$d =$a->{-data} ? $a->{-data} : exists($a->{-data}) ? {} : $a;
- local	$a->{-table} =recType ($s, $a, $d);
- local	$a->{-key}   =rmlKey($s, $a, $d);
+ my	$a =(@_< 3 && ref($_[1]) ? {%{$_[1]}} : {@_[1..$#_]});
+ my	$d =$a->{-data} ? {%{$a->{-data}}} : exists($a->{-data}) ? {} : $a;
+ local  $a->{-cmd}  ='recForm';
+ local	$a->{-table}=recType ($s, $a, $d);
+ local	$a->{-key}  =rmlKey($s, $a, $d);
  my	$m =mdeTable($s,$a->{-table});
- my	$r =(!$d->{-new} && (grep {$_} values %{$a->{-key}}) && $s->recRead(%$a,-data=>undef,-test=>1)) ||{};
-	map {$r->{$_} =$d->{$_}} keys %$d;
+ rmiTrigger($s, $a, $d, undef, qw(-recForm0C));
+ my	$r =(!$d->{-new} && (grep {$_} values %{$a->{-key}}) && $s->recRead(%$a,-data=>undef,-test=>1));
+	map {$d->{$_} =$r->{$_} if !exists($d->{$_})} keys %$r	if $r;
  foreach my $w (qw(-rvcInsBy -rvcUpdBy)) {foreach my $c ($m, $s) {
-	next if !$c->{$w}; $r->{$c->{$w}} =$s->user if !$r->{$c->{$w}}; last
+	next if !$c->{$w}; $d->{$c->{$w}} =$s->user if !$d->{$c->{$w}}; last
  }}
- rmiTrigger($s, $a, $r, undef, qw(-recForm0C));
- rmiTrigger($s, $a, $d, $r, qw(-recForm1C));
- $r
+ rmiTrigger($s, $a, $d, $r, qw(-recForm0R -recForm1C));
+ $d
 }
 
 
@@ -3220,12 +3367,22 @@ sub recIns {    # Insert record into database
 	$s->logRec('recIns', @_[1..$#_]);
  my	$a =(@_< 3 && ref($_[1]) ? {%{$_[1]}} : {@_[1..$#_]});
  my	$d =$a->{-data} ? {%{$a->{-data}}} : exists($a->{-data}) ? {} : $a;
+ local  $a->{-cmd}  ='recIns';
  local  $a->{-table}=recType ($s, $a, $d);
  local	$a->{-key}  =rmlKey($s, $a, $d);
  my	$m =mdeTable($s,$a->{-table});
- my	$r =undef;
  my	$v =$m->{-rvcActPtr}	||$s->{-rvcActPtr};
  my	$b =$m->{-rfa}	||$s->{-rfa};
+
+ foreach my $w (qw(-rvcInsBy -rvcUpdBy)) {foreach my $c ($m, $s) {
+	next if !$c->{$w}; $d->{$c->{$w}} =$s->user; last
+ }}
+ foreach my $w (qw(-rvcInsWhen -rvcUpdWhen)) {foreach my $c ($m, $s) {
+	next if !$c->{$w}; $d->{$c->{$w}} =$s->strtime; last
+ }}
+
+ rmiTrigger($s, $a, $d, undef, qw(-recForm0C -recIns0C));
+ my	$r =undef;
  my	$p =(grep {$_} values %{$a->{-key}}) && $s->recRead(%$a, -data=>undef, -test=>1);
  if ($p) {		# form record with prototype
     my $t =recData($s, $p);
@@ -3234,35 +3391,39 @@ sub recIns {    # Insert record into database
     if ($a eq $d)	{$a =$d =$t}
     else		{$d =$t}
  }
- foreach my $w (qw(-rvcInsBy -rvcUpdBy)) {foreach my $c ($m, $s) {
-	next if !$c->{$w}; $d->{$c->{$w}} =$s->user; last
- }}
- foreach my $w (qw(-rvcInsWhen -rvcUpdWhen)) {foreach my $c ($m, $s) {
-	next if !$c->{$w}; $d->{$c->{$w}} =$s->strtime; last
- }}
+
+ # !!! Permissions should be checked in -recIns0C trigger !!!
  if ($a->{-from}) {	# insert from cursor
-	while (my $t =$a->{-from}->fetchrow_hashref()) {
-		$t ={%$t};	# readonly hash
+	my $j =0;
+	while (my $e =$a->{-from}->fetchrow_hashref()) {
+		my $t ={%$e};	# readonly hash
 		rfdStamp($s, $a, $t) if $b;
 		@{$t}{recFields($s, $d)} =recValues($s, $d);
-		rmiTrigger($s, $a, $t, undef, qw(-recIns0C -recForm0C -recIns0R -recInsID));
-		rfdCp	  ($s, $t->{-file}, $a, $t) if $t && $t->{-file};
-		rfdCp	  ($s, $p->{-file}, $a, $t) if $p && $p->{-file};
+		rmiTrigger($s, $a, $t, undef, qw(-recForm0R -recChg0R -recIns0R -recInsID));
+		rfdCp	  ($s, $t->{-file}, $a, $t) if !$a->{-file} && $t && $t->{-file};
+		rfdCp	  ($s, $p->{-file}, $a, $t) if !$a->{-file} && $p && $p->{-file};
+		rfdCp	  ($s, $a->{-file}, $a, $t) if  $a->{-file};
 		rmiIndex  ($s, $a, $t) if $m->{-index} ||$s->{-index};
 		$r =$s->dbiIns($a, $t);
 		rfdStamp($s, $a, $r, '+') if $t && $t->{-file} || $p && $p->{-file};
-		rmiTrigger($s, $a, $t, $r, qw(-recIns1R -recIns1C)) if $r;
+		rmiTrigger($s, $a, $r, undef, qw(-recIns1R)) if $r;
+		$j++;
 	}
-	$r =$a;
+	$s->{-affected} =$j;
+	rmiTrigger($s, $a, $r, undef, '-recIns1C', $j ==1 ? ('-recForm1C') : ())
+			if $r;
+	$r =$r ||$d;
  }
  else {			# insert single record
-	rmiTrigger($s, $a, $d, undef, qw(-recIns0C -recForm0C -recIns0R -recInsID));
-	rfdCp	  ($s, $p, $a, $d)	if $p && $p->{-file};
-	rmiIndex  ($s, $a, $d, undef)	if $m->{-index} ||$s->{-index};
+	rmiTrigger($s, $a, $d, undef, qw(-recForm0R -recChg0R -recIns0R -recInsID));
+	rfdCp	  ($s, $p, $a, $d)		if !$a->{-file} && $p && $p->{-file};
+	rfdCp	  ($s, $a->{-file}, $a, $d)	if  $a->{-file};
+	rmiIndex  ($s, $a, $d, undef)		if $m->{-index} ||$s->{-index};
 	$r =$s->dbiIns($a, $d);
 	rfdStamp  ($s, $a, $r, '+');
 	$r->{-editable} =$s->user if $r && $s->{-rac} && ($m->{-racWriter}||$s->{-racWriter});
-	rmiTrigger($s, $a, $d, $r, qw(-recIns1R -recIns1C -recForm1C)) if $r;
+	$s->{-affected} =1;
+	rmiTrigger($s, $a, $r, undef, qw(-recIns1R -recIns1C -recForm1C)) if $r;
  }
  return($r)
 }
@@ -3337,7 +3498,7 @@ sub dbiIns {    # Insert record into database
 	@c =	([map {$d->{$_}} 
 			@{$s->{-table}->{$f}->{-key}}]
 		,($r =recData($s, $d)));
-	$s->logRec('dbiIns/kePut', $f, @c);
+	$s->logRec('dbiIns','kePut', $f, @c);
 	$s->dbmTable($f)->kePut(@c) || return(&{$s->{-die}}($s->lng(0,'dbiIns') .": kePut() -> $@") && undef);
 	$s->{-affected} =1;
  }
@@ -3372,6 +3533,7 @@ sub recUpd {    # Update record(s) in database
 	$s->logRec('recUpd', @_[1..$#_]);
  my	$a =(@_< 3 && ref($_[1]) ? {%{$_[1]}} : {@_[1..$#_]});
  my	$d =$a->{-data} ? {%{$a->{-data}}} : exists($a->{-data}) ? {} : $a;
+ local  $a->{-cmd}  ='recUpd';
  local  $a->{-table}=recType ($s, $a, $d);
  local	$a->{-key}  =rmlKey  ($s, $a, $d);
  my	$m =mdeTable($s,$a->{-table});
@@ -3398,8 +3560,8 @@ sub recUpd {    # Update record(s) in database
  foreach my $c ($m, $s) {
 	next if !$c->{-rvcUpdWhen}; $d->{$c->{-rvcUpdWhen}} =$s->strtime; last
  }
- rmiTrigger($s, $a, $d, undef, qw(-recUpd0C -recForm0C));
- if ($w ||$o ||$v ||$i ||grep {$s->{$_} || $m->{$_}} qw(-recUpd0R -recUpd -recUpd1R)) {
+ rmiTrigger($s, $a, $d, undef, qw(-recForm0C -recUpd0C));
+ if ($w ||$o ||$v ||$i ||grep {$s->{$_} || $m->{$_}} qw(-recForm0R -recChg0R -recUpd0R -recUpd1R)) {
 	my $c =$s->recSel(rmlClause($s, $a), -data=>undef);
 	my $j =0;
 	while ($r =$c->fetchrow_hashref()) {
@@ -3409,9 +3571,14 @@ sub recUpd {    # Update record(s) in database
 		return(&{$s->{-die}}($s->lng(0,'recUpd') .': ' .$s->lng(1,'recUpdAclStp')) && undef)
 			if $w && !$s->ugmember(map {$r->{$_}} @$w);
 		rfdStamp($s, $a, $r) if $b;
-		if ($v	&& $r->{$v}			# prohibit version
+		my ($n, $p);
+		if (($v	&& $r->{$v}			# prohibit version
 			&& (!$o || (defined($r->{$o->[0]})
-					&& ($r->{$o->[0]} ne $o->[1])))
+					&& ($r->{$o->[0]} ne $o->[1]))))
+		||  ($x && defined($r->{$x->[0]})
+			&& ($r->{$x->[0]} eq $x->[1])
+			&& (!defined($d->{$x->[0]}) 
+					|| ($d->{$x->[0]} eq $x->[1])))
 					) {
 			return(&{$s->{-die}}($s->lng(0,'recUpd') .': ' .$s->lng(1,'recUpdVerStp')) && undef)
 		}
@@ -3424,32 +3591,35 @@ sub recUpd {    # Update record(s) in database
 			&& $r->{$v}) {
 			my $t =$r->{'id'};
 			$e =$s->recUpd(%$r, %{recData($s,$d)}
-					, 'id'=>$r->{$v}, $v=>undef
-					, -table=>$a->{-table}, -key=>{'id'=>$r->{$v}});
+					, 'id'=>$r->{$v}
+					, $v=>undef
+					, -table=>$a->{-table}
+					, -key=>{'id'=>$r->{$v}});
 			rfdRm	($s, $a->{-table}, $r)	if $r->{-file};
 			rmiIndex($s, $a, undef, $r)	if $i;
 			$s->dbiDel({-table=>$a->{-table}, -key=>{'id'=>$t}});
+			$n =undef;
 		}
 		elsif ($o				# check-out
 			&& (($r->{$o->[0]}||'') ne $o->[1])
 			&& (($d->{$o->[0]}||'') eq $o->[1])) {
-			my $n ={%$r}; @{$n}{recFields($s, $d)} =recValues($s, $d);
+			$n ={%$r}; @{$n}{recFields($s, $d)} =recValues($s, $d);
 			$n->{$v} =$r->{'id'};
-			rmiTrigger($s, $a, $n, undef, qw(-recForm0C -recUpd0R -recInsID));
+			rmiTrigger($s, $a, $n, $n, qw(-recForm0R -recChg0R -recUpd0R -recInsID));
 			rfdCp	  ($s, $r->{-file}, $a, $n)	if $r->{-file};
 			rfdStamp  ($s, $a, $n, '+')		if $r->{-file};
 			rmiIndex  ($s, $a, $n, undef)		if $m->{-index} ||$s->{-index};
 			$e =$s->dbiIns($a, $n);
 			$e->{-file} =$n->{-file}		if $n->{-file};
+			$n =undef;
 		}
 		elsif ($v && (!$u			# version
 				|| (defined($r->{$u->[0]})
 				   && !grep {$r->{$u->[0]} eq $_
 					} @{$u}[1..$#{@$u}]))) {
-			my $n ={%$r}; @{$n}{recFields($s, $d)} =recValues($s, $d);
-			my $p ={%$r, $v=>$r->{'id'}, -table=>$a->{-table}};
-			rmiTrigger($s, $a, $n, $r, qw(-recUpd0R));
-					# !!! lost computed values
+			$n ={%$r}; @{$n}{recFields($s, $d)} =recValues($s, $d);
+			$p ={%$r, $v=>$r->{'id'}, -table=>$a->{-table}};
+			rmiTrigger($s, $a, $n, $r, qw(-recForm0R -recChg0R -recUpd0R));
 			rmiTrigger($s, $a, $p, undef, qw(-recInsID));
 			rfdCp	  ($s, $r->{-file}, $a, $p)
 					if $r 
@@ -3471,21 +3641,31 @@ sub recUpd {    # Update record(s) in database
 			$p =$s->dbiIns({-table=>$a->{-table}, -save=>1}, $p);
 		}
 		else {					# update only
-			my $n ={%$r}; @{$n}{recFields($s, $d)} =recValues($s, $d);
-			rmiTrigger($s, $a, $n, $r, qw(-recUpd0R));
-					# !!! lost computed values
+			$n ={%$r}; @{$n}{recFields($s, $d)} =recValues($s, $d);
+			rmiTrigger($s, $a, $n, $r, qw(-recForm0R -recChg0R -recUpd0R));
 			do {	rfdRm  ($s, $a->{-table}, $n);
 				rfdCp  ($s, $a->{-file},  $a->{-table}, $n);
 				}
-					if $a->{-file}
-					&& (!$r->{-file} || $r->{-file} ne $a->{-file});
-			rfdStamp  ($s, $a, $n, '+') if $r && $r->{-file};
-			rfdCln	  ($s, $a, $n)      if $r && $r->{-file} 
-							  && $u 
-							  && $n->{$u->[0]} 
-							  && !grep {$n->{$u->[0]} eq $_
-								} @{$u}[1..$#{@$u}];
+				if $a->{-file}
+				&& (!$r->{-file} || ($r->{-file} ne $a->{-file}));
+			rfdStamp  ($s, $a, $n, '+') 
+				if $r && $r->{-file};
+			rfdCln	  ($s, $a, $n)
+				if $r && $r->{-file} 
+				&& $u 
+				&& $n->{$u->[0]} 
+				&& !grep {$n->{$u->[0]} eq $_
+						} @{$u}[1..$#{@$u}];
 			rmiIndex  ($s, $a, $n, $r)  if $i;
+		}
+		if (1 && $n) {	# && ($s->{-recUpd0R} || $m->{-recUpd0R} || $s->{-recChg0R} || $m->{-recChg0R})
+				# !!! lost computed values while commented
+			$s->logRec('dbiUpd','SINGLE') if $j ==1;
+			$e =$s->dbiUpd({ -table=>$a->{-table}
+					,-key=>$s->recWKey($a->{-table}, $r)
+						# recKey, recWKey
+				}, $n, $r || {});
+			$s->{-affected} =$j if $s->{-affected};
 		}
 	} 
 	$r =$e || $s->dbiUpd($a, $d);
@@ -3500,10 +3680,10 @@ sub recUpd {    # Update record(s) in database
 			if $b;
 	$r->{-editable} =$w ? $s->ugmember(map {$r->{$_}} @$w) : $s->user
 			if $s->{-rac};
-	rmiTrigger($s, $a, $d, $r, qw(-recUpd1C -recForm1C));
+	rmiTrigger($s, $a, $r, undef, qw(-recUpd1C -recForm1C));
  }
  elsif ($r) {
-	rmiTrigger($s, $a, $d, $r, qw(-recUpd1C))
+	rmiTrigger($s, $a, $r, undef, qw(-recUpd1C))
  }
  $r
 }
@@ -3513,12 +3693,19 @@ sub dbiUpd {    # Update record(s) in database
 		# -table=>table, field=>value || -data=>{values}
 		# -key=>{field=>value}, -where=>'condition'
 		# -save=>boolean, -optrec=>boolean
- my ($s, $a, $d) =@_;
+		# $d && $dp - single record full new && prev data
+ my ($s, $a, $d, $dp) =@_;
  my  $f =$a->{-table};
  my  @c;
  my  $r =undef;
      $s->{-affected} =0;
  if (($s->{-table}->{$f}->{-dbd} ||$s->{-dbd} ||$s->{-tn}->{-dbd}) eq 'dbi') {
+	$d ={map {	(defined($dp->{$_}) && defined($d->{$_}) && ($dp->{$_} eq $d->{$_}))
+			|| (!defined($dp->{$_}) && !defined($d->{$_}))
+			? ()
+			: ($_ => $d->{$_}) } keys %$d}
+		if $dp;
+	$d =$dp if $dp && !scalar(keys(%$d));
 	my $db =$s->dbi();
 	my @cn =!$a->{-key} ? () : $s->{-dbiph} ? sort keys %{$a->{-key}} : keys %{$a->{-key}};
 	my(@a, @v); @a =recFields($s,$d) if $s->{-dbiph};
@@ -3548,11 +3735,11 @@ sub dbiUpd {    # Update record(s) in database
 			)
 		,$s->{-dbiph} ? ({}, (map {$d->{$_}} @a), (map {ref($a->{-key}->{$_}) ? @{$a->{-key}->{$_}} : $a->{-key}->{$_}} @cn)) : ()
 	);
-	$s->logRec('dbiUpd',@c);
+	$s->logRec('dbiUpd', @c);
 	$db->do(@c) || return(&{$s->{-die}}($s->lng(0,'dbiUpd') .": do() -> " .($DBI::errstr||'Unknown')) && undef);
 	$s->{-affected} =$DBI::rows;
 	$s->{-affected} =-$s->{-affected} if $s->{-affected} <0;
-	$s->logRec('dbiUpd','affected',$s->{-affected});
+	$s->logRec('dbiUpd','AFFECTED',$s->{-affected});
 	return($s->dbiIns($a, $d)) 
 		if !$s->{-affected} 
 		&& ($a->{-save}
@@ -3561,7 +3748,7 @@ sub dbiUpd {    # Update record(s) in database
 		if !$s->{-affected}
 		&& ($a->{-optrec}
 		||  $s->{-table}->{$f}->{-optrec});
-	return($a) if $s->{-affected} >1 ||$a->{-save};
+	return($d) if $s->{-affected} >1 ||$a->{-save};
 	if ($s->{-dbiph}) {
 		@cn =grep {defined($d->{$_}) 
 			|| !exists($d->{$_}) && defined($a->{-key}->{$_})
@@ -3588,29 +3775,40 @@ sub dbiUpd {    # Update record(s) in database
 	$r =$f && $f->execute(@v) && $f->fetchrow_hashref() || return(&{$s->{-die}}($s->lng(0,'dbiUpd') .": selectrow_hashref() -> " .($DBI::errstr||'Empty result set')) && undef);
  }
  elsif (($s->{-table}->{$f}->{-dbd} ||$s->{-dbd} ||$s->{-tn}->{-dbd}) eq 'dbm') {
-	my $h =$s->dbmTable($f);
-	my @f =recFields($s,$d);
-	my @v =recValues($s,$d);
-	my $j =0;
+	my ($j, $h, @f, @v);
+	$j =0;
+	$h =$s->dbmTable($f);
+	if (!$dp) {
+		@f =recFields($s,$d);
+		@v =recValues($s,$d);
+	}
 	$s->{-affected} =
-	$s->dbmSeek($a, sub {
+	!$dp
+	? $s->dbmSeek($a, sub {
 			$j++;
 			return(&{$s->{-die}}($s->lng(0,'dbiUpd') .": $j ". $s->lng(1,'-affected')) && undef)
 				if $s->{-affect} && $j >$s->{-affect};
-			$r =$_[2];
-			@{$r}{@f} =@v;
+			if (!$dp)	{ $r =$_[2]; @{$r}{@f} =@v }
+			else		{ $r =$d }
 			my $k =[map {$r->{$_}} @{$s->{-table}->{$f}->{-key}}];
-			$s->logRec('dbiUpd/kePut', $f, $k, $_[1], $r);
+			$s->logRec('dbiUpd','kePut', $f, $k, $_[1], $r);
 			$h->kePut($k, $_[1], $r);
-	});
+		})
+	: do {		my $k =[map {$d->{$_}} @{$s->{-table}->{$f}->{-key}}];
+			my $kp=[map {$dp->{$_}} @{$s->{-table}->{$f}->{-key}}];
+			$s->logRec('dbiUpd','kePut', $f, $k, $kp, $d);
+			$h->kePut($k, $kp, $d);
+			$r =$d;
+			1
+		};
 	if (!$s->{-affected}) {
 		return($s->dbiIns($a, $d)) 
 			if $a->{-save} || $s->{-table}->{$f}->{-ixcnd};
 		return($s->recIns($a, $d))
 			if $a->{-optrec} || $s->{-table}->{$f}->{-optrec};
-		return(&{$s->{-die}}($s->lng(0,'dbiUpd') .": dbmSeek() -> " .($@ ||'not found')) && undef)
+		return(&{$s->{-die}}($s->lng(0,'dbiUpd') .": dbiSeek() -> " .($@ ||'not found')) && undef)
 	}
-	$r =$s->{-affected} >1 ? $a : $r;
+	$r =$s->{-affected} >1 ? $d : $r;
  }
  $r
 }
@@ -3768,7 +3966,7 @@ sub dbmSeek {	# Select records from dbm file using -key and -where
 	&& (!$ft || grep {defined($_[2]->{$_}) && $_[2]->{$_} =~/\Q$ft\E/i} keys %{$_[2]})
 	&& (!$wf || &$wf(@_))
 	};
- $s->logRec('dbmSeek'
+ $s->logRec('dbiSeek'
 	, $a->{-table}, $ox, $k
 	, $wv	? (-version=> $wv)	: ()
 	, $wk	? ('-' .substr($o, 2)=>$wk)	 : ()
@@ -3925,6 +4123,7 @@ sub recDel {    # Delete record(s) in database
 	$s->logRec('recDel', @_[1..$#_]);
  my	$a =(@_< 3 && ref($_[1]) ? {%{$_[1]}} : {@_[1..$#_]});
  my	$d =$a->{-data} ? {%{$a->{-data}}} : exists($a->{-data}) ? {} : $a;
+ local  $a->{-cmd}  ='recDel';
  local  $a->{-table}=recType($s, $a, $d);
  local	$a->{-key}  =rmlKey($s, $a, $d);
  my	$m =mdeTable($s,$a->{-table});
@@ -3933,8 +4132,8 @@ sub recDel {    # Delete record(s) in database
  my	$x =$m->{-rvcDelState}	||$s->{-rvcDelState};
  my	$i =$m->{-index}	||$s->{-index};
  my	$b =$m->{-rfa}		||$s->{-rfa};
- rmiTrigger($s, $a, $d, undef, qw(-recDel0C -recForm0C));
- if ((($w||$i) && !$x) ||grep {$s->{$_} || $m->{$_}} qw(-recDel0R -recDel -recDel1R)) {
+ rmiTrigger($s, $a, $d, undef, qw(-recForm0C -recDel0C));
+ if ((($w||$i) && !$x) ||grep {$s->{$_} || $m->{$_}} qw(-recDel0R -recDel1R)) {
 	my $c =$s->recSel(rmlClause($s, $a), -data=>undef);
 	my $j =0;
 	while ($r =$c->fetchrow_hashref()) {
@@ -3962,7 +4161,7 @@ sub recDel {    # Delete record(s) in database
  }
  return(&{$s->{-die}}($s->lng(0,'recDel') .': ' .($s->{-affected}||0) .' ' .$s->lng(1,'-affected')) && undef)
 	if $s->{-affect} && (($s->{-affected}||0) != $s->{-affect});
- rmiTrigger($s, $a, $d, $r, qw(-recDel1C)) if $r;
+ rmiTrigger($s, $a, $d, undef, qw(-recDel1C)) if $r;
  $r
 }
 
@@ -3995,7 +4194,7 @@ sub dbiDel {    # Delete record(s) in database
 	$s->dbi->do(@c) || return(&{$s->{-die}}($s->lng(0,'dbiDel') .": do() -> " .($DBI::errstr||'Unknown')) && undef);
 	$s->{-affected} =$DBI::rows;
 	$s->{-affected} =-$s->{-affected} if $s->{-affected} <0;
-	$s->logRec('dbiDel','affected',$s->{-affected});
+	$s->logRec('dbiDel','AFFECTED',$s->{-affected});
 	return($s->{-affected} && $a);
  }
  elsif (($s->{-table}->{$f}->{-dbd} ||$s->{-dbd} ||$s->{-tn}->{-dbd}) eq 'dbm') {
@@ -4005,10 +4204,10 @@ sub dbiDel {    # Delete record(s) in database
 	$s->dbmSeek($a, sub {
 		$j++; return(&{$s->{-die}}($s->lng(0,'dbiDel') .": $j " .$s->lng(1,'-affected')) && undef)
 			if $s->{-affect} && $j >$s->{-affect};
-                $s->logRec('dbiDel/keDel', $f, $_[1]);
+                $s->logRec('dbiDel', 'keDel', $f, $_[1]);
 		$h->keDel($_[1]);
 	});
-	return(&{$s->{-die}}($s->lng(0,'dbiDel') .": dbmSeek() -> $@") && undef) if !defined($s->{-affected});
+	return(&{$s->{-die}}($s->lng(0,'dbiDel') .": dbiSeek() -> $@") && undef) if !defined($s->{-affected});
  }
  $s->{-affected} && $a
 }
@@ -4041,6 +4240,7 @@ sub recSel {    # Select records from database
  my	$a =@_< 3 && ref($_[1]) ? dsdClone($s, $_[1]) : {map {ref($_) ? dsdClone($s, $_) : $_} @_[1..$#_]};
 	$a->{-table}=recType($s, $a, $a);
  my	$m =mdeTable($s,$a->{-table});
+ local  $a->{-cmd}    ='recSel';
  local	$a->{-version}= ref($a->{-version})
 			? $a->{-version}
 			: $m && (!$a->{-version} ||$a->{-version} eq '-')
@@ -4068,13 +4268,14 @@ sub recRead {   # Read one record from database
  my	$s =$_[0];
  my	$a =@_< 3 && ref($_[1]) ? dsdClone($s, $_[1]) : {map {ref($_) ? dsdClone($s, $_) : $_} @_[1..$#_]};
  my	$d ={};
+ local  $a->{-cmd}  ='recRead';
  local	$s->{-affect}=1;
 	$a->{-table}=recType($s, $a, $d);
 	$a->{-key}  =rmlKey($s, $a, $d);
 	$a->{-data} =ref($a->{-data}) ne 'ARRAY' ? undef : $a->{-data};
  my	$m =mdeTable($s,$a->{-table});
  my	$r =undef;
- rmiTrigger($s, $a, $d, $r, qw(-recRead0C -recRead0R));
+ rmiTrigger($s, $a, $d, undef, qw(-recForm0C -recRead0C));
  $r =$s->dbiSel($a)->fetchrow_hashref();
  if ($r) {
 	$s->{-affected} =1;
@@ -4101,8 +4302,8 @@ sub recRead {   # Read one record from database
 		|| $s->ugmember(map {$r->{$_}} @{$m->{-racWriter} || $s->{-racWriter}||[]})
  }
  rfdStamp($s, $a, $r) if $m->{-rfa} ||$s->{-rfa};
- rmiTrigger($s, $a, $r, undef, qw(-recForm0C)) if $r && $a->{-edit};
- rmiTrigger($s, $a, $d, $r, qw(-recRead1R -recRead1C -recForm1C)) if $r;
+ rmiTrigger($s, $a, $r, $r, qw(-recForm0R -recRead0R -recRead1R -recRead1C -recForm1C))
+	if $r;
  $r
 }
 
@@ -4113,6 +4314,7 @@ sub recLast {   # Last record lookup for values
  my	$s =$_[0];
  my	$d =$_[2];
  my	$a ={-table=>ref($_[1]) ? $s->recType($_[1], $d) : $_[1]};
+ local  $a->{-cmd}   ='recLast';
  local	$s->{-affect}=1;
  my	$m =mdeTable($s,$a->{-table});
  my	$r =undef;
@@ -4133,12 +4335,14 @@ sub recLast {   # Last record lookup for values
 		}
 	}
 	next if !%{$a->{-key}};
-	$s->logRec('recLast',$i,$s->strdata($a));
-	rmiTrigger($s, $a, $d, $r, qw(-recRead0C -recRead0R));
+	$s->logRec('recLast',$i
+			, (map {($_=>$s->strdata($a->{$_}))} sort keys %$a)
+			, @_[3..$#_]);
+	rmiTrigger($s, $a, $d, $r, qw(-recForm0C -recRead0C));
 	$r =$s->dbiSel($a)->fetchrow_hashref();
 	next if !$r;
 	# $s->{-affected} =$s->{-fetched} =1;
-	rmiTrigger($s, $a, $d, $r, qw(-recRead1R -recRead1C));
+	rmiTrigger($s, $a, $r, $r, qw(-recForm0R -recRead0R -recRead1R -recRead1C -recForm1C));
 	if	(ref($_[$#_]) eq 'CODE') {
 		$r =$r && &{$_[$#_]}($s,$r);
 	}
@@ -4277,7 +4481,7 @@ sub dbiSel {    # Select records from database
 			  ) .')'
 			: $s->{-table}->{$f}->{-field}
 			? '(' .join(' OR '
-				, map {	$_->{-fld}
+				, map {	($_->{-expr} || $_->{-fld})
 					. ' LIKE ' .$s->dbi->quote('%' .$a->{-ftext} .'%')
 					} grep {ref($_) eq 'HASH' && $_->{-fld} && ($_->{-flg}||'') =~/[akwuql]/
 						} @{$s->{-table}->{$f}->{-field}}
@@ -4339,7 +4543,7 @@ sub dbiSel {    # Select records from database
  }
  elsif (($s->{-table}->{$f}->{-dbd} ||$s->{-dbd} ||$s->{-tn}->{-dbd}) eq 'dbm') {
 	$r =$s->dbmSeek($a);
-	return(&{$s->{-die}}($s->lng(0,'dbiSel') .": dbmSeek() -> $@") && undef) if !defined($r);
+	return(&{$s->{-die}}($s->lng(0,'dbiSel') .": dbiSeek() -> $@") && undef) if !defined($r);
 	if	($a->{-data} && (ref($a->{-data}) eq 'ARRAY')) {
 		$r->setcols($a->{-data})
 	}
@@ -4389,7 +4593,7 @@ sub cgiRun {	# Execute CGI query
 	$ARGV[0] ='-setup' if $ds >$dv;
  }
 		# Command line service options
- if ($ARGV[0]) {
+ if ($ARGV[0] && ($ARGV[0] =~/^-/)) {
 	$s->start();
 	print "Content-type: text/plain\n\n";
 	print "'$0' service operation: '" .$ARGV[0] ."'...\n";
@@ -4400,7 +4604,12 @@ sub cgiRun {	# Execute CGI query
 		$r =$s->setup();
 		$s->varStore();
 	}
+	elsif ($ARGV[0] eq '-call') {
+		$r =$ARGV[1];
+		$r =$s->$r(@ARGV[2..$#ARGV]);
+	}
 	# print "'$0' service operation: '" .$ARGV[0] ."'->$r\n";
+	$s->end();
 	return($s)
  }
 		# Error display handler
@@ -4444,6 +4653,7 @@ sub cgiRun {	# Execute CGI query
 
 		# Accept & parse CGI params, find form, command, global command, key...
  $s->cgiParse();
+ local $s->{-pcmd}->{-ui} =1;
  my $oa =$s->{-pcmd}->{-cmd};
  my $og =$s->{-pcmd}->{-cmg};
  my $on =$s->{-pcmd}->{-form} ||'default';
@@ -4835,7 +5045,7 @@ sub psEval {	# Evaluate perl script file
  }
  $s->hfNew($f)->read($c, -s $f)->close();
  $s->output($s->{-c}->{-httpheader} =$s->cgi->header(
-		  -charset => $s->{-charset}, -expires => 'now'
+		  -charset => $s->charset(), -expires => 'now'
 		, ref($s->{-httpheader})
 		? %{$s->{-httpheader}}
 		: ()))
@@ -4856,8 +5066,7 @@ sub cgiAction {	# cgiRun Action Executor encapsulated
     $od =$s->{-pdta} if !$od;
  my $oa =$s->{-pcmd}->{-cmd};
  my $og =$oc->{-cmg};
- my $ot =$oc->{-table};
- if	($ot && $oa =~/^rec/) {
+ if	($oc->{-table} && $oa =~/^rec/) {
 	if	($oa =~/^recList/) {
 		$s->{-pout} =$s->cgiQuery($on, $om)
 	}
@@ -4865,41 +5074,52 @@ sub cgiAction {	# cgiRun Action Executor encapsulated
 		$s->{-pout} ={%{$od}}
 	}
 	elsif	($oa =~/^rec(?:Read)/) {
-		$s->{-pout} =$s->recRead(-table=>$ot
-				, ref($om->{-recRead}) eq 'HASH' ? %{$om->{-recRead}} : ()
-				, map {($_=>$oc->{$_})
-				} grep {defined($oc->{$_}) 
+		$s->rmiTrigger($oc, $od, undef, qw(-recTrim0A -recForm0A));
+		$s->{-pout} =$s->recRead(
+				(map {($_=>$oc->{$_})
+				  } grep {defined($oc->{$_}) 
 					&& $oc->{$_} ne ''
-					}  qw(-key -form));
+					}  qw(-table -key -form -edit -ui))
+				, ref($om->{-recRead}) eq 'HASH' 
+				? %{$om->{-recRead}} 
+				: ());
 	}
 	else {
 		$s->rmiTrigger($oc, $od, undef, qw(-recTrim0A))
 			if $oa =~/^rec(?:New|Form|Ins|Upd|Del)/;
-		$s->rmiTrigger($oc, $od, undef, qw(-recChg0A))
+		$s->rmiTrigger($oc, $od, undef, qw(-recForm0A -recChg0A))
+			# uncleaned data may be needed for -recChg0A
 			if $oa =~/^rec(?:Form|Ins|Upd|Del)/;
-		$s->{-pout} =$s->$oa(-data=>$s->cgiDBData($on, $om, $oc, $od)
-				, -table=>$ot
+		$od =$s->cgiDBData($on, $om, $oc, $od);
+		$s->{-pout} =$s->$oa(-data=>$od
 				, $oa =~/^rec(?:Upd|Del)/ ? (-version =>'+') : ()
-				, map {($_=>$oc->{$_})
+				,(map {($_=>$oc->{$_})
 				} grep {defined($oc->{$_}) 
 					&& $oc->{$_} ne ''
-					}  qw(-key -form -edit));
+					}  qw(-table -key -form -edit -ui)));
 	}
-	$oc->{-key} =$s->recWKey($ot, $s->{-pout})
+	$oc->{-key} =$s->recWKey($oc->{-table}, $s->{-pout})
 		if $oa =~/^rec(?:Read|Ins|Upd)/
 		&& $oc->{-edit};
-	$s->{-pout} =$s->recRead(-table=>$ot
-			, %{$om->{-recRead}}
-			, -key=>$oc->{-key})
-		if ref($om->{-recRead}) eq 'HASH'
-		&& $oa =~/^rec(?:Ins|Upd)/;
+	delete $oc->{-key}
+		if $oa =~/^rec(?:New)/;
 	delete $oc->{-edit}
 		if $oc->{-edit}
 		&& $oa =~/^rec(?:Ins|Upd|Del)/;
-	$s->rmiTrigger($oc, $s->{-pout}, undef, qw(-recChg0A))
+	$s->{-pout} =$s->recRead(
+			 (map {($_=>$oc->{$_})
+				} grep {defined($oc->{$_}) 
+					&& $oc->{$_} ne ''
+					}  qw(-table -key -form -ui))
+			, %{$om->{-recRead}})
+		if ref($om->{-recRead}) eq 'HASH'
+		&& $oa =~/^rec(?:Ins|Upd)/;
+	$s->rmiTrigger($oc, $s->{-pout}, undef, qw(-recForm0A -recChg0A))
 		if $oc->{-edit} && ($oa =~/^rec(?:Read|New)/);
-	$s->rmiTrigger($oc, $od, $s->{-pout}, qw(-recChg1A))
+	$s->rmiTrigger($oc, $s->{-pout}, undef, qw(-recChg1A))
 		if $oa =~/^rec(?:Ins|Upd)/;
+	$s->rmiTrigger($oc, $s->{-pout}, undef, qw(-recForm1A))
+		if $oa =~/^rec(?:New|Form|Ins|Upd|Read)/;
  }
  elsif	($oa =~/^(recForm)/) {
 	# nothing needed
@@ -4929,7 +5149,7 @@ sub htmlStart {	# HTTP/HTML/Form headers
 	: 'Form' .($on ? ' ' .$on : '') .' List' .($on ? ' ' .$on .'__List' : '');
  my $r	=join(""
 	, $s->{-c}->{-httpheader} =$s->cgi->header(
-		-charset => $s->{-charset}, -expires => 'now'
+		-charset => $s->charset(), -expires => 'now'
 		, ref($s->{-httpheader}) 
 		? %{$s->{-httpheader}} 
 		: ()
@@ -4945,16 +5165,14 @@ sub htmlStart {	# HTTP/HTML/Form headers
 			||('<?xml version="1.0"'
 				.(!$s->{-charset}
 				 ? ''
-				 : $s->{-charset} =~/^\d/
-				 ? ' encoding="windows-' .$s->{-charset} .'"'
-				 : ' encoding="' .$s->{-charset} .'"')
+				 : ' encoding="' .$s->charset() .'"')
 			  .' ?>'))
 		  .($s->{-pcmd}->{-style}
 		   ? '<?xml:stylesheet href="' .$s->{-pcmd}->{-style} .'" type="text/css" ?>'
 		   : '')
 		  )
 		: $s->cgi->start_html(
-			 -head	=> '<meta http-equiv="Content-Type" content="text/html; charset=' .$s->{-charset} .'">'
+			 -head	=> '<meta http-equiv="Content-Type" content="text/html; charset=' .$s->charset() .'">'
 				.($s->{-pcmd}->{-refresh} ? '<meta http-equiv="refresh" content=' .$s->{-pcmd}->{-refresh} .'>' : '')
 			,-lang	=> $s->{-lang}
 			,-style	=> ".Form {margin-top:0px; font-size: 8pt; font-family: Verdana, Helvetica, Arial, sans-serif; }\n"
@@ -5357,7 +5575,10 @@ sub cgiDBData {	# Database data fields/values
      $m =$s->{-form}->{$n}||$s->{-table}->{$n} if !$m;
  my  $mt=$m->{-field}||($m->{-table} && $s->{-table}->{$m->{-table}}->{-field})||[];
  my  $mn=exists($m->{-null}) ? $m->{-null} : $m->{-table} ? $s->{-table}->{$m->{-table}}->{-null} : undef;
+ my  $cc=($c && $c->{-cmd} ||'');
+ my  @xx;
  my  $r ={};
+ local $_;
  if (($c && $c->{-cmg} ||'') eq 'recNew') {
 	$r->{-new} =$s->strtime;
  }
@@ -5374,7 +5595,23 @@ sub cgiDBData {	# Database data fields/values
 		if exists ($v->{$f->{-fld}})
 		&& (!$f->{-flg}
 		||   $f->{-flg} =~/[au]/);	# 'a'll, 'u'pdate
+	if ($cc =~/^rec(?:Ins|Upd)/) {
+		push @xx
+			, ("'"	.$s->lnglbl($f,'-fld')
+				."' - " .$s->lng(0,'fldReqStp'))
+			if $f->{-flg} && ($f->{-flg} =~/[m]/)
+			&& (!defined($r->{$f->{-fld}}) || ($r->{$f->{-fld}} eq ''));
+		if ($f->{-chk}) {
+			$_ =$r->{$f->{-fld}}; $@ ='';
+			&{$f->{-chk}}($s,$m,$f,$r);
+			if ($@)	{push @xx, ("'"	.$s->lnglbl($f,'-fld') ."' - "
+						.$@ .' - ' .$s->lng(0,'fldChkStp'))}
+			else	{$r->{$f->{-fld}} =$_}
+		}
+	}
  }
+ return(&{$s->{-die}}(join("\n",@xx). "\n\n") && undef)
+	if scalar(@xx);
  %$r ? $r : undef
 }
 
@@ -5550,12 +5787,18 @@ sub cgiForm {	# Print CGI screen form
 			.'">'
 		: $qm
 		? undef
-		: (($m->{-ridRef} ||$s->{-ridRef})
-			&& (grep {$f->{-fld} eq $_} @{$m->{-ridRef}||$s->{-ridRef}})
-			|| ($f->{-fld} eq ($m->{-rvcActPtr}||$s->{-rvcActPtr}||'"'))
-			|| ($f->{-fld} eq ($m->{-key} && @{$m->{-key}} <2 && $m->{-key}->[0]))
+		: !$c->{-print}
+		  && (($m->{-ridRef} ||$s->{-ridRef})
+			&& (grep {$f->{-fld} eq $_
+				} @{$m->{-ridRef}||$s->{-ridRef}})
+			|| ($f->{-fld} eq ($m->{-rvcActPtr}
+						||$s->{-rvcActPtr}||'"'))
+			|| ($f->{-fld} eq ($m->{-key} && @{$m->{-key}} <2 
+						&& $m->{-key}->[0]))
 			)
-		  && (!$f->{-inp} || !(grep {$f->{-inp}->{$_}} qw(-arows -rows -cols -hrefs -htmlopt)))
+		  && (!$f->{-inp} 
+			|| !(grep {$f->{-inp}->{$_}
+					} qw(-arows -rows -cols -hrefs -htmlopt)))
 		? '<a href="?_cmd=recRead' 
 		  .( $d->{$f->{-fld}} !~/\Q$RISM1\E/ 
 		   ? $HS .'_form=' .$s->htmlEscape($n) 
@@ -5583,7 +5826,7 @@ sub cgiForm {	# Print CGI screen form
 			.' title="' .htmlEscape($s,$cmt) .'"'
 			.($f->{-fhprop} ? ' ' .$f->{-fhprop} : '')
 			.'>' .$lbl .'</span>'
-		: $lbl =~/<t[dh]\b/i 
+		: $lbl =~/^\s*<t[dh]\b/i 
 		? $lbl 
 		:('<th align="left" valign="top"'
 			.($f->{-fhclass} ? ' class="' .$f->{-fhclass} .'"' : '')
@@ -5616,7 +5859,7 @@ sub cgiForm {	# Print CGI screen form
 		.($f->{-fdstyle} ? ' style="'  .$f->{-fdstyle} .'"' : '')
 		.($f->{-fdprop}	 ? ' ' .$f->{-fdprop} : '')
 		.'>' .$wgp .'</td>'
-		if $wgp !~/<t[dh]\b/i && !$lt 
+		if $wgp !~/^\s*<t[dh]\b/i && !$lt 
 		&& !($hide && $f->{-hidel});
 
 	if	(!$lt) {
@@ -7813,8 +8056,9 @@ sub store {
  my $l =$s->{-lock};
  $s->opent() if !$s->{-handle};
  $s->lock(LOCK_EX) if $l eq LOCK_UN;
- truncate($s->{-handle}, 0);
+ $s->select(sub{$|=1});
  my $r =$s->seek(0)->print(@_ ? @_ : $s->{-buf});
+ truncate($s->{-handle}, CORE::tell($s->{-handle}));
  $s->lock(LOCK_UN) if $l eq LOCK_UN;
  $r
 }

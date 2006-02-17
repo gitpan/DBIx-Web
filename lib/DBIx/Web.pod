@@ -286,7 +286,7 @@ C<output>, C<outhtm>, C<outhtml>, C<outxml>
 C<-user>, C<-unames>, C<-ugroups>; 
 C<-AuthUserFile>, C<-AuthGroupFile>;
 C<-userln>, C<-usernt>;
-C<-udflt>, C<-unflt>, C<-ugflt>;
+C<-udflt>, C<-unflt>, C<-ugflt>, C<-ugadd>;
 
 C<user>, C<userln>, C<unames>, C<ugroups>, C<ugnames>, C<udisp>, C<uglist>;
 C<ugrexp>, C<ugmember>, C<uguest>, C<uadmrdr>, C<uadmwtr>, C<uadmin>;
@@ -339,7 +339,8 @@ C<-cgvXXX>)
 C<-field> C<Table/Form Description> slot contains array ref of field
 descriptions (hash refs) and formatting strings.
 
-C<-fld>, C<-expr>, C<-lbl>, C<-lblhtml>, C<-form>, C<-cmt>, C<-flg>;
+C<-fld>, C<-expr>, C<-lbl>, C<-lblhtml>, C<-form>, C<-cmt>;
+C<-flg>, C<-chk>;
 C<-hide>, C<-hidel>, C<-edit>, C<-null>;
 C<-inp>, C<-inphtml>, C<-ddlb>, C<-ddlbmult>, C<-ddlbtgt>;
 C<-colspan>, C<-fhclass>, C<-fhstyle>, C<-fhprop>, C<-fdstyle>, C<-fdclass>, C<-fdprop>;
@@ -394,17 +395,14 @@ See also C<tvmReferences>, C<tfvReferences>
 
 =item Triggers
 
-Triggers may be defined (in execution order) at database level, table level, form level.
-Common trigger sub{} arguments are ($self, {command}, {command field => value}, {database field => value}).
-Database values should be considered as old values in '0R' triggers,
-as new values in '1R' triggers and 
-also in '1C' triggers of single-row operations.
+C<-end0>, C<-endh>, C<-end1>;
 
-C<-end0>, C<-endh>, C<-end1>,
-C<-recTrim0A>, C<-recChg0A>, C<-recChg1A>;
-C<-recForm0C>, C<-recForm1C>;
-C<-recNew0C>, C<-recNew1C>;
-C<-recIns0R>, C<-recInsID>, C<-recIns1R>;
+C<Triggers Interface>;
+
+C<-recTrim0A>, C<-recChg0A>, C<-recChg0R>, C<-recChg1A>;
+C<-recForm0A>, C<-recForm0C>, C<-recForm0R>, C<-recForm1C>, C<-recForm1A>;
+C<-recNew0C>, C<-recNew0R>, C<-recNew1C>;
+C<-recIns0C>, C<-recIns0R>, C<-recInsID>, C<-recIns1R>, C<-recIns1C>;
 C<-recUpd0C>, C<-recUpd0R>, C<-recUpd1C>;
 C<-recDel0C>, C<-recDel0R>, C<-recDel1C>;
 C<-recIndex0R>;
@@ -444,7 +442,7 @@ C<-form>;
 C<-cgcXXX>;
 C<-subst>,
 C<-recXXX> (C<-recNew>, C<-recForm>, C<-recIns>, C<-recUpd>, C<-recDel>, C<-recRead>, C<-recList>,...);
-C<-recX#A> (C<-recTrim0A>, C<-recChg0A>, C<-recChg1A>);
+C<-recX#A> (C<-recTrim0A>, C<-recChg0A>, C<-recChg0R>, C<-recChg1A>);
 C<-httpheader>, C<-htmlstart>;
 C<-logo>, C<-icons>, C<-menuchs>, C<-menuchs1>, C<-frmLso>, C<-frmLsc>;
 C<-login>;
@@ -520,6 +518,7 @@ See also C<-affect>
 
 (C<User Identification>)
 Apache Users file, to be used in C<uglist> method, optional
+See also C<w32agf>.
 
 
 =item -AuthGroupFile
@@ -597,6 +596,20 @@ See C<-cgcXXX> for full external implementation.
 
 (C<Locale>)
 Application's charset, see also C<-locale>
+
+
+
+=item -chk
+
+	=> not exists || sub{}(self, )
+
+(C<User Interface> - C<Field Description>)
+Field value check.
+Performed after C<-recTrim0A> and C<-null> conversion 
+preceding C<recIns> or C<recUpd> operation.
+$_ represents field value, may be read and assigned;
+$@ intended for constraint violation message.
+
 
 
 =item -cmt
@@ -868,7 +881,7 @@ Database field name or expression may be explained by C<-expr>.
 
 =item -flg
 
-	=> not exists || 'ahkweuqln"'
+	=> not exists || 'ahkweumqln"'
 
 (C<Field Description>)
 Flags of the field:
@@ -884,6 +897,8 @@ Flags of the field:
 'e'ditable, C<-edit> preffered, see also C<-hide>
 
 'u'pdateable, may be inserted or saved into database
+
+'m'andatory value
 
 'q'uery form, may be used to form query condition
 
@@ -971,7 +986,7 @@ File Store Readers - users names
 
 =item -fswtr
 
-	=> [$ENV{USERNAME} || $^O eq 'MSWin32' ? eval{Win32::LoginName} : `logname`]
+	=> not exists || [users names]
 
 (C<File Store>)
 File Store Writers - users names
@@ -1333,9 +1348,9 @@ New record sign, stamped in C<recNew>, considered in C<recForm>.
 
 	=> null value
 
-(C<Field Description>, C<Form Description>, C<Table Description>)
+(C<User Interface> - C<Field Description>, C<Form Description>, C<Table Description>)
 
-Field value to be converted to undef, used by C<cgiDBData>.
+Field value to be converted to undef.
 
 
 =item -optrec
@@ -1572,23 +1587,35 @@ See also C<tvmReferences>, C<tfvReferences>.
 
 =item -recChg0A
 
-	=> not exists || sub{}($self, {UI command}, data {field => value})
-
 =item -recChg1A
 
-	=> not exists || sub{}($self, {UI command}, source {field => value}, result {field => value})
+	=> not exists || sub{}($self, {UI command}, data {field => value})
 
 (C<User Interface>: C<Database Description>, C<Table Description>, C<Form Description> - all executed)
 
 Record changing triggers before ('0A') and after ('1A') record data actions.
 Called by C<User Interface>.
-C<-recChg0A> called after C<-recTrim0A>, C<recNew>, C<recRead>,
-and before 
-C<recForm>, C<recIns>, C<recUpd>, C<recDel>.
-C<-recChg1A> called after 
-C<recNew>, C<recForm>, C<recIns>, C<recUpd>, C<recRead>.
-May be used to provide interactivelly computed values.
 
+C<-recChg0A> called after C<-recTrim0A>, C<recNew>, C<recRead> (in edit mode),
+and before any of
+C<recForm>, C<recIns>, C<recUpd>, C<recDel>.
+
+C<-recChg1A> called after C<recIns>, C<recUpd>.
+
+May be used to provide interactively computed values.
+See also C<-recChg0R>; C<-recForm0A>, C<-recForm0C>, C<-recForm1C>, C<-recForm1A>.
+
+
+
+=item -recChg0R
+
+	=> not exists || sub{}($self, {command}, new {field => value}, ? prev {field => value})
+
+(C<Database Description>, C<Table Description>, C<Form Description>; all executed)
+C<recIns> and C<recUpd> trigger before each row.
+Executed before C<-recIns0R> and C<-recUpd0R>.
+May be used to provide absolutely computed values.
+See also C<-recChg0A>.
 
 
 =item -recDel
@@ -1601,16 +1628,16 @@ C<recDel> operation UI implementation
 
 =item -recDel0C	
 
-=item -recDel0R
-
 =item -recDel1C		
 
-	=> not exists || sub{}($self, {command}, new {field => value}, database {field => value})
+	=> not exists || sub{}($self, {command}, ?)
+
+=item -recDel0R
+
+	=> not exists || sub{}($self, {command}, ?, prev {field => value})
 
 (C<Database Description>, C<Table Description>, C<Form Description>; all executed)
 C<recDel> triggers before command ('0C'), before each row ('0R'), after command ('1C').
-Old values in command ('C') triggers are not available.
-New values will be surprise!
 When record versioning, update triggers will be executed too, within.
 
 
@@ -1626,22 +1653,53 @@ C<-recXXX> for particular substitutions.
 
 
 
+=item -recForm0A
+
+	=> not exists || sub{}($self, {UI command}, source {field => value})
+
+=item -recForm1A
+
+	=> not exists || sub{}($self, {UI command}, result {field => value})
+
+(C<User Interface>: C<Database Description>, C<Table Description>, C<Form Description> - all executed)
+
+Record display triggers starting ('0A') or ending ('1A') any record edit or display action,
+except C<recDel> ending and C<recQBF>.
+Called by C<User Interface>,
+C<-recForm0A> after C<-recTrim0A> but before C<-recChg0A>,
+C<-recForm1A> after C<-recChg1A>.
+
+May be used to provide computed for display values.
+See also C<-recChg0A>, C<-recChg0R>, C<-recChg1A>; 
+C<-recForm0C>, C<-recForm0R>, C<-recForm1C>.
+
+
+
 =item -recForm0C
 
-	=> not exists || sub{}($self, {command}, data {field => value})
+	=> not exists || sub{}($self, {command}, source {field => value})
+
+=item -recForm0R
+
+	=> not exists || sub{}($self, {command}, new {field => value}, database {field => value})
 
 =item -recForm1C
 
-	=> not exists || sub{}($self, {command}, source {field => value}, result {field => value})
+	=> not exists || sub{}($self, {command}, result {field => value})
 
 (C<Database Description>, C<Table Description>, C<Form Description>; all executed)
-C<recForm> triggers before ('0C') and after command ('1C').
+C<recForm> triggers before command ('0C'), row ('0R'), after command ('1C').
+
 C<-recForm0C> is executed starting any record data manipulation,
-after C<-recNew0C>, C<-recIns0C>, C<-recUpd0C>, C<-recDel0C>;
-may be used for some kind of computed values.
+before C<-recNew0C>, C<-recIns0C>, C<-recUpd0C>, C<-recDel0C>, C<-recRead0C>.
+
+C<-recForm0R> is executed when database record read, 
+before C<-recChg0R>, C<-recRead0R>, C<-recForm0C>.
+
 C<-recForm1C> is executed ending any single-record data operation
 alike C<recNew>, C<recForm>, C<recIns>, C<recUpd>, C<recRead>;
 may be used to provide values for display only fields.
+
 
 
 =item -recIndex0R
@@ -1666,22 +1724,23 @@ C<recIns> operation UI implementation
 
 =item -recIns0R
 
+	=> not exists || sub{}($self, {command}, source {field => value})
+
 =item -recIns1R
 
 =item -recIns1C
 
-	=> not exists || sub{}($self, {command}, source {field => value}, result {field => value})
+	=> not exists || sub{}($self, {command}, result {field => value})
 
 (C<Database Description>, C<Table Description>, C<Form Description>; all executed)
-C<recIns> triggers before before command ('0C'), before row ('0R'),
+C<recIns> triggers before command ('0C'), before row ('0R'),
 after row ('1R'), after command ('1C').
-Result values are not available in '0R' triggers.
 See also C<-recInsID>.
 
 
 =item -recInsID
 
-	=> not exists || sub{}($self, {command}, {field => value})
+	=> not exists || sub{}($self, {command}, data {field => value})
 
 (C<Database Description>, C<Table Description>; nearest executed)
 C<recIns> row ID generation trigger.
@@ -1707,16 +1766,20 @@ C<recNew> operation UI implementation
 
 =item -recNew0C
 
-	=> not exists || sub{}($self, {command}, record {field => value}, sample {field => value})
+	=> not exists || sub{}($self, {command}, source {field => value})
+
+=item -recNew0R
+
+	=> not exists || sub{}($self, {command}, source {field => value}, sample {field => value})
 
 =item -recNew1C		
 
-	=> not exists || sub{}($self, {command}, source {field => value}, result {field => value})
+	=> not exists || sub{}($self, {command}, new {field => value})
 
 (C<Database Description>, C<Table Description>, C<Form Description>; all executed)
 C<recNew> triggers before ('0') and after command ('1C').
-Newly created record's hash ref is available in '0C' trigger, which
-may add some sample field values.
+If key value available, a sample record will be fetched and provided to
+C<-recNew0R> trigger to add some field values from sample record.
 
 
 =item -recQBF
@@ -1753,19 +1816,23 @@ from C<-recForm1C> trigger inside C<Database Operation>.
 
 =item -recRead0C
 
+	=> not exists || sub{}($self, {command}, ?)
+
+=item -recRead0R
+
+=item -recRead1R
+
 =item -recRead1C
 
-	=> not exists || sub{}($self, {command}, source {field => value}, result {field => value})
+	=> not exists || sub{}($self, {command}, data {field => value})
 
 (C<Database Description>, C<Table Description>, C<Form Description>; all executed)
-C<recRead> triggers before ('0')  and after ('1') row read.
-Result values are not available in before triggers.
-Source values should be ignored.
+C<recRead> triggers before ('0')  and after ('1') command.
 
 
 =item -recSel0C
 
-	=> not exists || sub{}($self, {command}, undef, undef)
+	=> not exists || sub{}($self, {command})
 
 (C<Database Description>, C<Table Description>, C<Form Description>; all executed)
 C<recSel> before command trigger.
@@ -1791,17 +1858,22 @@ before C<-recChg0A>.
 C<recUpd> operation UI implementation
 
 
+
 =item -recUpd0C	
+
+	=> not exists || sub{}($self, {command}, source {field => value})
 
 =item -recUpd0R
 
+	=> not exists || sub{}($self, {command}, new {field => value}, prev {field => value})
+
 =item -recUpd1C
 
-	=> not exists || sub{}($self, {command}, new {field => value}, old {field => value})
+	=> not exists || sub{}($self, {command}, result {field => value})
 
 (C<Database Description>, C<Table Description>, C<Form Description>; all executed)
 C<recUpd> triggers before command ('0C'), before each row ('0R'), after command ('1C').
-Old values are not available in 'C'ommand triggers.
+
 
 
 =item -recXXX
@@ -1957,6 +2029,17 @@ Considered in C<w32agf>.
 See also C<-unflt>, C<-ugflt>.
 
 
+=item -ugadd
+
+	=> not exists || [group names] || {group name => alias,...} || sub{}() -> ... 
+
+(C<User Identification>)
+Additional user groups names.
+Research sub{} will be evaluated against user groups names in $_.
+Considered in C<ugroups> and C<uglist> default code.
+
+
+
 =item -ugflt
 
 	=> not exists || sub{}()
@@ -2051,6 +2134,20 @@ Windows NT style usernames ('domain\\username') switch
 
 (C<Persistent Variables>)
 Variables hash ref, handled via C<varLoad> and C<varStore> calls.
+
+
+
+=item -w32IISdpsn
+
+	=> 1 | 2, not exists | 0
+
+C<User Identification>.
+Deimpersonation place for Microsoft IIS authenticated user session,
+using C<w32IISdpsn>.
+
+	0 - never
+	1 - when required, i.e. for file store operation
+	2 - always and early
 
 
 =item -warn
@@ -2545,9 +2642,10 @@ See also C<recFields>, C<recValues>, C<recKey>
 
 C<Database Operation>.
 Deletes record(s) into database, under '-key' or '-where' conditions.
-When C<Record level Version Control>, operation will be passed to C<recUpd>.
-But C<recDel> triggers (C<-recDel0C>, C<-recDel0R>, C<-recDel1C>) will be executed anyway.
 Returns command hash ref or the result of C<recUpd>.
+When C<Record level Version Control>, operation will be passed to C<recUpd>,
+but C<recDel> triggers (C<-recForm0C>, C<-recDel0C>, C<-recDel0R>, C<-recDel1C>) will be executed anyway.
+
 
 
 =item recFields ({-keyword ||fieldname => value,...}) -> field names
@@ -2563,7 +2661,7 @@ C<Database Operation>.
 Recalculates record, new or existing in database.
 Original field values obtained via C<recRead>(-table=>name, -key=>{original C<recKey>})
 and added to new data given if not exists;
-C<-recForm0C> and C<-recForm1C> triggers executed.
+C<-recForm0C>, C<-recForm0R>, C<-recForm1C> triggers executed.
 
 
 =item recIndex (index table name, key {field=>value}, ? data {field=>value})
@@ -2576,19 +2674,22 @@ Useful for C<-recIndex0R> trigger.
 
 =item recIns (? -table => name, ? -form => name, ? (-data => {fieldname => value,..}) || (fieldname => value,..), ? -key => {prototype C<recKey>}) -> successfully inserted {field => value,...}
 
-=item recIns (...? -from => C<recSel> cursor) -> successful {command}
+=item recIns (...? -from => C<recSel> cursor) -> successful {data}
 
 C<Database Operation>.
 Inserts record(s) into database.
+Returns record successfully inserted or data hash ref.
+Given field values are used to initiate new record's hash ref;
+C<-recForm0C> and C<-recIns0C> triggers are executed;
+C<-rvcInsBy> C<-rvcUpdBy>, C<-rvcInsWhen>, C<-rvcUpdWhen> fields are filled.
 Data to be inserted may be given from 
 prototype record via C<recRead>(-table=>name, -key=>{original C<recKey>}),
 or C<recSel> cursor.
-Then, given field values will be applied;
-C<-rvcInsBy> C<-rvcUpdBy>, C<-rvcInsWhen>, C<-rvcUpdWhen> filled;
-C<-recForm0C>, C<-recIns0R>, C<-recInsID> executed;
-record inserted into database;
-<-recIns1R>, C<-recForm1C> executed.
-Returns record inserted, or command hash ref when insertion from cursor.
+After all given values applied,
+C<-recForm0R>, C<-recChg0R>, C<-recIns0R>, C<-recInsID> triggers executed
+and record is inserted into database.
+At last, <-recIns1R> and C<-recForm1C> triggers are executed.
+
 See also C<recNew> and C<recForm>, but they are not required to prepare data to be inserted.
 
 
@@ -2620,12 +2721,12 @@ Passes all work to C<recSel> now, may be redesigned.
 
 C<Database Operation>.
 Creates a new data record to be inserted into database.
-Prototype's field values obtained via C<recRead>(-table=>name, -key=>{prototype C<recKey>}),
-but not used instead of C<-recNew0C>.
-Given field values used to initiate new record's hash ref;
-C<-rvcInsBy> C<-rvcUpdBy>, C<-rvcInsWhen>, C<-rvcUpdWhen> filled;
-C<-recNew0C> and C<-recForm0C> executed;
-C<-recNew1C> and C<-recForm1C> executed.
+Given field values are used to initiate new record's hash ref;
+C<-recForm0C> and C<-recNew0C> triggers are executed;
+C<-rvcInsBy> C<-rvcUpdBy>, C<-rvcInsWhen>, C<-rvcUpdWhen> fields are filled.
+Prototype's field values may be obtained via C<recRead>(-table=>name, -key=>{prototype C<recKey>}),
+but are not used instead of C<-recNew0R>.
+C<-recNew1C> and C<-recForm1C> triggers are executed at last.
 The following calls may be C<recForm> and C<recIns>.
 
 
@@ -2649,7 +2750,7 @@ implemented within C<cgiRun> and C<cgiForm>
 C<Database Operation>.
 Reads single record from database using C<recSel>, 
 returns this record as a hash ref (with C<-file>, C<-editable> slots if applicable).
-Executes C<-recRead0C>, C<-recRead1C>, C<-recForm1C>.
+Executes C<-recForm0C>, C<-recRead0C>, C<-recForm0R>, C<-recRead1C>, C<-recForm1C> triggers.
 
 
 =item recReindex (clear?, ?index names) -> success
@@ -2691,13 +2792,14 @@ methods are supported by cursor.
 See also C<-recSel0C>, C<recList>, C<recRead>.
 
 
-=item recUpd (? -table => name, ? -form => name, ? (-data => {fieldname => value,..}) || (fieldname => value,..), ? -key => {original C<recKey>}, ? -where => 'condition', ? -optrec => false ||true) -> successfully updated {field => value,...} || successful {command}
+=item recUpd (? -table => name, ? -form => name, ? (-data => {fieldname => value,..}) || (fieldname => value,..), ? -key => {original C<recKey>}, ? -where => 'condition', ? -optrec => false ||true) -> successfully updated {field => value,...}
 
 C<Database Operation>.
 Updates record(s) into database, under '-key' or '-where' conditions.
 With '-optrec', record will be inserted if not present.
-Returns record updated if one only, or command hash ref if zero or more then one record updated.
-See also C<-recUpd0C>, C<-recForm0C>, C<-recUpd0R>, C<-recUpd1C>, C<-recForm1C>.
+Returns record updated if one only, or data hash ref if zero or more then one record updated.
+See also C<-recForm0C>, C<-recUpd0C>, C<-recForm0R>, C<-recChg0R>, 
+C<-recUpd0R>, C<-recUpd1C>, C<-recForm1C> triggers.
 
 
 =item recValues ({-keyword ||fieldname => value,...}) -> field values
@@ -3111,15 +3213,18 @@ C<User Identification>.
 Creates or periodically updates user group files using Microsoft Windows system catalogue.
 C<pthForm>('var','ualist') file is for C<uglist>.
 C<pthForm>('var','uagroup') file may be used as Apache's 'AuthGroupFile'.
-C<-AuthGroupFile> should not be set to C<pthForm>('var','uagroup'),
-it should be set only to externally controlled file!
+
+Using C<w32agf>(), C<-AuthGroupFile> and C<-AuthUserFile> should not be set.
+This slots should be set only to externally controlled files.
+I.e. to files produced via "$0 -call w32agf 0 q" C<Command Line>.
 
 
 =item w32IISdpsn () -> success
 
 C<User Identification>.
 Deimpersonation of authenticated user session on Microsoft IIS.
-See source for details and warnings!
+See C<-w32IISdpsn>.
+See source for details and warnings.
 
 
 =item warn (message string) -> warning raise
@@ -3167,7 +3272,6 @@ See also C<htlsTag>, C<outxml>
 
 =back
 
-
 =head1 Database Engines
 
 =over
@@ -3205,6 +3309,38 @@ May be in future?
 
 
 
+=head1 Triggers Interface
+
+=over
+
+=item Triggers Interface
+
+Triggers may be defined (in execution order) at database level, table level, form level.
+Common trigger sub{} arguments are 
+
+($self, {command}, {new field => value}, {prev field => value})
+
+Previous values are available only in 'by-row' triggers for existed records.
+Special additional command attributes may be: 
+
+-cmd	=> command or method name,
+
+-cmdf	=> form metadata, 
+
+-cmdt	=> table metadata;
+
+and from C<User Interface>:
+
+-form	=> form name,
+
+-ui => user interactive sign (C<-pcmd>, C<-pdta>, C<-pout> may be looked),
+
+-edit => editing sign.
+
+
+=back
+
+
 =head1 Perl Script Pages
 
 =over
@@ -3230,8 +3366,13 @@ C<psEval> method executes perl script file by parsing, compiling into sub{}, eva
 =item Command Line
 
 CGI scripts may provide service operations on database from shell command line,
-i.e. "web.cgi -reindex" or "web.cgi -setup".
-Several command line options are implemented within C<cgiRun> method,
+i.e. 
+
+  web.cgi -call method arguments
+  web.cgi -reindex
+  web.cgi -setup
+
+Several command line options mentioned are implemented within C<cgiRun> method,
 another options may be implemented within script itself.
 
 
@@ -3242,7 +3383,48 @@ another options may be implemented within script itself.
 
 =over
 
+
+=head2 2006-02-17 - Development Version 0.60
+
+
+=head2 2006-02-14
+
+Redesign of C<-recForm0C> triggers position, now always called first in command.
+New C<-recForm0R> triggers added.
+C<-recIns0C> and C<-recRead0C> triggers repositioned just after C<-recForm0C>.
+C<Triggers Interface> extended.
+
+
+=head2 2006-02-11
+
+Redesign of triggers interface:
+all command triggers except C<-recNew0C> use only one data parameter;
+all row triggers, except C<-recIns0R> and C<-recIns1R>, uses new values and previous values.
+
+
+=head2 2006-01-20
+
+C<recUpd>/C<dbiUpd> improved updating each row after each '0R' trigger call.
+Record indexing improved too.
+
+New C<-chk> C<Field Description>; extended C<-flg> with 'm'andatory field values.
+
+New C<-recChg0R>, C<-recForm1A>, C<-recForm0A> C<Triggers>.
+
+New C<-w32IISdpsn> slot with late 'RevertToSelf' capability.
+Moved C<-fswtr> default from C<new> to use cases.
+New C<-call> C<Command Line> service operation.
+
+
+
+=head2 2005-12-26
+
+New C<-ugadd> slot.
+
+
+
 =head2 2005-11-25 - Development Version 0.59
+
 
 
 =head2 2005-06-19 - Development Version 0.58

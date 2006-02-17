@@ -2,9 +2,19 @@
 #http://localhost/cgi-bin/web.cgi
 BEGIN {
 #push @INC, $1 .'sitel/lib' if !(grep /sitel/i, @INC) && ($INC[0] =~/(.+?[\\\/])lib$/i)
-#$ENV{DOCUMENT_ROOT} ='c:/Inetub' if !$ENV{DOCUMENT_ROOT};
 }
 #$ENV{HTTP_ACCEPT_LANGUAGE} ='';
+my $wsdir =$^O eq 'MSWin32' ? Win32::GetFullPathName($0) : $0;
+   $wsdir =~s/\\/\//g;
+   $wsdir =	  $wsdir =~/^(\w:\/inetpub)\//i
+		? $1
+		: $wsdir =~/\/cgi-bin\//i
+		? $`
+		: $ENV{DOCUMENT_ROOT} && $ENV{DOCUMENT_ROOT} =~/[\\\/]htdocs/i
+		? $`
+		: '../';
+   $wsdir =	  $wsdir =~/^(\w:\/inetpub)\//i ? "$wsdir/wwwroot" : "$wsdir/htdocs";
+
 use DBIx::Web;
 my $w =DBIx::Web->new(
   -title	=>'DBIx-Web'	# title of application
@@ -15,7 +25,7 @@ my $w =DBIx::Web->new(
 #,-dbiph	=>1		# dbi placeholders usage
 #,-dbiACLike	=>'eq lc'	# dbi access control comparation
  ,-keyqn	=>1		# key query null comparation
-#,-path		=>"$ENV{DOCUMENT_ROOT}/dbix-web"
+#,-path		=>"$wsdir/dbix-web"
 #,-url		=>'/dbix-web'	# filestore URL
  ,-urf		=>'-path'	# filestore filesystem URL
 #,-fswtr	=>''		# filesystem writers (default is process account)
@@ -23,6 +33,7 @@ my $w =DBIx::Web->new(
 #,-AuthGroupFile=>''		# apache groups file
 #,-login	=>/cgi-bin/ntlm/# login URL
 #,-userln	=>0		# short local usernames (0==off, 1==default)
+ ,-ugadd	=>['Everyone','Guests']		# additional user groups
 #,-rac		=>0		# record access control (0==off, 1==default)
 #,-racAdmRdr	=>''		# record access control admin reader
 #,-racAdmWtr	=>''		# record access control admin writer
@@ -83,7 +94,7 @@ $w->set(-table=>{
 			,-flg=>'euql', -null=>undef
 				}
 			,{-fld=>'subject'
-			,-flg=>'euql'
+			,-flg=>'euqlm'
 			,-colspan=>4
 			,-inp=>{-asize=>60}
 			# ,-ddlb=>[[1,'one'],2,3,'qw']	# test
@@ -101,10 +112,10 @@ $w->set(-table=>{
 		,-racWriter	=>[$w->tn('-rvcUpdBy'), $w->tn('-rvcInsBy'), 'authors']
 		,-ridRef	=>[qw(idrm idpr comment)]
 		,-rfa		=>1
-		,-recNew0C	=>sub{	$_[2]->{'idrm'} =$_[3]->{'id'}||'';
+		,-recNew0R	=>sub{	$_[2]->{'idrm'} =$_[3] && $_[3]->{'id'}||'';
 					foreach my $n (qw(authors readers)) {
 						$_[2]->{$n} =$_[3]->{$n} 
-							if $_[3]->{$n};
+							if $_[3] && $_[3]->{$n};
 						$_[0]->recLast($_[1],$_[2],[$_[0]->tn('-rvcUpdBy')],[$n])
 							if !$_[2]->{$n};
 					}
