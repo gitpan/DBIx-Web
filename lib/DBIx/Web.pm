@@ -6,7 +6,6 @@
 #
 # Future ToDo:
 # - development of cgi-bus remake
-# - smtp mailer
 # - w32agf using ldap with search scopes and naming rooles
 # - htmlMenu scroll
 # - !!! review
@@ -18,10 +17,24 @@
 #
 #
 # ToDo:
-# - test/debug 'webus.cgi'&'web.cgi': behaviour, versioning, checkouts, attachments, triggers transformation
+# - test examples: behaviour, versioning, checkouts, attachments, triggers
 #
 # Done:
 #
+# 2006-03-23 dbmTableFlush, dbmTableClose
+# 2006-03-22 recNew '-recNew0C' become filler again, other triggers as usual
+# 2006-03-21 rename '-recChg0A', 'recChg1A' -> '-recEdt0A', '-recEdt1A'
+# 2006-03-21 new '-recEdt0R' to translate values when record editing
+# 2006-03-20 webus triggers order: -recNew0R > -recChg0A > -recChg0R > -recUpd0R
+# 2006-03-17 '-ddlbloop' ddlb reopen hint (for hierarchical choise) + listbox
+# 2006-03-15 cgiList: !"</select>\n" - better ddlb
+# 2006-03-15 '-ddlbmsab' - 'ddlbMSvbsAddrBook'
+# 2006-03-14 '-lblhtbr'
+# 2006-03-14 tfvReferences(), tfvVersions(): my $v -> sub{}
+# 2006-03-10 {-tn}->{-ridSubject}
+# 2006-03-10 'smtpSend' documented
+# 2006-03-10 sub{} may be -ldclass,-ldstyle,-fhclass,-fhstyle,-fdclassm,-fdstyle
+# 2006-02-18 sub{} for -ldstyle, record state colorisation
 # 2006-02-14 reposition of '-recNew0C' before cmd, use '-recNew0R' with sample
 # 2006-02-14 reposition of '-recForm1C' before any cmd, new '-recForm0R'
 # 2006-02-12 periodical trigger and chk-out state and file store
@@ -232,7 +245,7 @@ use Fcntl qw(:DEFAULT :flock :seek :mode);
 
 use vars qw($VERSION @ISA @EXPORT @EXPORT_OK %EXPORT_TAGS $AUTOLOAD $SELF $CACHE $LNG $IMG);
 
-	$VERSION= '0.60';
+	$VERSION= '0.61';
 	$SELF   =undef;				# current object pointer
 	$CACHE	={};				# cache for pointers to subobjects
 	*isa    = \&UNIVERSAL::isa; isa('','');	# isa function
@@ -352,9 +365,12 @@ $LNG ={
 	,'authors'	=>['Authors',	'Authors of the record, comma delimited']
 	,'rrole'	=>['Readers',	'Readers of the record, group or role']
 	,'readers'	=>['Readers',	'Readers of the record, users and groups, comma delimited']
+	,'mailto'	=>['MailTo',	'Receipients of e-mail of the record status current, comma delimited']
 	,'record'	=>['Record',	'Class/type of the record described by']
 	,'object'	=>['Object',	'Object of the record described by']
 	,'project'	=>['Project',	'Project, related to the record']
+	,'cost'		=>['Cost',	'Cost of the record described by']
+	,'doctype'	=>['Doctype',	'Type of the document contained']
 	,'subject'	=>['Subject',	'Subject, Title, Brief description']
 	,'comment'	=>['Comment',	"Comment text or HTML, 'urlh://', 'urlr://', 'urlf://' URL protocols may be used to denote relative URLs to host, this script, file store"]
 	,'cargo'	=>['Cargo',	'Additional data']
@@ -418,7 +434,7 @@ $LNG ={
 	,'tvmVersions'	=>['Все Версии',	'Все записи и их версии']
 	,'tvmHistory'	=>['Все Новости',	'Все новые, измененные, удаленные записи']
 	,'tvmReferences'=>['Все Ссылки',	'Все ссылки на записи']
-	,'tvdIndex'	=>['Все Оглавление',	'Содержание']
+	,'tvdIndex'	=>['Все Содержание',	'Оглавление']
 	,'tvdFTQuery'	=>['Поиск файлов',	'Полнотекстовый поиск в файлах']
 	,'-qftwhere'	=>['FTQuery',		'Условие полнотекстового поиска']
 	,'-qftord'	=>['FTOrder',		'Сортировка результатов полнотекстового поиска']
@@ -457,9 +473,12 @@ $LNG ={
 	,'authors'	=>['Авторы',	'Авторы записи, пользователи и группы, через запятую']
 	,'rrole'	=>['Читатели',	'Роль или группа читателей записи']
 	,'readers'	=>['Читатели',	'Читатели записи, пользователи и группы, через запятую']
+	,'mailto'	=>['эПочтой',	'Получатели сообщений электронной почты об этой записи, через запятую']
 	,'record'	=>['Запись',	'Класс или тип записей']
 	,'object'	=>['Объект',	'Объект или ключевое слово, к которому относится запись']
 	,'project'	=>['Проект',	'Направление, объект, процесс, статья расходов, к которой относится запись']
+	,'cost'		=>['Затраты',	'Затраты на выполнение описываемого записью']
+	,'doctype'	=>['Тип док.',	'Тип документа, содержащегося в записи']
 	,'subject'	=>['Тема',	'Тема или заглавие записи']
 	,'comment'	=>['Коммент',	"Текст или HTML комментария, гиперссылки могут быть начаты с 'urlh://' (компьютер), 'urlr://' (этот сценарий), 'urlf://' (файловое хранилище)"]
 	,'cargo'	=>['Карго',	'Дополнительные данные']
@@ -640,14 +659,20 @@ sub initialize {
 
 				# Record Manipulation Triggers:
  # ,-recTrim0A	=>sub{}		# 'recTrim' trigger before	UI action
- # ,-recChg0A	=>sub{}		# 'recChg'  trigger before	UI action
- # ,-recChg1A	=>sub{}		# 'recChg'  trigger after	UI action
- # ,-recNew	=>'form'|sub{}	# 'recNew'  UI implementation
- # ,-recNew0C	=>sub{}		# 'recNew'  trigger before	each row
- # ,-recNew1C	=>sub{}		# 'recNew'  trigger after	command
  # ,-recForm	=>'form'|sub{}	# 'recForm' UI implementation
+ # ,-recForm0A	=>sub{}		# 'recForm' trigger before	UI action
  # ,-recForm0C	=>sub{}		# 'recForm' trigger before	command
+ # ,-recForm0R	=>sub{}		# 'recForm' trigger before	row
  # ,-recForm1C	=>sub{}		# 'recForm' trigger after	command
+ # ,-recForm1A	=>sub{}		# 'recForm' trigger after	UI action
+ # ,-recEdt0A	=>sub()		# 'recEdt'  trigger before	UI action
+ # ,-recEdt0R	=>sub()		# 'recEdt'  trigger before	row
+ # ,-recChg0R	=>sub()		# 'recChg'  trigger before	row
+ # ,-recEdt1A	=>sub()		# 'recEdt'  trigger after	UI action
+ # ,-recNew	=>'form'|sub{}	# 'recNew'  UI implementation
+ # ,-recNew0C	=>sub{}		# 'recNew'  trigger before	command
+ # ,-recNew0R	=>sub{}		# 'recNew'  trigger before	row
+ # ,-recNew1C	=>sub{}		# 'recNew'  trigger after	command
  # ,-recIns	=>'form'|sub{}	# 'recIns'  UI implementation
  # ,-recIns0C	=>sub{}		# 'recIns'  trigger before	row command
  # ,-recIns0R	=>sub{}		# 'recIns'  trigger before	row
@@ -699,6 +724,7 @@ sub initialize {
 	,-rvcChgState	=>['status'=>'edit','chk-out']
 	,-rvcCkoState	=>['status'=>'chk-out']
 	,-rvcDelState	=>['status'=>'deleted']
+	,-ridSubject	=>[qw(record object subject)]	# subject fields | sub{}
 	,'tvmVersions'	=>'versions'	# versions view name
 	,'tvmHistory'	=>'history'	# history view name
 	,'tvmReferences'=>'references'	# references view name
@@ -976,6 +1002,7 @@ sub end {	# end session
  delete $s->{-cgi};
  foreach my $k (sort keys %{$s->{-endh}}) {eval{&{$s->{-endh}->{$k}}($s)}};
  $s->{-endh} ={};
+ $s->smtp(undef) if $s->{-smtp};
  $s->{-var}->{'_handle'}->destroy if $s->{-var} && $s->{-var}->{'_handle'};
  $s->{-log}->lock(0) if ref($s->{-log});
  $s->{-log}->destroy if ref($s->{-log});
@@ -1317,7 +1344,7 @@ sub cptran {	# Translate strings between codepages
    elsif ($v =~/koi/i)       {$v ='бвчздеіцъйклмнопртуфхжигюыэшщяьасБВЧЗДЕЈЦЪЙКЛМНОПРТУФХЖИГЮЫЭШЩЯЬАС'}
    elsif ($v =~/8859-5/i)    {$v ='°±ІіґµЎ¶·ё№є»јЅѕїАБВГДЕЖЗИЙМЛКНОПРСТУФХсЦЧШЩЪЫЬЭЮЯабвгдежзиймлкноп'}
  }
- map {eval("~tr/$f/$t/")} @s; 
+ map {eval("~tr/$f/$t/") if defined($_)} @s; 
  @s >1 ? @s : $s[0];
 }
 
@@ -1575,6 +1602,42 @@ sub dbmTable {	# Get isam datafile object
 }
 
 
+sub dbmTableClose {	# Close isam datafile object if opened
+ return(&{$_[0]->{-die}}('Bad table \'' .$_[1] .'\'')) if !$_[1];
+ if ($_[1] eq '*') {
+	# $_[0]->logRec('dbmTableClose',$_[1]);
+	foreach my $k (keys %{$CACHE->{$_[0]}}) {
+		next if $k !~/^-dbm\//;
+		dbmTableClose($_[0], $')
+	}
+	return($_[0])
+ }
+ return($_[0]) if !$CACHE->{$_[0]}->{'-dbm/' .$_[1]};
+ # $_[0]->logRec('dbmTableClose',$_[1]);
+ $CACHE->{$_[0]}->{'-dbm/' .$_[1]}->close();
+ delete $CACHE->{$_[0]}->{'-dbm/' .$_[1]};
+ $_[0]
+}
+
+
+sub dbmTableFlush {	# Reopen isam datafile object if opened
+ return(&{$_[0]->{-die}}('Bad table \'' .$_[1] .'\'')) if !$_[1];
+ if ($_[1] eq '*') {
+	# $_[0]->logRec('dbmTableFlush',$_[1]);
+	foreach my $k (keys %{$CACHE->{$_[0]}}) {
+		next if $k !~/^-dbm\//;
+		dbmTableFlush($_[0], $')
+	}
+	return($_[0])
+ }
+ return($_[0]) if !$CACHE->{$_[0]}->{'-dbm/' .$_[1]};
+ # $_[0]->logRec('dbmTableFlush',$_[1]);
+ $CACHE->{$_[0]}->{'-dbm/' .$_[1]}->close();
+ $CACHE->{$_[0]}->{'-dbm/' .$_[1]}->opent();
+}
+
+
+
 sub osCmd {     # OS Command
                 # -'i'gnore retcode
   my $s   =shift;
@@ -1687,6 +1750,154 @@ sub outhtml {	# Output HTML tag
 sub outxml  {	# Output XML tag
   output($_[0], xmlsTag(@_))
 }
+
+
+sub smtp {	# SMTP object
+		# (| undef | sub{})
+ if	(!$_[0]->{-smtp}) {}
+ elsif	((scalar(@_) >1) && !$_[1]) {
+	$_[0]->{-smtp}->quit() if $_[0]->{-smtp};
+	delete $_[0]->{-smtp};
+ }
+ elsif	($_[0]->{-smtp}) {
+	if (ref($_[1])) {
+		local $^W=undef;
+		return(&{$_[1]}($_[0],$_[0]->{-smtp}));
+	}
+	return($_[0]->{-smtp}) if $_[0]->{-smtp};
+ }
+ $_[0]->{-smtp} =eval {
+		local $^W=undef; 
+		eval("use Net::SMTP"); 
+		$_[0]->{-smtphost}
+			? Net::SMTP->new($_[0]->{-smtphost})
+			: CORE::die('name required')
+	};
+ return(&{$_[0]->{-die}}("SMTP host '" .$_[0]->{-smtphost} ."': $@\n")) 
+	if !$_[0]->{-smtp} ||$@;
+ return(&{$_[1]}($_[0],$_[0]->{-smtp})) if ref($_[1]);
+ $_[0]->{-smtp};
+}
+
+
+sub smtpAdr {	# SMTP address translate
+  ($_[1] =~/^([^\\]+)\\(.+)$/ 
+	? $2 
+	: $_[1])
+ .((index($_[1],'@') <0) && $_[0]->{-smtpdomain}
+	? '@' .$_[0]->{-smtpdomain}
+	: '')
+}
+
+
+sub smtpAdrd {	# SMTP address displayable translate
+ return($_[1]) if $_[1] =~/</;
+ my $d =$_[0]->udisp($_[1]) ||$_[1];
+ unless ($d =~s/<([^<>]+)>/'<' .$_[0]->smtpAdr($_[1]) .'>'/e) {
+	$d .=' <' .$_[0]->smtpAdr($_[1]) .'>'
+ }
+ $d
+}
+
+
+sub smtpSend {	# SMTP mail msg send
+ my ($s, %a) =@_;
+ return($s) if !$s->{-smtphost};
+ local $s->{-smtpdomain} =$s->{-smtpdomain} 
+			|| ($s->{-smtphost} && $s->smtp(sub{$_[1]->domain()}))
+			|| 'nothing.net';
+ $a{-from}	=$a{-from} ||$a{-sender} ||$s->user;
+ $a{-from}	=&{$a{-from}}($s,\%a)	if ref($a{-from}) eq 'CODE';
+ $a{-from}	=$s->smtpAdrd($a{-from});
+ $a{-to}	=&{$a{-to}}($s,\%a)	if ref($a{-to}) eq 'CODE';
+ $a{-to}	=[grep {$_} split /\s*[,;]\s*/, ($a{-to} =~/^\s*(.*)\s*$/ ? $1 : $a{-to})]
+					if $a{-to} && ($a{-to} =~/[,;]/);
+ $a{-to}	=ref($a{-to}) 
+			? [map {$s->smtpAdrd($_)} @{$a{-to}}]
+			: $s->smtpAdrd($a{-to}) 
+			if $a{-to};
+ $a{-sender}	=$s->smtpAdr($a{-sender} ||$a{-from} ||$s->user);
+ $a{-recipient}	=$a{-recipient} ||$a{-to};
+ $a{-recipient}	=&{$a{-recipient}}($s,\%a) if ref($a{-recipient}) eq 'CODE';
+ $a{-recipient}	=[grep {$_} split /\s*[,;]\s*/, ($a{-recipient} =~/^\s*(.*)\s*$/ ? $1 : $a{-recipient})]
+					if $a{-recipient} && ($a{-recipient} =~/[,;]/);
+ return($s)	if !$a{-recipient};
+ $a{-recipient}	=ref($a{-recipient}) 
+			? [map {$s->smtpAdr($_)} @{$a{-recipient}}]
+			: $s->smtpAdr($a{-recipient});
+ if (!defined($a{-data})) {
+	my $koi =(($a{-charset}||$s->charset()) =~/1251/);
+	$a{-subject} =    ref($a{-subject}) eq 'CODE'
+			? &{$a{-subject}}($s,\%a)
+			: ref($a{-subject})
+			? join(' ', map {
+				!defined($a{-pout}->{$_})
+				? ()
+				: ($a{-pout}->{$_})
+				} @{$a{-subject}})
+			: $a{-pout}
+			? $s->mdeSubj($a{-pout})
+			: ''
+		if ref($a{-subject}) ||!defined($a{-subject});
+	$a{-data}  ='';
+	$a{-data} .='From: ' .($koi	? $s->cptran('ansi','koi',$a{-from}) 
+					: $a{-from})
+			."\cM\cJ";
+	$a{-data} .='Subject: '
+			.($koi
+			? $s->cptran('ansi','koi',$a{-subject})
+			: $a{-subject}) ."\cM\cJ";
+	$a{-data} .='To: ' 
+			.($koi	
+			? $s->cptran('ansi','koi', ref($a{-to}) ? join(', ',@{$a{-to}}) : $a{-to}) 
+			: (ref($a{-to}) ? join(', ',@{$a{-to}}) : $a{-to}))
+			."\cM\cJ" 
+			if $a{-to};
+	$a{-data} .="MIME-Version: 1.0\cM\cJ";
+	$a{-data} .='Content-type: '  .($a{-pout} ||$a{-html} ? 'text/html' : 'text/plain')
+			.'; charset=' .($a{-charset}||$s->charset())
+			."\cM\cJ";
+	$a{-data} .='Content-Transfer-Encoding: ' .($a{-encoding} ||'8bit') ."\cM\cJ";
+	$a{-data} .="\cM\cJ";
+	if ($a{-pout}) {
+		$a{-form} =$a{-form} || $a{-pcmd} && ($a{-pcmd}->{-form} ||$a{-pcmd}->{-table});
+		$a{-data} .=do{	local $s->{-c}->{-httpheader} =1;
+				# local $s->{-htmlstart} ={ref($s->{-htmlstart}) ? %{$s->{-htmlstart}} : (), -xbase=>$s->cgi->url()};
+				$s->htmlStart($a{-form})};
+		$a{-data} .='<base href="'. $s->htmlEscape($s->cgi->url()) .'" />' ."\n";
+		local $s->{-output} =sub{$a{-data} .=join('',@_[1..$#_])};
+		# local $a{-pout} ={%{$a{-pout}}}; # read-only supposed
+		local $a{-pcmd} ={($a{-pcmd} ? %{$a{-pcmd}} : ())
+				, -edit=>undef, -print=>1, -mail=>1
+				, -cmd=>'recRead', -cmg=>'recRead'};
+		local $s->{-pout} =$a{-pout};
+		local $s->{-pcmd} =$a{-pcmd};
+		$s->cgiForm($a{-form}
+			, $a{-pcmd}->{-cmdf} ||$a{-pcmd}->{-cmdt}
+			, $a{-pcmd}
+			, $a{-pout}
+			);
+		$a{-data} .=$s->htmlEnd();
+	}
+	$a{-data} .=$a{-html} ||$a{-text} ||'';
+	# $s->logRec('smtpSend',%a);
+	# $s->logRec('smtpSend',$a{-data}); 
+ }
+ return($s) if !$s->{-smtphost};
+ $s->logRec('smtpSend',$a{-recipient});
+ local $^W=undef;
+ $s->smtp->mail($a{-sender})
+	||return(&{$_[0]->{-die}}("SMTP sender \'" .$a{-sender} ."'"));
+ $s->smtp->to(ref($a{-recipient}) ? @{$a{-recipient}} : $a{-recipient})
+	||return(&{$_[0]->{-die}}("SMTP recipient \'" 
+		.(ref($a{-recipient}) ? join(', ',$a{-recipient}) : $a{-recipient}) ."'"));
+ $s->smtp->data($a{-data})
+	||return(&{$_[0]->{-die}}("SMTP data \'" .$a{-data} ."'"));
+ $s->smtp->dataend()
+	||return(&{$_[0]->{-die}}("SMTP dataend"));
+ $s;
+}
+
 
 
 #########################################################
@@ -2336,7 +2547,6 @@ sub w32IISdpsn {# deimpersonate Microsoft IIS impersonated process
 		|| $_[0]->{-c}->{-RevertToSelf}
 		|| ($^O ne 'MSWin32')
 		|| !(($ENV{SERVER_SOFTWARE}||'') =~/IIS/)
-	#	|| !$ENV{REMOTE_USER}
 	#	|| $ENV{'GATEWAY_INTERFACE'}
 		|| $ENV{'FCGI_SERVER_VERSION'};
  $_[0]->user();
@@ -2556,7 +2766,7 @@ sub w32udisp {	# Win32 user display name
 			? ($1,$2) 
 			: $_[1] =~/^([^@]+)@(.+)/ 
 			? ($2,$1) 
-			: (Win32::NodeName(),$_);
+			: (Win32::NodeName(),$_[1]);
 	my $o =eval('use Win32::OLE; Win32::OLE->Option("Warn"=>0); 1')
 		&& Win32::OLE->GetObject("WinNT://$dn/$gn");
 	!$o
@@ -2711,6 +2921,21 @@ sub mdeQuote {	# Quote field value if needed
   : !$_[0]->{-dbi}
   ? strquot($_[0], $_[3])
   : $_[0]->{-dbi}->quote($_[3])
+}
+
+
+sub mdeSubj {	# Subject generalized of record
+		# (self, data) | (self, meta, data) -> subject
+ if ($#_ >1) {
+ }
+ (      ref($_[0]->{-tn}->{-ridSubject}) eq 'CODE'
+	? &{$_[0]->{-tn}->{-ridSubject}}(@_)
+	: join(' ', map {
+				!defined($_[1]->{$_}) || ($_[1]->{$_} eq '')
+				? ()
+				: ($_[1]->{$_})
+					} @{$_[0]->{-tn}->{-ridSubject}}))
+	||''
 }
 
 
@@ -2942,7 +3167,7 @@ sub rmiTrigger {# Execute trigger
  local $_[0]->{-affect}	=undef;
  local $_[0]->{-rac}	=undef;
  foreach my $t (@_[4..$#_]) {
-	if (!$_[1]->{-cmdv} 	# !!! undocumented, may be changed or excluded
+	if (0 && !$_[1]->{-cmdv} 	# !!! undocumented, may be changed or excluded
 	&& (0 || $_[0]->{$t} || ($tbl && $tbl->{$t}) || ($frm && $frm->{$t}))) {
 		foreach my $d (@_[2..3]) {
 			$_[1]->{-cmdv} .=
@@ -3309,16 +3534,13 @@ sub recNew {    # Create new record to be inserted into database
 		# -key=>sample
  my	$s =$_[0];
 	$s->logRec('recNew', @_[1..$#_]);
- my	$a =(@_< 3 && ref($_[1]) ? $_[1] : {@_[1..$#_]});
+ my	$a =(@_< 3 && ref($_[1]) ? {%{$_[1]}} : {@_[1..$#_]});
  my	$d =$a->{-data} ? {%{$a->{-data}}} : exists($a->{-data}) ? {} : $a;
+ my	$r =$d;
  local  $a->{-cmd}  ='recNew';
  local	$a->{-table}=recType ($s, $a, $d);
  local	$a->{-key}  =rmlKey($s, $a, $d);
  my	$m =mdeTable($s,$a->{-table});
- rmiTrigger($s, $a, $d, undef, qw(-recForm0C -recNew0C));
- my	$r ={%$d};
- my	$p =(grep {$_} values %{$a->{-key}}) ? $s->recRead(%$a, -data=>undef, -test=>1) : {};
- #	map {$r->{$_} =$p->{$_}} keys %$p;
  foreach my $w (qw(-rvcInsBy -rvcUpdBy)) {foreach my $c ($m, $s) {
 	next if !$c->{$w}; $r->{$c->{$w}} =$s->user; last
  }}
@@ -3326,13 +3548,14 @@ sub recNew {    # Create new record to be inserted into database
 	next if !$c->{$w}; delete $r->{$c->{$w}}; last
  }}
  foreach my $w (qw(id -file -fupd)) {
-	 delete $r->{$w};
+	delete $r->{$w};
  }
  $r->{-new} =$s->strtime();
  $r->{-editable} =$s->user() if $s->{-rac} && ($m->{-racWriter}||$s->{-racWriter});
- rmiTrigger($s, $a, $r, undef,	qw(-recForm0R));
- rmiTrigger($s, $a, $r, $p,	qw(-recNew0R));
- rmiTrigger($s, $a, $r, undef,	qw(-recNew1R -recNew1C -recForm1C));
+ rmiTrigger($s, $a, $r, undef, qw(-recForm0C));
+ my $p =(grep {$_} values %{$a->{-key}}) ? $s->recRead(%$a, -data=>undef, -test=>1) : {};
+ rmiTrigger($s, $a, $r, $p, qw(-recNew0C));
+ rmiTrigger($s, $a, $r, undef,	qw(-recForm0R -recEdt0R -recNew0R -recNew1C -recForm1C));
  $r
 }
 
@@ -3354,7 +3577,7 @@ sub recForm {   # Recalculate record - new or existing
  foreach my $w (qw(-rvcInsBy -rvcUpdBy)) {foreach my $c ($m, $s) {
 	next if !$c->{$w}; $d->{$c->{$w}} =$s->user if !$d->{$c->{$w}}; last
  }}
- rmiTrigger($s, $a, $d, $r, qw(-recForm0R -recForm1C));
+ rmiTrigger($s, $a, $d, $r, qw(-recForm0R -recEdt0R -recForm1C));
  $d
 }
 
@@ -3392,14 +3615,14 @@ sub recIns {    # Insert record into database
     else		{$d =$t}
  }
 
- # !!! Permissions should be checked in -recIns0C trigger !!!
+ # !!! Permissions should be checked in -recIns0C trigger!
  if ($a->{-from}) {	# insert from cursor
 	my $j =0;
 	while (my $e =$a->{-from}->fetchrow_hashref()) {
 		my $t ={%$e};	# readonly hash
 		rfdStamp($s, $a, $t) if $b;
 		@{$t}{recFields($s, $d)} =recValues($s, $d);
-		rmiTrigger($s, $a, $t, undef, qw(-recForm0R -recChg0R -recIns0R -recInsID));
+		rmiTrigger($s, $a, $t, undef, qw(-recForm0R -recEdt0R -recChg0R -recIns0R -recInsID));
 		rfdCp	  ($s, $t->{-file}, $a, $t) if !$a->{-file} && $t && $t->{-file};
 		rfdCp	  ($s, $p->{-file}, $a, $t) if !$a->{-file} && $p && $p->{-file};
 		rfdCp	  ($s, $a->{-file}, $a, $t) if  $a->{-file};
@@ -3415,7 +3638,7 @@ sub recIns {    # Insert record into database
 	$r =$r ||$d;
  }
  else {			# insert single record
-	rmiTrigger($s, $a, $d, undef, qw(-recForm0R -recChg0R -recIns0R -recInsID));
+	rmiTrigger($s, $a, $d, undef, qw(-recForm0R -recEdt0R -recChg0R -recIns0R -recInsID));
 	rfdCp	  ($s, $p, $a, $d)		if !$a->{-file} && $p && $p->{-file};
 	rfdCp	  ($s, $a->{-file}, $a, $d)	if  $a->{-file};
 	rmiIndex  ($s, $a, $d, undef)		if $m->{-index} ||$s->{-index};
@@ -3561,7 +3784,7 @@ sub recUpd {    # Update record(s) in database
 	next if !$c->{-rvcUpdWhen}; $d->{$c->{-rvcUpdWhen}} =$s->strtime; last
  }
  rmiTrigger($s, $a, $d, undef, qw(-recForm0C -recUpd0C));
- if ($w ||$o ||$v ||$i ||grep {$s->{$_} || $m->{$_}} qw(-recForm0R -recChg0R -recUpd0R -recUpd1R)) {
+ if ($w ||$o ||$v ||$i ||grep {$s->{$_} || $m->{$_}} qw(-recForm0R -recEdt0R -recChg0R -recUpd0R -recUpd1R)) {
 	my $c =$s->recSel(rmlClause($s, $a), -data=>undef);
 	my $j =0;
 	while ($r =$c->fetchrow_hashref()) {
@@ -3605,7 +3828,7 @@ sub recUpd {    # Update record(s) in database
 			&& (($d->{$o->[0]}||'') eq $o->[1])) {
 			$n ={%$r}; @{$n}{recFields($s, $d)} =recValues($s, $d);
 			$n->{$v} =$r->{'id'};
-			rmiTrigger($s, $a, $n, $n, qw(-recForm0R -recChg0R -recUpd0R -recInsID));
+			rmiTrigger($s, $a, $n, $n, qw(-recForm0R -recEdt0R -recChg0R -recUpd0R -recInsID));
 			rfdCp	  ($s, $r->{-file}, $a, $n)	if $r->{-file};
 			rfdStamp  ($s, $a, $n, '+')		if $r->{-file};
 			rmiIndex  ($s, $a, $n, undef)		if $m->{-index} ||$s->{-index};
@@ -3619,7 +3842,7 @@ sub recUpd {    # Update record(s) in database
 					} @{$u}[1..$#{@$u}]))) {
 			$n ={%$r}; @{$n}{recFields($s, $d)} =recValues($s, $d);
 			$p ={%$r, $v=>$r->{'id'}, -table=>$a->{-table}};
-			rmiTrigger($s, $a, $n, $r, qw(-recForm0R -recChg0R -recUpd0R));
+			rmiTrigger($s, $a, $n, $r, qw(-recForm0R -recEdt0R -recChg0R -recUpd0R));
 			rmiTrigger($s, $a, $p, undef, qw(-recInsID));
 			rfdCp	  ($s, $r->{-file}, $a, $p)
 					if $r 
@@ -3642,7 +3865,7 @@ sub recUpd {    # Update record(s) in database
 		}
 		else {					# update only
 			$n ={%$r}; @{$n}{recFields($s, $d)} =recValues($s, $d);
-			rmiTrigger($s, $a, $n, $r, qw(-recForm0R -recChg0R -recUpd0R));
+			rmiTrigger($s, $a, $n, $r, qw(-recForm0R -recEdt0R -recChg0R -recUpd0R));
 			do {	rfdRm  ($s, $a->{-table}, $n);
 				rfdCp  ($s, $a->{-file},  $a->{-table}, $n);
 				}
@@ -3658,8 +3881,7 @@ sub recUpd {    # Update record(s) in database
 						} @{$u}[1..$#{@$u}];
 			rmiIndex  ($s, $a, $n, $r)  if $i;
 		}
-		if (1 && $n) {	# && ($s->{-recUpd0R} || $m->{-recUpd0R} || $s->{-recChg0R} || $m->{-recChg0R})
-				# !!! lost computed values while commented
+		if (1 && $n) {
 			$s->logRec('dbiUpd','SINGLE') if $j ==1;
 			$e =$s->dbiUpd({ -table=>$a->{-table}
 					,-key=>$s->recWKey($a->{-table}, $r)
@@ -3977,6 +4199,10 @@ sub dbmSeek {	# Select records from dbm file using -key and -where
 	, $wf	? (-filter=>$wf)	: ()
 	, $e	? (-subw=>$e)		: ()
 	);
+ !$s->{-c}->{-dbmSeek} 
+ ? $s->dbmTableFlush($a->{-table})	# !!! for proper seek
+ : $s->dbmTable($a->{-table})->sync();
+ local $s->{-c}->{-dbmSeek} =1;
  $s->dbmTable($a->{-table})->keSeek($ox,$k,$w,$e);
 }
 
@@ -4207,7 +4433,8 @@ sub dbiDel {    # Delete record(s) in database
                 $s->logRec('dbiDel', 'keDel', $f, $_[1]);
 		$h->keDel($_[1]);
 	});
-	return(&{$s->{-die}}($s->lng(0,'dbiDel') .": dbiSeek() -> $@") && undef) if !defined($s->{-affected});
+	return(&{$s->{-die}}($s->lng(0,'dbiDel') .": dbiSeek() -> $@") && undef) 
+		if !defined($s->{-affected});
  }
  $s->{-affected} && $a
 }
@@ -4534,7 +4761,7 @@ sub dbiSel {    # Select records from database
 	$r =$s->dbi->prepare(@c) || return(&{$s->{-die}}($s->lng(0,'dbiSel') .": prepare() -> " .($DBI::errstr||'Unknown')) && undef);
 	$r->execute(@cv) || return(&{$s->{-die}}($s->lng(0,'dbiSel') .": execute() -> " .($DBI::errstr||'Unknown')) && undef);
 	$r =DBIx::Web::dbiCursor->new($r, -flt=>$cf) 
-		if $cf || 1;	# !!! DBI::st hides keys !!!
+		if $cf || 1;	# !!! DBI::st hides keys!
 	$r->{-rec} ={map {($_ => undef)} @{$r->{NAME}}};
 	$r->{-rfr} =[map {\($r->{-rec}->{$_})} @{$r->{NAME}}];
 	$r->{-flt} =$cf;
@@ -4700,7 +4927,7 @@ sub cgiRun {	# Execute CGI query
 	my $nxt;			# delegation - substitute object
 	foreach my $v (map {$om->{"-$_"}} ('subst', $oa
 			, $oa eq 'recList' && $og eq 'recQBF'
-			? ('recQBFl')	# !!! legacy from '-qlist', needed ???
+			? ('recQBFl')	# !!! legacy from '-qlist', needed?
 			: $og =~/rec(New|Read|Del|QBF)/ 
 			? ($og, 'recForm') 
 			: $og)) {
@@ -4751,7 +4978,7 @@ sub cgiRun {	# Execute CGI query
  $s->cgiList($on, $om, $s->{-pcmd}, $s->{-pout}) if $s->cgiHook('recList');
  $s->recCommit();
  $s->cgiFooter();
- $s->htmlEnd();
+ $s->output($s->htmlEnd());
  $s->end();
  $s
 }
@@ -4992,7 +5219,7 @@ sub psParse {	# PerlScript Parse Source
  }
  if ($b && $i =~m{(<body[^>]*>)}i) {
      my ($i0,$i1) =($` .$1 ,$');
-     $i =$i0 .('<base href="'. $s->urlEscape($b) .'/" />') .$i1
+     $i =$i0 .('<base href="'. $s->htmlEscape($b) .'/" />') .$i1
  }
  if ($opt =~/e/i && $i =~m{<body[^>]*>}i) {	# '-e'mbeddable html
     $i =$';
@@ -5087,8 +5314,8 @@ sub cgiAction {	# cgiRun Action Executor encapsulated
 	else {
 		$s->rmiTrigger($oc, $od, undef, qw(-recTrim0A))
 			if $oa =~/^rec(?:New|Form|Ins|Upd|Del)/;
-		$s->rmiTrigger($oc, $od, undef, qw(-recForm0A -recChg0A))
-			# uncleaned data may be needed for -recChg0A
+		$s->rmiTrigger($oc, $od, undef, qw(-recForm0A -recEdt0A))
+			# uncleaned data may be needed for -recEdt0A
 			if $oa =~/^rec(?:Form|Ins|Upd|Del)/;
 		$od =$s->cgiDBData($on, $om, $oc, $od);
 		$s->{-pout} =$s->$oa(-data=>$od
@@ -5114,9 +5341,9 @@ sub cgiAction {	# cgiRun Action Executor encapsulated
 			, %{$om->{-recRead}})
 		if ref($om->{-recRead}) eq 'HASH'
 		&& $oa =~/^rec(?:Ins|Upd)/;
-	$s->rmiTrigger($oc, $s->{-pout}, undef, qw(-recForm0A -recChg0A))
+	$s->rmiTrigger($oc, $s->{-pout}, undef, qw(-recForm0A -recEdt0A))
 		if $oc->{-edit} && ($oa =~/^rec(?:Read|New)/);
-	$s->rmiTrigger($oc, $s->{-pout}, undef, qw(-recChg1A))
+	$s->rmiTrigger($oc, $s->{-pout}, undef, qw(-recEdt1A))
 		if $oa =~/^rec(?:Ins|Upd)/;
 	$s->rmiTrigger($oc, $s->{-pout}, undef, qw(-recForm1A))
 		if $oa =~/^rec(?:New|Form|Ins|Upd|Read)/;
@@ -5132,7 +5359,7 @@ sub cgiAction {	# cgiRun Action Executor encapsulated
 
 
 sub htmlStart {	# HTTP/HTML/Form headers
- my ($s,$on)=@_;
+ my ($s,$on,$om)=@_;	# (object name, object meta)
  $on =$s->{-pcmd}->{-form} ||$s->{-pcmd}->{-table} ||'default'
 	if !$on;
  my $cs	= $s->{-c}->{-htmlclass}
@@ -5148,7 +5375,9 @@ sub htmlStart {	# HTTP/HTML/Form headers
 	? 'Form Help' .($on ? ' ' .$on .'__Help' : '')
 	: 'Form' .($on ? ' ' .$on : '') .' List' .($on ? ' ' .$on .'__List' : '');
  my $r	=join(""
-	, $s->{-c}->{-httpheader} =$s->cgi->header(
+	, $s->{-c}->{-httpheader}
+	? ()
+	: do{$s->{-c}->{-httpheader} =$s->cgi->header(
 		-charset => $s->charset(), -expires => 'now'
 		, ref($s->{-httpheader}) 
 		? %{$s->{-httpheader}} 
@@ -5156,7 +5385,7 @@ sub htmlStart {	# HTTP/HTML/Form headers
 		, $s->{-pcmd}->{-xml}
 		? (-type => 'text/xml')
 		: ()
-		)
+		)}
 	, $s->{-c}->{-htmlstart}  =
 		  $s->{-pcmd}->{-xml}
 		? (ref($s->{-xmlstart})
@@ -5208,10 +5437,10 @@ sub htmlStart {	# HTTP/HTML/Form headers
 sub htmlEnd {	# End of HTML/HTTP output
  my ($s) =@_;
  if ($s->{-pcmd}->{-xml}) {		
-	$s->output("\n</" .$s->xmlTagEscape($s->{-pcmd}->{-form}||'default') .">\n")
+	return("\n</" .$s->xmlTagEscape($s->{-pcmd}->{-form}||'default') .">\n")
  }
  else {
-	$s->output($s->cgi()->endform(), $s->cgi()->end_html())
+	return($s->cgi()->endform(), $s->cgi()->end_html())
  }
 }
 
@@ -5350,7 +5579,7 @@ sub htmlMenu {	# Screen menu bar
  !$s->{-icons}
  ?  "\n<div class=\"$cs\">" .join("\n", @r, $mi, '<br />', $mh, '<br />', $mc ? ($mc, '<br />') : ()) ."</div>\n\n"
  : ("\n<div class=\"$cs\"><table class=\"$cs\" cellpadding=0><tr>\n"
-	# style=\"position: absolute; top: 0; left: 0;\"
+	# style=\"position: absolute; top: 0; left: 0;\" # scrolled up
 	# <br /><br />
 	# scrollHeight
 	.join("\n", @r)
@@ -5366,7 +5595,7 @@ sub htmlMenu {	# Screen menu bar
 	.(!$c->{-refresh} 
 	? '<script for="window" event="onload">{var w=window.document.getElementsByTagName(\'table\')[' .($e ? 1 : 0) .']; if(w){w.focus()}}</script>' ."\n" 
 	: '')
-	.(0
+	.(0	# scrollTop==0
 	? '<script for="window" event="onscroll">{var w=window.document.getElementsByTagName(\'table\')[0]; window.status=document.body.scrollTop; if (!w) {} else if(document.body.scrollTop >(w.height||0)){w.style.position="absolute"; w.style.top=document.body.scrollTop} else {w.style.position="static"} return(true)}</script>' ."\n" 
 	: '')
 	."\n")
@@ -5623,9 +5852,9 @@ sub cgiForm {	# Print CGI screen form
     $c =$s->{-pcmd} if !$c;
     $d =$s->{-pout} if !$d;
 
- return($s) if $c->{-cmg} eq 'recDel';
+ return($s) if ($c->{-cmg}||'') eq 'recDel';
 
- my $qm=$c->{-cmg} eq 'recQBF';
+ my $qm=($c->{-cmg}||'') eq 'recQBF';
     $d =ref($m->{-query}->{-qkey}) eq 'CODE'
 	? &{$m->{-query}->{-qkey}}($s, $n, $m, $c)
 	: {%{$m->{-query}->{-qkey}}}	if $qm && (!$d ||!%$d) && $m->{-query}
@@ -5635,8 +5864,11 @@ sub cgiForm {	# Print CGI screen form
  my ($lt, $lr) =$c->{-xml} ? (1,1) : (0,1);
 
  $s->output('<table>'
+		#  style="margin-left: 0px; padding: 0px; border-left-width: 0px; border-width: 0px; position: relative; left: 0;"
+		#  cellspacing="0" cellpadding="0"
+		# margin + left + border + padding ["Measuring Element Dimension and Location"]
 	,"\n<tr>\n"
-	, $m->{-fwidth}		# !!! not documented, not needed ???
+	, $m->{-fwidth}		# !!! not documented, not needed?
 	? '<th colspan=20><nobr>' 
 		.('&nbsp;' x $m->{-fwidth}) ."</nobr></th></tr>\n<tr>\n"
 	: ''
@@ -5708,12 +5940,12 @@ sub cgiForm {	# Print CGI screen form
 		next;
 	}
 	elsif	($f eq "\f")		{		# close table
-		$s->output("\n</tr>\n</table>\n");
+		$s->output("\n</tr>\n</table>\n") if !$lt;
 		$lt =1; $lr =1;
 		next 
 	}
 	elsif	($f eq '</table>')		{	# close table & labels
-		$s->output("\n</tr>\n</table>\n");
+		$s->output("\n</tr>\n</table>\n") if !$lt;
 		$lt =2; $lr =1;
 		next 
 	}
@@ -5744,6 +5976,7 @@ sub cgiForm {	# Print CGI screen form
 	my $fuc =!$excl && !$hide && $f->{-fld} && $s->mdeFldIU($mt, $f->{-fld});
 	my $lbl =$s->htmlEscape($s->lnglbl($f,'-fld'));
 	my $cmt =($s->lngcmt($f) ||$s->lng(1, $f->{-fld})) .' [' .$f->{-fld} .($f->{-flg} ? ': ' .$f->{-flg} : '') .']';
+	$_=$d->{$f->{-fld}};
 	my $rid =$hide	|| $excl
 		? undef
 		: $edit && !$c->{-print}
@@ -5754,7 +5987,7 @@ sub cgiForm {	# Print CGI screen form
 			.'">'
 		: (!defined($d->{$f->{-fld}}) || ($d->{$f->{-fld}} eq ''))
 		? undef
-		: !$c->{-print} 
+		: (!$c->{-print})
 		  && (	   $f->{-form} 
 			|| (($f->{-flg}||'')=~/[h]/)
 			|| $fuc
@@ -5784,10 +6017,10 @@ sub cgiForm {	# Print CGI screen form
 					&& $f->{-form}
 					|| $m->{-table} ||$n)
 			.$HS .'_key='  .$s->htmlEscape($s->strdatah($f->{-fld} => $d->{$f->{-fld}}))
-			.'">'
+			.'"' .($c->{-mail} ? ' target="_blank"': '') .' >'
 		: $qm
 		? undef
-		: !$c->{-print}
+		: (!$c->{-print} ||$c->{-mail})
 		  && (($m->{-ridRef} ||$s->{-ridRef})
 			&& (grep {$f->{-fld} eq $_
 				} @{$m->{-ridRef}||$s->{-ridRef}})
@@ -5803,8 +6036,10 @@ sub cgiForm {	# Print CGI screen form
 		  .( $d->{$f->{-fld}} !~/\Q$RISM1\E/ 
 		   ? $HS .'_form=' .$s->htmlEscape($n) 
 		   : '')
-		  .$HS .'_key=' .$s->htmlEscape($d->{$f->{-fld}}) .'">'
+		  .$HS .'_key=' .$s->htmlEscape($d->{$f->{-fld}}) 
+		  .'"' .($c->{-mail} ? ' target="_blank"': '') .' >'
 		: undef;
+	$_=$d->{$f->{-fld}};
 	if	($excl||$hide)	{$lbl =' '}
 	elsif	(defined($f->{-lblhtml})) {
 		my $l =$f->{-lblhtml};
@@ -5821,20 +6056,44 @@ sub cgiForm {	# Print CGI screen form
 		? ''
 		: $lt
 		? '<span' 
-			.($f->{-fhclass} ? ' class="' .$f->{-fhclass} .'"' : '')
-			.($f->{-fhstyle} ? ' style="' .$f->{-fhstyle} .'"' : '')
+			.($f->{-fhclass} ? ' class="' 
+						.(ref($f->{-fhclass})
+						? &{$f->{-fhclass}}($s,$c,$d)
+						: $f->{-fhclass}) .'"' : '')
+			.($f->{-fhstyle} ? ' style="'
+						.(ref($f->{-fhstyle})
+						? &{$f->{-fhstyle}}($s,$c,$d)
+						: $f->{-fhstyle}) .'"' : '')
 			.' title="' .htmlEscape($s,$cmt) .'"'
 			.($f->{-fhprop} ? ' ' .$f->{-fhprop} : '')
 			.'>' .$lbl .'</span>'
 		: $lbl =~/^\s*<t[dh]\b/i 
 		? $lbl 
 		:('<th align="left" valign="top"'
-			.($f->{-fhclass} ? ' class="' .$f->{-fhclass} .'"' : '')
-			.($f->{-fhstyle} ? ' style="' .$f->{-fhstyle} .'"' : '')
+			.($f->{-fhclass} ? ' class="'
+						.(ref($f->{-fhclass})
+						? &{$f->{-fhclass}}($s,$c,$d)
+						: $f->{-fhclass}) .'"'
+					 : '')
+			.($f->{-fhstyle} ? ' style="'
+						.(ref($f->{-fhstyle})
+						? &{$f->{-fhstyle}}($s,$c,$d)
+						: $f->{-fhstyle}) .'"'
+					 : '')
+					# style="padding-left: 0; padding: 0; margin-left: 0; margin: 0; border-left-width: 0; border-width: 0; layout-grid-mode: none;"
 			.' title="' .htmlEscape($s,$cmt) .'"'
 			.($f->{-fhprop} ? ' ' .$f->{-fhprop} : '')
 			.'>' .$lbl .'</th>');
+	if ($f->{-lblhtbr}) {
+		$lbl =(!$lr ? '' : "\n</tr>\n<tr>\n") 
+			.$lbl
+			."\n</tr>\n</table>\n"
+			if !$lt;
+		$lt =$f->{-lblhtbr} eq '</table>' ? 2 : 1;
+		$lr =0;
+	}
 
+	$_=$d->{$f->{-fld}};
 	my $wgp =$excl || $hide
 		? ''
 		: $edit
@@ -5855,8 +6114,12 @@ sub cgiForm {	# Print CGI screen form
 		if $rid && !$edit && $wgp !~/<a\s+href\s*=\s*/i;
 	$wgp	='<td valign="top" align="left"'
 		.($f->{-colspan} ? ' colspan=' .$f->{-colspan} :'')
-		.($f->{-fdclass} ? ' class="'  .$f->{-fdclass} .'"' : '')
-		.($f->{-fdstyle} ? ' style="'  .$f->{-fdstyle} .'"' : '')
+		.($f->{-fdclass} ? ' class="'  .(ref($f->{-fdclass})
+						? &{$f->{-fdclass}}($s,$c,$d)
+						: $f->{-fdclass}) .'"' : '')
+		.($f->{-fdstyle} ? ' style="'   .(ref($f->{-fdstyle})
+						? &{$f->{-fdstyle}}($s,$c,$d)
+						: $f->{-fdstyle}) .'"' : '')
 		.($f->{-fdprop}	 ? ' ' .$f->{-fdprop} : '')
 		.'>' .$wgp .'</td>'
 		if $wgp !~/^\s*<t[dh]\b/i && !$lt 
@@ -5886,6 +6149,12 @@ sub cgiForm {	# Print CGI screen form
 				, $wgp =~/<(\/p|br\s*\/)>[\s\r\n]*$/i
 				? "\n" : "<br />\n")
 		}
+		elsif ($f->{-lblhtbr} && ($lbl =~/<\/table>[\r\n]*$/i)) {
+			$s->output("\n</tr>\n</table>\n")
+		}
+	}
+	elsif ($f->{-lblhtbr} && ($lbl =~/<\/table>[\r\n]*$/i)) {
+			$s->output("\n</tr>\n</table>\n")
 	}
 	$lr =1
  }
@@ -6180,9 +6449,14 @@ sub htmlField {	# Generate field widget HTML
 		unshift @$tv, '' if $s->{-pcmd}->{-cmg} eq 'recQBF';
 		$wgp	=$s->cgi->popup_menu(
 			 ($s->{-c}->{-htmlclass} ? (-class=>$s->{-c}->{-htmlclass}) : ())
-			,(map {($_ =>	(ref($m->{$_}) eq 'CODE'
-					? &{$m->{$_}}($s,$m,local($_)=$v)
-					: $m->{$_}))} keys %$m)
+			,$m->{-ddlbloop}||$m->{-loop}
+				? (-onchange => '{_cmd.value="recForm"; submit(); return(false)}')
+				: ()
+			,(map {	!defined($m->{$_}) || ($_=~/^(?:-ddlbloop|loop)$/)
+				? ()
+				: ref($m->{$_}) eq 'CODE'
+				? ($_ => &{$m->{$_}}($s,$m,local($_)=$v))
+				: ($_ => $m->{$_})} keys %$m)
 			,-name=>$n, -title=>$t
 			, $tv ? (-values=>$tv) : ()
 			, $tl ? (-labels=>$tl) : ()
@@ -6318,9 +6592,50 @@ sub cgiDDLB {	# CGI Drop-down list box
 	$s->output('<script for="window" event="onload">{'
 	.'window.document.forms[0].' .$nf .'.focus();}</script>');
  }
- if	(!$s->{-pdta}->{$no}) {		# open button & exit
+ if	(!$s->{-pdta}->{$no}		# open button & exit
+	&& ($f->{-ddlbloop} ? !$s->{-pdta}->{$ne} : 1)
+	) {
+	if ($f->{-ddlbmsab} && $s->cgi->user_agent('MSIE')) {
+	$s->output("<script language=\"jscript\"></script><script language=\"VBScript\">
+	function ${no}O(fldnme)
+	Dim Users1
+	Dim t
+	Dim item
+	Dim field
+	${no}O =\"\"
+	On Error Resume Next
+	rem EnsureImport()
+	Set field =Document.getElementsByName(fldnme)(0)
+	Set t = CreateObject(\"MsSvAbw.AddrBookWrapper\")
+	if Err <> 0 then
+		Err.Clear
+		set t = CreateObject(\"MsoSvAbw.AddrBookWrapper\")
+	end if
+	if IsObject(t) then
+		t.AddressBook \"Microsoft Address Book\", 1, \"\", \"\", \"\", Users1
+		if Err = 0 or Err <> 0 then
+			For each item in Users1
+				if len(field.value) <> 0 then
+					field.value =field.value & \", \" & item.SMTPAddress
+				else
+					field.value =item.SMTPAddress
+				end if
+			Next
+			rem MsgBox(field.value)
+			${no}O =\"fldnme\"
+		else
+			MsgBox(\"Error=\" & Err.Description)
+			Err.Clear
+		end if
+	end if
+	End function"
+	,"</script><script language=\"jscript\"></script>");
+	}
 	$s->output($s->cgi->submit(-name=>$no
 	,($s->{-c}->{-htmlclass} ? (-class=>$s->{-c}->{-htmlclass}) : ())
+	, $f->{-ddlbmsab} && $s->cgi->user_agent('MSIE')
+		? (-OnClick=>"if(${no}O('$nf')) {return(false)};")
+		: ()
 	, -value=>$s->lng(0,'ddlbopen')
 	, -title=>$s->lng(1,'ddlbopen')));
 	return('');
@@ -6342,11 +6657,13 @@ sub cgiDDLB {	# CGI Drop-down list box
 	)
 	.'if(!k){return(false)}; k=k.toLowerCase();'
 	.'for (var i=0; i <l.length; ++i) {'
-	.($s->cgi->user_agent('MSIE')
-	?'if (l.options.item(i).value.toLowerCase().indexOf(k)'
+	.($_[0] eq '4'
+	? 'if (l.options.item(i).value.toLowerCase() ==k){'
+	: $s->cgi->user_agent('MSIE')
+	? 'if (l.options.item(i).value.toLowerCase().indexOf(k)'
 		.($_[0] eq '3' ?'>=' :'==') .'0 || l.options.item(i).innerText.toLowerCase().indexOf(k)'
 		.($_[0] eq '3' ?'>=' :'==') .'0){'
-	:'if (l.options.item(i).value.toLowerCase().indexOf(k)'
+	: 'if (l.options.item(i).value.toLowerCase().indexOf(k)'
 		.($_[0] eq '3' ?'>=' :'==') .'0){')
 	.'l.selectedIndex =i; break;}}'
 	.($_[0] ? 'return(false);' : '')
@@ -6401,14 +6718,14 @@ sub cgiDDLB {	# CGI Drop-down list box
 		my ($n, $l, $m) =ref($b) ? @$b : ($b,$b,($b||'') =~/[+,;]/);
 		   $n =$f->{-fld} if !defined($n);
 		   $l =($m ? '<+' : '<') .$s->lng(0, $n) if !defined($l);
-		my $f =($n =~/^[<+-]*(.+)/ ? $1 : $n);
-		   $m =',' if $m && $m =~/^\d*$/;
+		my $w =($n =~/^[<+-]*(.+)/ ? $1 : $n);
+		   $m =', ' if $m && $m =~/^\d*$/;
 		$s->output($s->cgi->button(
 		  -value=>$l
 		, -title=>$s->lng(1,'ddlbsubmit')
 		,($s->{-c}->{-htmlclass} ? (-class=>$s->{-c}->{-htmlclass}) : ())
 		, -onClick=>"{var fs =window.document.forms[0].$nl; "
-			."var ft =window.document.forms[0].$f; "
+			."var ft =window.document.forms[0].$w; "
 			."var i  =fs.selectedIndex; i =i <0 ? 0 : i; "
 			.($s->cgi->user_agent('MSIE')
 			?(!$m	? "ft.value =(fs.options.item(i).value ==\"\" ? fs.options.item(i).text : fs.options.item(i).value);}"
@@ -6890,8 +7207,8 @@ sub cgiList {	# List queried records
 	: !$b
 	? ["\n<table $hstl>\n"
 		,"<tr>\n",	    "<td align=\"left\" valign=\"top\" $hstl>","<a $hstl href=\"", '">', '</a>', "</td>\n", "</tr>\n", "</table>\n"]
-	: $b =~/<select/
-	? [$b	,'<option value="', '',				    '">',	 '',	'',	'',	"</option>\n",	"</select>\n"]
+	: $b =~/<select/ # !"</select>\n"
+	? [$b	,'<option value="', '',				    '">',	 '',	'',	'',	"</option>\n",	"</select>"]
 	: ["<span $hstl>"
 		,' ',' '," <a $hstl href=\"",'">','</a> ',' ',"$b\n","</span>\n"]
 	if !ref($b);
@@ -7037,16 +7354,40 @@ sub cgiList {	# List queried records
 				|| ($b->[2] !~/^<.*>$/)
 		? $b->[2]
 		: do {	my $v =$b->[2];
-			$v =~/\sclass\s*=\s*"/
-			? $v =~s/\sclass\s*=\s*"([^"]*)"/' class="' .$1 .' ' .$f->{-ldclass} .'"'/ie
-			: $v =~s/^(.+)(>)$/$1 .' class="' .$f->{-ldclass} .'"' .$2/ie
-				if $f->{-ldclass};
-			$v =~/\sstyle\s*=\s*"/
-			? $v =~s/\sstyle\s*=\s*"([^"]*)"/' style="' .$1 .'; ' .$f->{-ldstyle} .'"'/ie
-			: $v =~s/^(.+)(>)$/$1 .' style="' .$f->{-ldstyle} .'"' .$2/ie
-				if $f->{-ldstyle};
-			$v =~s/^(.+)(>)$/$1 .' ' .$f->{-ldprop} .'>'/ie
-				if $f->{-ldprop};
+			if (ref($f->{-ldclass})) {
+				my($i,$cs,$w) =($j, $f->{-ldclass}, $v);
+				$v =sub {my $v =ref($w) ? &$w : $w;
+					local $_=ref($_[2]) ?$_[2]->[$i] :$_[2];
+					$v =~/\sclass\s*=\s*"/
+					? $v =~s/\sclass\s*=\s*"([^"]*)"/' class="' .$1 .'; ' .&$cs .'"'/ie
+					: $v =~s/^(.+)(>)$/$1 .' class="' .&$cs .'"' .$2/ie;
+					$v}
+			}
+			elsif ($f->{-ldclass}) {
+				$v =~/\sclass\s*=\s*"/
+				? $v =~s/\sclass\s*=\s*"([^"]*)"/' class="' .$1 .' ' .$f->{-ldclass} .'"'/ie
+				: $v =~s/^(.+)(>)$/$1 .' class="' .$f->{-ldclass} .'"' .$2/ie
+			}
+			if (ref($f->{-ldstyle})) {
+				my($i,$cs,$cp,$w) =($j, $f->{-ldstyle}, $f->{-ldprop}, $v);
+				$v =sub {my $v =ref($w) ? &$w : $w;
+					local $_=ref($_[2]) ?$_[2]->[$i] :$_[2];
+					$v =~/\sstyle\s*=\s*"/
+					? $v =~s/\sstyle\s*=\s*"([^"]*)"/' style="' .$1 .'; ' .&$cs .'"'/ie
+					: $v =~s/^(.+)(>)$/$1 .' style="' .&$cs .'"' .$2/ie;
+					$v =~s/^(.+)(>)$/$1 .' ' .(ref($cp) ? &$cp : $cp) .'>'/ie
+						if $cp;
+					$v}
+			}
+			elsif ($f->{-ldstyle}) {
+				$v =~/\sstyle\s*=\s*"/
+				? $v =~s/\sstyle\s*=\s*"([^"]*)"/' style="' .$1 .'; ' .$f->{-ldstyle} .'"'/ie
+				: $v =~s/^(.+)(>)$/$1 .' style="' .$f->{-ldstyle} .'"' .$2/ie;
+				$v =~s/^(.+)(>)$/$1 .' ' .$f->{-ldprop} .'>'/ie
+					if $f->{-ldprop};
+			}
+			else {
+			}
 			$v }
 		, $f]
 		if $disp || $f->{-lsthtml} || (($f->{-flg}||'') =~/[l]/);
@@ -7162,7 +7503,8 @@ sub cgiList {	# List queried records
 		,$b->[7])
 		: $s->output($b->[1]
 		, (map {!ref($_->[1])
-			? (	  $_->[3] ||htmlEscBlnk($s, ref($r) ? $r->[$_->[1]] : $r)
+			? (	  (ref($_->[3]) ? &{$_->[3]}($s, $i, $r, $h) : $_->[3])
+					||htmlEscBlnk($s, ref($r) ? $r->[$_->[1]] : $r)
 				, $b->[3]
 				, $b->[4] && $h, $b->[4]
 				, ref($_->[1]) 
@@ -7172,7 +7514,9 @@ sub cgiList {	# List queried records
 			: &$_($s, $i, $r, $h)
 			} @colf[0..$hrcol])
 		, (map { !ref($_->[1])
-			? (	  $_->[3]  # $b->[2]
+			? (	  ref($_->[3])
+				? &{$_->[3]}($s, $i, $r)
+				: $_->[3]  # $b->[2]
 				, ref($_->[1])
 				? &{$_->[1]}($s, $i, $r)
 				: htmlEscape($s, ref($r) ? $r->[$_->[1]] : $r)
@@ -7248,11 +7592,11 @@ sub tfoShow {	# Template Field Option '-lblhtml' to Show all details absent
  sub{	my $x =!$h ? '$_' : ref($h) eq 'CODE' ? &$h(@_) : $h;
 	   $_[3]
 	|| $_[0]->{-pdta}->{$n||'tfoShow_'}
-	|| ($d && !grep {!$_[0]->{-pout}->{$_}} @$d)
+	|| ($d && !(grep {!$_[0]->{-pout}->{$_}} @$d))
 	? $x
 	: ($x
 	  .'<input type="submit" name="' .($n||'tfoShow_')
-	  .($s->{-c}->{-htmlclass} ? '" class="' .$s->htmlEscape($s->{-c}->{-htmlclass}) : ())
+	  .($s->{-c}->{-htmlclass} ? '" class="' .$s->htmlEscape($s->{-c}->{-htmlclass}) : '')
 	  .'" value="' .$_[0]->lng(0,'ddlbopen') 
 	  .'" title="' .$_[0]->lng(1,'ddlbopen') 
 	  .'" />')
@@ -7294,15 +7638,17 @@ sub tfdRFD {	# Template Field Definition for Record File Directory
 
 
 sub ttoRVC {	# Template Table Option for Record Version Control
-	(-key		=> $_[0]->{-tn}->{-key}
-	,-rvcInsBy	=> $_[0]->{-tn}->{-rvcInsBy}
-	,-rvcInsWhen	=> $_[0]->{-tn}->{-rvcInsWhen}
-	,-rvcUpdBy	=> $_[0]->{-tn}->{-rvcUpdBy}
-	,-rvcUpdWhen	=> $_[0]->{-tn}->{-rvcUpdWhen}
-	,-rvcActPtr	=> $_[0]->{-tn}->{-rvcActPtr}
-	,-rvcChgState	=> $_[0]->{-tn}->{-rvcChgState}
-	,-rvcCkoState	=> $_[0]->{-tn}->{-rvcCkoState}
-	,-rvcDelState	=> $_[0]->{-tn}->{-rvcDelState}
+	my $s =$_[0];
+	my $tn=$s->{-tn};
+	(-key		=> $tn->{-key}
+	,-rvcInsBy	=> $tn->{-rvcInsBy}
+	,-rvcInsWhen	=> $tn->{-rvcInsWhen}
+	,-rvcUpdBy	=> $tn->{-rvcUpdBy}
+	,-rvcUpdWhen	=> $tn->{-rvcUpdWhen}
+	,-rvcActPtr	=> $tn->{-rvcActPtr}
+	,-rvcChgState	=> $tn->{-rvcChgState}
+	,-rvcCkoState	=> $tn->{-rvcCkoState}
+	,-rvcDelState	=> $tn->{-rvcDelState}
 	,@_ > 1 ? @_[1..$#_] : ())
 }
 
@@ -7310,49 +7656,47 @@ sub ttoRVC {	# Template Table Option for Record Version Control
 sub tvmVersions {	# Template for Materialized View of Versions of records
 			# 'versions' materialized view default definition
 			# self, ? fields, ? definitions
-	my $s =$_[0]; return($s->{-tn}->{'tvmVersions'}=>
+	my $s =$_[0]; 
+	my $tn=$s->{-tn};
+	return($tn->{'tvmVersions'}=>
 	{-lbl	=>	sub{$_[0]->lng(0,'tvmVersions')}
 	,-cmt	=>	sub{$_[0]->lng(1,'tvmVersions')}
 	,-field	=>	[
-		 {-fld=>'table',			-edit=>0, -flg=>'uql'}
-		,{-fld=>$s->{-tn}->{-rvcActPtr},	-edit=>0, -flg=>'uql'}
+		 {-fld=>'table',		-edit=>0, -flg=>'uql'}
+		,{-fld=>$tn->{-rvcActPtr},	-edit=>0, -flg=>'uql'}
 		,''
-		,{-fld=>'id',				-edit=>0, -flg=>'uql'}
-		,{-fld=>$s->{-tn}->{-rvcInsWhen},	-edit=>0, -flg=>'uq'}
+		,{-fld=>'id',			-edit=>0, -flg=>'uql'}
+		,{-fld=>$tn->{-rvcInsWhen},	-edit=>0, -flg=>'uq'}
 		,''
-		,{-fld=>$s->{-tn}->{-rvcInsBy},		-edit=>0, -flg=>'uq'}
-		,{-fld=>$s->{-tn}->{-rvcUpdWhen},	-edit=>0, -flg=>'uql'}
+		,{-fld=>$tn->{-rvcInsBy},	-edit=>0, -flg=>'uq'}
+		,{-fld=>$tn->{-rvcUpdWhen},	-edit=>0, -flg=>'uql'}
 		,''
-		,{-fld=>$s->{-tn}->{-rvcUpdBy},		-edit=>0, -flg=>'uql'}
-		,{-fld=>$s->{-tn}->{-rvcState},		-edit=>0, -flg=>'uql'}
+		,{-fld=>$tn->{-rvcUpdBy},	-edit=>0, -flg=>'uql'}
+		,{-fld=>$tn->{-rvcState},	-edit=>0, -flg=>'uql'}
 		,''
-		,{-fld=>'subject',			-edit=>0, -flg=>'uql'}
-		,{-fld=>'readers',			-edit=>0, -flg=>'u'}
-		,{-fld=>'cargo',			-edit=>0, -flg=>'u'}
+		,{-fld=>'subject',		-edit=>0, -flg=>'uql'}
+		,{-fld=>'readers',		-edit=>0, -flg=>'u'}
+		,{-fld=>'cargo',		-edit=>0, -flg=>'u'}
 		,ref($_[1]) eq 'ARRAY' ? @{$_[1]} : ()
 		]
-	,-key	=>	['table',$s->{-tn}->{-rvcActPtr},'id']
+	,-key	=>	['table',$tn->{-rvcActPtr},'id']
 	,-racReader=>	['readers']
-	,-rvcInsBy=>	$s->{-tn}->{-rvcInsBy}
-	,-rvcUpdBy=>	$s->{-tn}->{-rvcUpdBy}
-	,-rvcActPtr=>	$s->{-tn}->{-rvcActPtr}
+	,-rvcInsBy=>	$tn->{-rvcInsBy}
+	,-rvcUpdBy=>	$tn->{-rvcUpdBy}
+	,-rvcActPtr=>	$tn->{-rvcActPtr}
 	,-query	=>	{-version=>'+'}
 	,-ixcnd	=>	sub{$_[2]->{'id'}}
 	,-ixrec	=>	sub{my $m =$_[0]->{-table}->{$_[1]->{-table}};
 		return(
-		{'table'	=>$_[1]->{-table}
-		,$s->{-tn}->{-rvcActPtr}	=>$m->{-rvcActPtr} && $_[2]->{$m->{-rvcActPtr}}
-		,'id'		=>$_[2]->{'id'}
-		,$s->{-tn}->{-rvcInsWhen}=>$m->{-rvcInsWhen} && $_[2]->{$m->{-rvcInsWhen}}
-		,$s->{-tn}->{-rvcInsBy}	 =>$m->{-rvcInsBy}   && $_[2]->{$m->{-rvcInsBy}}
-		,$s->{-tn}->{-rvcUpdWhen}=>$m->{-rvcUpdWhen} && $_[2]->{$m->{-rvcUpdWhen}}
-		,$s->{-tn}->{-rvcUpdBy}	 =>$m->{-rvcUpdBy}   && $_[2]->{$m->{-rvcUpdBy}}
-		,$s->{-tn}->{-rvcState}	 =>$m->{-rvcChgState}&& $_[2]->{$m->{-rvcChgState}->[0]}
-		,'subject'	=>join(' '
-				,(map {$_[2]->{$_}
-					} grep {$_[2]->{$_}
-						} qw(record object subject))
-				)
+		{'table'		=>$_[1]->{-table}
+		,$tn->{-rvcActPtr}	=>$m->{-rvcActPtr} && $_[2]->{$m->{-rvcActPtr}}
+		,'id'			=>$_[2]->{'id'}
+		,$tn->{-rvcInsWhen}	=>$m->{-rvcInsWhen} && $_[2]->{$m->{-rvcInsWhen}}
+		,$tn->{-rvcInsBy}	=>$m->{-rvcInsBy}   && $_[2]->{$m->{-rvcInsBy}}
+		,$tn->{-rvcUpdWhen}	=>$m->{-rvcUpdWhen} && $_[2]->{$m->{-rvcUpdWhen}}
+		,$tn->{-rvcUpdBy}	=>$m->{-rvcUpdBy}   && $_[2]->{$m->{-rvcUpdBy}}
+		,$tn->{-rvcState}	=>$m->{-rvcChgState}&& $_[2]->{$m->{-rvcChgState}->[0]}
+		,'subject'	=>mdeSubj($_[0],$_[2])
 		,'readers'	=>join(',', map {$_[2]->{$_}||''} 
 				grep {$_[2]->{$_}} 
 				@{$m->{-racReader}||$_[0]->{-racReader}||[]}
@@ -7370,12 +7714,12 @@ sub tvmVersions {	# Template for Materialized View of Versions of records
 
 sub tfvVersions {	# Template for Field View of Versions of records
  my ($s, $f, @o) =@_;	# (self, ? fields, ? definitions)
- my $v =$s->{-tn}->{'tvmVersions'};
  sub{	
 	return('')	if ($_[0]->{-pcmd}->{-cmg} eq 'recQBF')
 			|| !$_[0]->{-pcmd}->{-table}
 			|| !$_[0]->{-pout}->{'id'}
 			|| $_[0]->{-pcmd}->{-print};
+	my $v =$s->{-tn}->{'tvmVersions'};
 	my $q =($_[0]->{-table}->{$_[0]->{-pcmd}->{-table}}->{-dbd} ||$_[0]->{-dbd}) eq 'dbi';
 	$v =$_[0]->{-pcmd}->{-table} if $q;
 	local $s->{-uiclass} ='tfvVersions';
@@ -7407,41 +7751,44 @@ sub tfvVersions {	# Template for Field View of Versions of records
 sub tvmHistory {	# Template for Materialized View of database History
 			# 'history' materialized view default definition
 			# self, ? fields, ? definition
-	my $s =$_[0]; return($s->{-tn}->{'tvmHistory'}=>
+	my $s =$_[0]; 
+	my $tn=$s->{-tn};
+	return($tn->{'tvmHistory'}=>
 	{-lbl	=>	sub{$_[0]->lng(0,'tvmHistory')}
 	,-cmt	=>	sub{$_[0]->lng(1,'tvmHistory')}
 	,-field	=>	[
-		 {-fld=>$s->{-tn}->{-rvcInsWhen},	-edit=>0, -flg=>'uq'}
+		 {-fld=>$tn->{-rvcInsWhen},	-edit=>0, -flg=>'uq'}
 		,''
-		,{-fld=>$s->{-tn}->{-rvcInsBy},		-edit=>0, -flg=>'uq'}
-		,{-fld=>$s->{-tn}->{-rvcUpdWhen},	-edit=>0, -flg=>'uql'}
+		,{-fld=>$tn->{-rvcInsBy},	-edit=>0, -flg=>'uq'}
+		,{-fld=>$tn->{-rvcUpdWhen},	-edit=>0, -flg=>'uql'}
 		,''
-		,{-fld=>$s->{-tn}->{-rvcUpdBy},		-edit=>0, -flg=>'uql'}
+		,{-fld=>$tn->{-rvcUpdBy},	-edit=>0, -flg=>'uql'}
 		#	,{-fld=>'table', -edit=>0, -flg=>'uq'}
 		#	,''
-		,{-fld=>'id',				-edit=>0, -flg=>'uq'}
-		,{-fld=>$s->{-tn}->{-rvcState},		-edit=>0, -flg=>'uql'}
+		,{-fld=>'id',			-edit=>0, -flg=>'uq'}
+		,{-fld=>$tn->{-rvcState},	-edit=>0, -flg=>'uql'}
 		,''
-		,{-fld=>$s->{-tn}->{-rvcActPtr},	-edit=>0, -flg=>'uq'}
-		,{-fld=>'subject',			-edit=>0, -flg=>'uql'}
-		,{-fld=>'auser',			-edit=>0, -flg=>'uql'}
+		,{-fld=>$tn->{-rvcActPtr},	-edit=>0, -flg=>'uq'}
+		,{-fld=>'subject',		-edit=>0, -flg=>'uql'}
+		,{-fld=>'auser',		-edit=>0, -flg=>'uql'}
 		,''
-		,{-fld=>'arole',			-edit=>0, -flg=>'uql'}
-		,{-fld=>'puser',			-edit=>0, -flg=>'uq'}
+		,{-fld=>'arole',		-edit=>0, -flg=>'uql'}
+		,{-fld=>'puser',		-edit=>0, -flg=>'uq'}
 		,''
-		,{-fld=>'prole',			-edit=>0, -flg=>'uq'}
-		,{-fld=>'readers',			-edit=>0, -flg=>'u'}
-		,{-fld=>'cargo',			-edit=>0, -flg=>'u'}
+		,{-fld=>'prole',		-edit=>0, -flg=>'uq'}
+		,{-fld=>'readers',		-edit=>0, -flg=>'u'}
+		,{-fld=>'cargo',		-edit=>0, -flg=>'u'}
 		,ref($_[1]) eq 'ARRAY' ? @{$_[1]} : ()
 		]
-	,-key	=>	[$s->{-tn}->{-rvcUpdWhen},$s->{-tn}->{-rvcUpdBy},'id']	# ,'table'
+	,-key	=>	[$tn->{-rvcUpdWhen},$tn->{-rvcUpdBy},'id']
+					# ,'table'
 	,-racReader=>	['readers']
 	,-racPrincipal=>['puser','prole']
 	,-racActor=>	['auser','arole']
-	,-rvcInsBy=>	$s->{-tn}->{-rvcInsBy}
-	,-rvcUpdBy=>	$s->{-tn}->{-rvcUpdBy}
-	,-rvcActPtr=>	$s->{-tn}->{-rvcActPtr}
-	,-ixcnd	=>	sub{$_[2]->{'id'} && $_[2]->{$s->{-tn}->{-rvcUpdWhen}}}
+	,-rvcInsBy=>	$tn->{-rvcInsBy}
+	,-rvcUpdBy=>	$tn->{-rvcUpdBy}
+	,-rvcActPtr=>	$tn->{-rvcActPtr}
+	,-ixcnd	=>	sub{$_[2]->{'id'} && $_[2]->{$tn->{-rvcUpdWhen}}}
 	,-ixrec	=>	sub{
 		my $m	=$_[0]->{-table}->{$_[1]->{-table}};
 		my $ra	= mdeRole($_[0], $m, 'authors');
@@ -7450,17 +7797,13 @@ sub tvmHistory {	# Template for Materialized View of database History
 		{'id'		=>$_[1]->{-table} .$RISM1 .$_[2]->{'id'}
 		#'table'	=>$_[1]->{-table}
 		#'id'		=>$_[2]->{'id'}
-		,$_[0]->{-tn}->{-rvcInsWhen}=>$m->{-rvcInsWhen} && $_[2]->{$m->{-rvcInsWhen}}
-		,$_[0]->{-tn}->{-rvcInsBy}	 =>$m->{-rvcInsBy}   && $_[2]->{$m->{-rvcInsBy}}
-		,$_[0]->{-tn}->{-rvcUpdWhen}=>$m->{-rvcUpdWhen} && $_[2]->{$m->{-rvcUpdWhen}}
-		,$_[0]->{-tn}->{-rvcUpdBy}	 =>$m->{-rvcUpdBy}   && $_[2]->{$m->{-rvcUpdBy}}
-		,$_[0]->{-tn}->{-rvcState}	 =>$m->{-rvcChgState}&& $_[2]->{$m->{-rvcChgState}->[0]}
-		,$_[0]->{-tn}->{-rvcActPtr} =>$m->{-rvcActPtr}  && $_[2]->{$m->{-rvcActPtr}}
-		,'subject'	=>join(' '
-				,(map {$_[2]->{$_}
-					} grep {$_[2]->{$_}
-						} qw(record object subject))
-				)
+		,$tn->{-rvcInsWhen}	=>$m->{-rvcInsWhen} && $_[2]->{$m->{-rvcInsWhen}}
+		,$tn->{-rvcInsBy}	=>$m->{-rvcInsBy}   && $_[2]->{$m->{-rvcInsBy}}
+		,$tn->{-rvcUpdWhen}	=>$m->{-rvcUpdWhen} && $_[2]->{$m->{-rvcUpdWhen}}
+		,$tn->{-rvcUpdBy}	=>$m->{-rvcUpdBy}   && $_[2]->{$m->{-rvcUpdBy}}
+		,$tn->{-rvcState}	=>$m->{-rvcChgState}&& $_[2]->{$m->{-rvcChgState}->[0]}
+		,$tn->{-rvcActPtr}	=>$m->{-rvcActPtr}  && $_[2]->{$m->{-rvcActPtr}}
+		,'subject'	=>mdeSubj($_[0],$_[2])
 		,'auser'	=>(!$ra 		? undef
 				: !ref($ra)		? $_[2]->{$ra}
 				: @$ra && $ra->[0]	? $_[2]->{$ra->[0]}
@@ -7499,42 +7842,44 @@ sub tvmHistory {	# Template for Materialized View of database History
 sub tvmReferences {	# Template for Materialized View of References to records
 			# 'references' materialized view default definition
 			# self, ? fields, ? definition
-	my $s =$_[0]; return ($s->{-tn}->{'tvmReferences'}=>
+	my $s =$_[0]; 
+	my $tn=$s->{-tn};
+	return ($tn->{'tvmReferences'}=>
 	{-lbl	=>	sub{$_[0]->lng(0,'tvmReferences')}
 	,-cmt	=>	sub{$_[0]->lng(1,'tvmReferences')}
 	,-field	=>	[
-		 {-fld=>'ir',				-edit=>0, -flg=>'uql'}
+		 {-fld=>'ir',			-edit=>0, -flg=>'uql'}
 		,''
-		,{-fld=>'id',				-edit=>0, -flg=>'uql'}
+		,{-fld=>'id',			-edit=>0, -flg=>'uql'}
 
-		,{-fld=>$s->{-tn}->{-rvcInsWhen},	-edit=>0, -flg=>'uq'}
+		,{-fld=>$tn->{-rvcInsWhen},	-edit=>0, -flg=>'uq'}
 		,''
-		,{-fld=>$s->{-tn}->{-rvcInsBy},		-edit=>0, -flg=>'uq'}
-		,{-fld=>$s->{-tn}->{-rvcUpdWhen},	-edit=>0, -flg=>'uql'}
+		,{-fld=>$tn->{-rvcInsBy},	-edit=>0, -flg=>'uq'}
+		,{-fld=>$tn->{-rvcUpdWhen},	-edit=>0, -flg=>'uql'}
 		,''
-		,{-fld=>$s->{-tn}->{-rvcUpdBy},		-edit=>0, -flg=>'uq'}
+		,{-fld=>$tn->{-rvcUpdBy},	-edit=>0, -flg=>'uq'}
 
-		,{-fld=>$s->{-tn}->{-rvcState},		-edit=>0, -flg=>'uql'}
+		,{-fld=>$tn->{-rvcState},	-edit=>0, -flg=>'uql'}
 		,''
-		,{-fld=>$s->{-tn}->{-rvcActPtr},	-edit=>0, -flg=>'uq'}
-		,{-fld=>'subject',			-edit=>0, -flg=>'uql'}
-		,{-fld=>'auser',			-edit=>0, -flg=>'uql'}
+		,{-fld=>$tn->{-rvcActPtr},	-edit=>0, -flg=>'uq'}
+		,{-fld=>'subject',		-edit=>0, -flg=>'uql'}
+		,{-fld=>'auser',		-edit=>0, -flg=>'uql'}
 		,''
-		,{-fld=>'arole',			-edit=>0, -flg=>'uql'}
-		,{-fld=>'puser',			-edit=>0, -flg=>'uq'}
+		,{-fld=>'arole',		-edit=>0, -flg=>'uql'}
+		,{-fld=>'puser',		-edit=>0, -flg=>'uq'}
 		,''
-		,{-fld=>'prole',			-edit=>0, -flg=>'uq'}
-		,{-fld=>'readers',			-edit=>0, -flg=>'u'}
+		,{-fld=>'prole',		-edit=>0, -flg=>'uq'}
+		,{-fld=>'readers',		-edit=>0, -flg=>'u'}
 		,ref($_[1]) eq 'ARRAY' ? @{$_[1]} : ()
 		]
-	,-key	=>	['ir',$s->{-tn}->{-rvcUpdWhen},'id']
+	,-key	=>	['ir',$tn->{-rvcUpdWhen},'id']
 	,-qhrcol=>	1
 	,-racReader=>	['readers']
 	,-racPrincipal=>['puser','prole']
 	,-racActor=>	['auser','arole']
-	,-rvcInsBy=>	$s->{-tn}->{-rvcInsBy}
-	,-rvcUpdBy=>	$s->{-tn}->{-rvcUpdBy}
-	,-rvcActPtr=>	$s->{-tn}->{-rvcActPtr}
+	,-rvcInsBy=>	$tn->{-rvcInsBy}
+	,-rvcUpdBy=>	$tn->{-rvcUpdBy}
+	,-rvcActPtr=>	$tn->{-rvcActPtr}
 	,-ixcnd	=>	sub{$_[2]->{'id'} 
 			&& ($_[0]->{-table}->{$_[1]->{-table}}->{-ridRef}
 				||$_[0]->{-ridRef})}
@@ -7570,17 +7915,13 @@ sub tvmReferences {	# Template for Materialized View of References to records
 		my $rv	=
 		{'id'		=>$id
 				# below alike 'tvmHistory'
-		,$s->{-tn}->{-rvcInsWhen}=>$m->{-rvcInsWhen} && $_[2]->{$m->{-rvcInsWhen}}
-		,$s->{-tn}->{-rvcInsBy}  =>$m->{-rvcInsBy}   && $_[2]->{$m->{-rvcInsBy}}
-		,$s->{-tn}->{-rvcUpdWhen}=>$m->{-rvcUpdWhen} && $_[2]->{$m->{-rvcUpdWhen}}
-		,$s->{-tn}->{-rvcUpdBy}	 =>$m->{-rvcUpdBy}   && $_[2]->{$m->{-rvcUpdBy}}
-		,$s->{-tn}->{-rvcState}	 =>$m->{-rvcChgState}&& $_[2]->{$m->{-rvcChgState}->[0]}
-		,$s->{-tn}->{-rvcActPtr} =>$m->{-rvcActPtr}  && $_[2]->{$m->{-rvcActPtr}}
-		,'subject'	=>join(' '
-				,(map {$_[2]->{$_}
-					} grep {$_[2]->{$_}
-						} qw(record object subject))
-				)
+		,$tn->{-rvcInsWhen}	=>$m->{-rvcInsWhen} && $_[2]->{$m->{-rvcInsWhen}}
+		,$tn->{-rvcInsBy}	=>$m->{-rvcInsBy}   && $_[2]->{$m->{-rvcInsBy}}
+		,$tn->{-rvcUpdWhen}	=>$m->{-rvcUpdWhen} && $_[2]->{$m->{-rvcUpdWhen}}
+		,$tn->{-rvcUpdBy}	=>$m->{-rvcUpdBy}   && $_[2]->{$m->{-rvcUpdBy}}
+		,$tn->{-rvcState}	=>$m->{-rvcChgState}&& $_[2]->{$m->{-rvcChgState}->[0]}
+		,$tn->{-rvcActPtr}	=>$m->{-rvcActPtr}  && $_[2]->{$m->{-rvcActPtr}}
+		,'subject'	=>mdeSubj($_[0],$_[2])
 		,'auser'	=>(!$ra 		? undef
 				: !ref($ra)		? $_[2]->{$ra}
 				: @$ra && $ra->[0]	? $_[2]->{$ra->[0]}
@@ -7618,12 +7959,12 @@ sub tvmReferences {	# Template for Materialized View of References to records
 
 sub tfvReferences {	# Template for Field embedded View of References to record
  my ($s, $f, @o) =@_;	# (self, ? fields, ? definitions)
- my $v =$s->{-tn}->{'tvmReferences'};
  sub{
 	return('') 
 		if ($_[0]->{-pcmd}->{-cmg} eq 'recQBF')
 		|| !$_[0]->{-pcmd}->{-table}
 		|| !$_[0]->{-pout}->{'id'};
+	my $v =$s->{-tn}->{'tvmReferences'};
 	my $q =(($_[0]->{-table}->{$_[0]->{-pcmd}->{-table}}->{-dbd} ||$_[0]->{-dbd}) 
 			eq 'dbi')
 		&& !$_[0]->{-table}->{$v};
@@ -7726,7 +8067,7 @@ sub tvdIndex {	# Template View Definition for Index page
 	$s->output("\n</table>\n");
 	# $s->recCommit();
 	$s->cgiFooter() if !$s->{-pcmd}->{-print};
-	$s->htmlEnd();
+	$s->output($s->htmlEnd());
 	$s->end();
 	}
 	,@_ > 1 ? @_[1..$#_] : ()
@@ -7859,7 +8200,7 @@ sub tvdFTQuery {	# Template View Definition for Full-Text Query
 	}
 	$s->{-pcmd}->{-cmd} =$s->{-pcmd}->{-cmg} ='recList';
 	$s->cgiFooter() if !$s->{-pcmd}->{-print};
-	$s->htmlEnd();
+	$s->output($s->htmlEnd());
 	$s->end();
  }
  ,@_ > 1 ? @_[1..$#_] : ()})
@@ -7878,6 +8219,7 @@ sub ttsAll {	# Template Tables Set of All generally used views
 sub tfsAll {	# Template Fields Set for All generally used fields
  return(	# - to add to '-field'
 	 $_[0]->tfdRFD()
+	,"\f"
 	,$_[0]->tfvVersions()
 	,$_[0]->tfvReferences()
  )
@@ -8168,6 +8510,12 @@ sub close {
  $_[0]->{-lcks}   ={};
 #eval {untie %$h}; # warning if another reference exists
  $_[0]
+}
+
+
+sub sync {
+ return($_[0]) if !$_[0]->{-handle};
+ $_[0]->{-handle}->sync();
 }
 
 

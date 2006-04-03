@@ -273,12 +273,14 @@ C<logOpen>, C<logLock>, C<logRec>
 
 =item SubObjects
 
-C<-dbi>, C<-dbiarg>, C<-dbiph>, C<-dbiACLike>; C<-cgi>; C<-output>;
+C<-dbi>, C<-dbiarg>, C<-dbiph>, C<-dbiACLike>; C<-cgi>; C<-output>; 
+C<-smtp>, C<-smtphost>, C<-smtpdomain>;
 
-C<dbi>, C<cgi>;
+C<dbi>, C<cgi>, C<smtp>;
 C<hfNew>, C<dbmNew>, C<dbmTable>, C<ccbNew>;
 C<osCmd>;
-C<output>, C<outhtm>, C<outhtml>, C<outxml>
+C<output>, C<outhtm>, C<outhtml>, C<outxml>;
+C<smtpSend>
 
 
 =item User Identification
@@ -339,11 +341,13 @@ C<-cgvXXX>)
 C<-field> C<Table/Form Description> slot contains array ref of field
 descriptions (hash refs) and formatting strings.
 
-C<-fld>, C<-expr>, C<-lbl>, C<-lblhtml>, C<-form>, C<-cmt>;
-C<-flg>, C<-chk>;
-C<-hide>, C<-hidel>, C<-edit>, C<-null>;
-C<-inp>, C<-inphtml>, C<-ddlb>, C<-ddlbmult>, C<-ddlbtgt>;
-C<-colspan>, C<-fhclass>, C<-fhstyle>, C<-fhprop>, C<-fdstyle>, C<-fdclass>, C<-fdprop>;
+C<-fld>, C<-expr>, C<-lbl>, C<-cmt>;
+C<-flg>, C<-null>, C<-chk>, C<-edit>;
+C<-colspan>, C<-hide>, C<-hidel>;
+C<-lblhtml>, C<-lblhtbr>, C<-fhclass>, C<-fhstyle>, C<-fhprop>;
+C<-inp>, C<-inphtml>, C<-fdstyle>, C<-fdclass>, C<-fdprop>;
+C<-ddlb>, C<-ddlbmult>, C<-ddlbtgt>, C<-ddlbloop>, C<-ddlbmsab>;
+C<-form>;
 C<-lsthtml>, C<-lhclass>, C<-lhstyle>, C<-lhprop>, C<-ldclass>, C<-ldstyle>, C<-ldprop>
 
 
@@ -399,8 +403,9 @@ C<-end0>, C<-endh>, C<-end1>;
 
 C<Triggers Interface>;
 
-C<-recTrim0A>, C<-recChg0A>, C<-recChg0R>, C<-recChg1A>;
+C<-recTrim0A>;
 C<-recForm0A>, C<-recForm0C>, C<-recForm0R>, C<-recForm1C>, C<-recForm1A>;
+C<-recEdt0A>, C<-recEdt0R>, C<-recChg0R>, C<-recEdt1A>;
 C<-recNew0C>, C<-recNew0R>, C<-recNew1C>;
 C<-recIns0C>, C<-recIns0R>, C<-recInsID>, C<-recIns1R>, C<-recIns1C>;
 C<-recUpd0C>, C<-recUpd0R>, C<-recUpd1C>;
@@ -442,7 +447,7 @@ C<-form>;
 C<-cgcXXX>;
 C<-subst>,
 C<-recXXX> (C<-recNew>, C<-recForm>, C<-recIns>, C<-recUpd>, C<-recDel>, C<-recRead>, C<-recList>,...);
-C<-recX#A> (C<-recTrim0A>, C<-recChg0A>, C<-recChg0R>, C<-recChg1A>);
+C<-recX#A> (C<-recTrim0A>, C<-recEdt0A>, C<-recEdt0R>, C<-recEdt1A>);
 C<-httpheader>, C<-htmlstart>;
 C<-logo>, C<-icons>, C<-menuchs>, C<-menuchs1>, C<-frmLso>, C<-frmLsc>;
 C<-login>;
@@ -569,7 +574,7 @@ See C<-cgvXXX> for external implementation of presentation only.
 CGI object, if used, created and available via C<cgi> call
 
 
-item -cgibus
+=item -cgibus
 
 	=> not exists || CGI::Bus::tm file attachments path
 
@@ -601,7 +606,7 @@ Application's charset, see also C<-locale>
 
 =item -chk
 
-	=> not exists || sub{}(self, )
+	=> not exists || sub{$_, $@}(self, )
 
 (C<User Interface> - C<Field Description>)
 Field value check.
@@ -616,7 +621,7 @@ $@ intended for constraint violation message.
 
 =item -cmt_LL
 
-	=> not exists || comment text || sub{}(self) -> comment text
+	=> not exists || comment text || sub{}(self,...) -> comment text
 
 (C<Table Description>, C<Form Description>, C<Field Description>)
 Text of object description to display to users,
@@ -707,6 +712,26 @@ Default behaviour is embedding values quoted as hinted via C<-flg> or analysed.
 (C<Field Description>)
 Drop-down list box with editable input and produced on button press selection list.
 See also C<-ddlbmult>, C<-ddlbtgt>
+
+
+=item -ddlbloop
+
+	=> not exists || boolean
+
+(C<Field Description>)
+Hint to reopen list box after input value chosen from it,
+may be used for hierarchical selection lists.
+See C<-ddlb>.
+
+
+=item -ddlbmsab
+
+	=> not exists || boolean
+
+(C<Field Description>)
+Hint to use Microsoft Address Book instead of C<-ddlb> if possible.
+See C<-ddlb>.
+
 
 
 =item -ddlbmult
@@ -801,13 +826,13 @@ Field name for application is explained as C<-fld>.
 =item -fdclass
 
 (C<Field Description>)
-Form data ('td') HTML tag class
+Form data ('td') HTML tag class - string or sub{$_}($self, command, record)
 
 
 =item -fdstyle
 
 (C<Field Description>)
-Form data ('td') HTML tag style
+Form data ('td') HTML tag style - string or sub{$_}($self, command, record)
 
 
 =item -fdprop
@@ -827,13 +852,13 @@ Distinguish from C<-affected>
 =item -fhclass
 
 (C<Field Description>)
-Form label ('th') HTML tag class
+Form label ('th') HTML tag class - string or sub{$_}($self, command, record)
 
 
 =item -fhstyle
 
 (C<Field Description>)
-Form label ('th') HTML tag style
+Form label ('th') HTML tag style - string or sub{$_}($self, command, record)
 
 
 =item -fhprop
@@ -857,7 +882,7 @@ Another type entries are tabular form layout hints:
 "\t" skips cell(s),
 "\f" finishes tabular layout,
 '</table>' finishes tabular layout and labels of the fields.
-See also C<-colspan> and C<-rowspan>.
+See also C<-colspan> and C<-lblhtbr>.
 
 
 =item -file
@@ -865,7 +890,7 @@ See also C<-colspan> and C<-rowspan>.
 	=> not exists || record file attachments subdirectory
 
 (C<Data Record Special fields>, C<Record File Attachments>)
-Record file attachments sign and place. 
+Sign and place of files attached to the record.
 Stamped by C<Database Operation> calls.
 Use C<rfdPath> to obtain absolute location.
 
@@ -875,7 +900,7 @@ Use C<rfdPath> to obtain absolute location.
 	=> field name
 
 (C<Field Description>)
-Name of the field as used by application.
+Field name as used by application.
 Database field name or expression may be explained by C<-expr>.
 
 
@@ -1012,7 +1037,7 @@ Stamped by C<Database Operation> calls along with C<-file>.
 
 =item -hide
 
-	=> not exists || sub{}({self},{field},edit,query,value) || boolean
+	=> not exists || sub{$_}({self},{field},edit,query,value) || boolean
 
 (C<Field Description>)
 Hide field condition.
@@ -1020,7 +1045,7 @@ Hide field condition.
 
 =item -hidel
 
-	=> not exists || sub{}({self},{field},edit,query,value) || boolean
+	=> not exists || sub{$_}({self},{field},edit,query,value) || boolean
 
 (C<Field Description>)
 Hide field condition with left shift of following layout.
@@ -1081,11 +1106,10 @@ Materialized views support switch, see C<-ixcnd>, C<-ixrec>
 	=> not exists || {L<CGI|CGI> widget parameters} || sub{}(C<htmlField> args) -> html
 
 (C<Field Description>)
-Widget description, mostly in terms of L<CGI|CGI>, 
-to which description will be passed. 
-Type selection and additional meanings specified below.
+Widget description, mostly in terms of L<CGI|CGI> module. 
+Widget type selection rules and additional meanings are specified below.
 See also C<-ddlb>, C<-ddlbtgt> for editable list boxes.
-See also C<-inphtml>, C<-lbl>, C<-lblhtml>
+See also C<-inphtml>, C<-lbl>, C<-lblhtml>.
 
 not exists		# text field
 
@@ -1101,11 +1125,13 @@ not exists		# text field
 
 -asize	=> min		# text field of variable length
 
--labels	=> sub{}(self) ||{value=>label,...}	# list box, see C<-ddlb> for editable features
+-labels	=> sub{}(self) ||{value=>label,...}	# list box, optional if '-values', see C<-ddlb> instead
 
 -labels_LL...					# ... user language specific
 
 -values	=> sub{}(self) ||[value,...]		# list box, optional if '-labels'
+
+-loop   => boolean  or  -ddlbloop => boolean	# C<recForm> on list box choice change
 
 -rfd	=> boolean	# record file attachments widget
 
@@ -1114,7 +1140,7 @@ otherwise		# text field
 
 =item -inphtml
 
-	=> not exists || html text || sub{}({self},{field},edit,query,value) -> html
+	=> not exists || html text || sub{$_}({self},{field},edit,query,value) -> html
 
 (C<Field Description>)
 HTML presentation of field entry, use it together with C<-inp>.
@@ -1184,9 +1210,19 @@ See also C<-cmt>, C<-lblhtml>, C<-inp>, C<-inphtml>
 
 
 
+=item -lblhtbr
+
+	=> not exists || "\f" || '</table>' || true
+
+(C<Field Description>)
+Finish of form tabular layout between field label and value.
+See C<-field> for values possible.
+
+
+
 =item -lblhtml
 
-	=> not exists || html text || sub{}({self},{field},edit,query,value) -> html
+	=> not exists || html text || sub{$_}({self},{field},edit,query,value) -> html
 
 (C<Field Description>)
 HTML presentation of field label, use it together with C<-lbl>.
@@ -1197,13 +1233,13 @@ Sub{} will be evaluated to produce HTML string.
 =item -ldclass
 
 (C<Field Description>)
-List data ('<td>') HTML tag class
+List data ('<td>') HTML tag class - string or sub{$_}($self, cursor)
 
 
 =item -ldstyle
 
 (C<Field Description>)
-List data ('<td>') HTML tag style
+List data ('<td>') HTML tag style - string or sub{$_}($self, cursor)
 
 =item -ldprop
 
@@ -1298,7 +1334,7 @@ Logotype to display in the button bar
 
 =item -lsthtml
 
-	=> not exists || sub{}($self, cursor, [record]) -> HTML # local $_ =value
+	=> not exists || sub{$_}($self, cursor, [record]) -> HTML # local $_ =value
 
 (C<Field Description>)
 Conversion of field value to HTML in the list of records via C<cgiList>.
@@ -1585,37 +1621,15 @@ See also C<tvmReferences>, C<tfvReferences>.
 
 
 
-=item -recChg0A
-
-=item -recChg1A
-
-	=> not exists || sub{}($self, {UI command}, data {field => value})
-
-(C<User Interface>: C<Database Description>, C<Table Description>, C<Form Description> - all executed)
-
-Record changing triggers before ('0A') and after ('1A') record data actions.
-Called by C<User Interface>.
-
-C<-recChg0A> called after C<-recTrim0A>, C<recNew>, C<recRead> (in edit mode),
-and before any of
-C<recForm>, C<recIns>, C<recUpd>, C<recDel>.
-
-C<-recChg1A> called after C<recIns>, C<recUpd>.
-
-May be used to provide interactively computed values.
-See also C<-recChg0R>; C<-recForm0A>, C<-recForm0C>, C<-recForm1C>, C<-recForm1A>.
-
-
-
 =item -recChg0R
 
 	=> not exists || sub{}($self, {command}, new {field => value}, ? prev {field => value})
 
 (C<Database Description>, C<Table Description>, C<Form Description>; all executed)
-C<recIns> and C<recUpd> trigger before each row.
-Executed before C<-recIns0R> and C<-recUpd0R>.
-May be used to provide absolutely computed values.
-See also C<-recChg0A>.
+Record changing trigger before each row.
+Executed in C<recIns> and C<recUpd> before C<-recIns0R> and C<-recUpd0R>.
+May be used to provide absolutely computed values when record storing.
+See also C<-recEdt0R>.
 
 
 =item -recDel
@@ -1639,6 +1653,42 @@ C<recDel> operation UI implementation
 (C<Database Description>, C<Table Description>, C<Form Description>; all executed)
 C<recDel> triggers before command ('0C'), before each row ('0R'), after command ('1C').
 When record versioning, update triggers will be executed too, within.
+
+
+
+=item -recEdt0A
+
+=item -recEdt1A
+
+	=> not exists || sub{}($self, {UI command}, data {field => value})
+
+(C<User Interface>: C<Database Description>, C<Table Description>, C<Form Description> - all executed)
+
+Record editing triggers before ('0A') and after ('1A') record data actions.
+Called by C<User Interface>.
+
+C<-recEdt0A> called after C<-recTrim0A>, C<recNew>, C<recRead> (in edit mode),
+and before any of
+C<recForm>, C<recIns>, C<recUpd>, C<recDel>.
+
+C<-recEdt1A> called after C<recIns>, C<recUpd>.
+
+May be used to provide interactively computed values.
+See also C<-recChg0R>; C<-recForm0A>, C<-recForm0C>, C<-recForm1C>, C<-recForm1A>.
+
+
+
+=item -recEdt0R
+
+	=> not exists || sub{}($self, {command}, new {field => value}, ? prev {field => value})
+
+(C<Database Description>, C<Table Description>, C<Form Description>; all executed)
+Record editing trigger before each row.
+Executed after C<-recForm0R> and before C<-recChg0R>.
+May be used to translate values or provide absolutely computed values 
+during record editing or storing.
+See also C<-recChg0R>.
+
 
 
 =item -recForm
@@ -1693,8 +1743,8 @@ C<recForm> triggers before command ('0C'), row ('0R'), after command ('1C').
 C<-recForm0C> is executed starting any record data manipulation,
 before C<-recNew0C>, C<-recIns0C>, C<-recUpd0C>, C<-recDel0C>, C<-recRead0C>.
 
-C<-recForm0R> is executed when database record read, 
-before C<-recChg0R>, C<-recRead0R>, C<-recForm0C>.
+C<-recForm0R> is executed when database record read,
+before C<-recEdt0R>, C<-recChg0R>, C<-recRead0R>, C<-recForm0C>.
 
 C<-recForm1C> is executed ending any single-record data operation
 alike C<recNew>, C<recForm>, C<recIns>, C<recUpd>, C<recRead>;
@@ -1764,13 +1814,14 @@ C<recList> operation UI implementation
 C<recNew> operation UI implementation
 
 
+
 =item -recNew0C
 
-	=> not exists || sub{}($self, {command}, source {field => value})
+	=> not exists || sub{}($self, {command}, source {field => value}, sample {field => value})
 
 =item -recNew0R
 
-	=> not exists || sub{}($self, {command}, source {field => value}, sample {field => value})
+	=> not exists || sub{}($self, {command}, source {field => value})
 
 =item -recNew1C		
 
@@ -1779,7 +1830,8 @@ C<recNew> operation UI implementation
 (C<Database Description>, C<Table Description>, C<Form Description>; all executed)
 C<recNew> triggers before ('0') and after command ('1C').
 If key value available, a sample record will be fetched and provided to
-C<-recNew0R> trigger to add some field values from sample record.
+C<-recNew0C> trigger to add some field values from sample record.
+
 
 
 =item -recQBF
@@ -1979,6 +2031,23 @@ Serialisation level of database operation:
 Allows automatic C<setup> when C<main::DATA> last modify time later C<varStore>d
 
 
+=item -smtp
+
+	=> SMTP object, on demand
+
+=item -smtphost
+
+	=> SMTP server name or address
+
+=item -smtpdomain
+
+	=> default mail domain name
+
+(C<SubObjects>)
+SMTP mailing parameters for C<smtp> and C<smtpSend>.
+C<-smtphost> required, otherwise C<smtpSend> ignored.
+
+
 =item -subst
 
 	=> not exists || table or form name
@@ -2031,7 +2100,7 @@ See also C<-unflt>, C<-ugflt>.
 
 =item -ugadd
 
-	=> not exists || [group names] || {group name => alias,...} || sub{}() -> ... 
+	=> not exists || [group names] || {group name => alias,...} || sub{$_}() -> ... 
 
 (C<User Identification>)
 Additional user groups names.
@@ -2042,7 +2111,7 @@ Considered in C<ugroups> and C<uglist> default code.
 
 =item -ugflt
 
-	=> not exists || sub{}()
+	=> not exists || sub{$_}()
 
 (C<User Identification>)
 User groups filter sub{} to be evaluated against each group name in $_.
@@ -2070,7 +2139,7 @@ See C<unames>.
 
 =item -unflt
 
-	=> not exists || sub{}()
+	=> not exists || sub{$_}()
 
 (C<User Identification>)
 User names filter sub{} to be evaluated against each name in $_.
@@ -2686,7 +2755,7 @@ Data to be inserted may be given from
 prototype record via C<recRead>(-table=>name, -key=>{original C<recKey>}),
 or C<recSel> cursor.
 After all given values applied,
-C<-recForm0R>, C<-recChg0R>, C<-recIns0R>, C<-recInsID> triggers executed
+C<-recForm0R>, C<-recEdt0R>, <-recChg0R>, C<-recIns0R>, C<-recInsID> triggers executed
 and record is inserted into database.
 At last, <-recIns1R> and C<-recForm1C> triggers are executed.
 
@@ -2726,7 +2795,7 @@ C<-recForm0C> and C<-recNew0C> triggers are executed;
 C<-rvcInsBy> C<-rvcUpdBy>, C<-rvcInsWhen>, C<-rvcUpdWhen> fields are filled.
 Prototype's field values may be obtained via C<recRead>(-table=>name, -key=>{prototype C<recKey>}),
 but are not used instead of C<-recNew0R>.
-C<-recNew1C> and C<-recForm1C> triggers are executed at last.
+C<-recForm0R>, C<-recEdt0R>, C<-recNew1C>, C<-recForm1C> triggers are executed at last.
 The following calls may be C<recForm> and C<recIns>.
 
 
@@ -2877,6 +2946,46 @@ but C<set> smartly processes some options.
 C<Creation and Setup>.
 Reads and executes setup script from C<main::DATA> file handle.
 See examples source for details.
+
+
+
+=item smtp () -> SMTP connection object
+
+=item smtp (undef) -> close SMTP connection
+
+C<SubObjects>.
+Returns L<Net::SMTP|Net/SMTP> object, creates it if not exists in C<-smtp>.
+Uses C<-smtphost>.
+
+
+
+=item smtpSend (-option => value,...) -> sent
+
+C<SubObjects>.
+Sends SMTP mail message using C<smtp> connection 
+and C<-smtpdomain> default mail domain name.
+
+-sender => mail name, default is '-from' or current user.
+
+-from => alike '-sender', but used also to form message, default is '-sender' or current user.
+
+-recipient => mail names string or array ref, default is '-to'.
+
+-to => alike '-recipient', but used also to form message, optional.
+
+-subject => subject of message, optional, may be obtained via '-pout' and '-pcmd'.
+
+-data => message body, optional, may be obtained via '-pout'/'-pcmd', '-html' or '-text'.
+
+-pout => data of record to be formed to '-data' using '-pcmd' and C<cgiForm>.
+
+-pcmd => command options for '-pout' forming.
+I.e., within trigger, $_[0]->smtpSend(-to=>$_[2]->{mailto}, -pcmd=>$_[1], -pout=>$_[2])
+
+-html => message body option.
+
+-text => message body option.
+
 
 
 =item start (-option=>value,...) -> self object
@@ -3384,6 +3493,32 @@ another options may be implemented within script itself.
 =over
 
 
+=head2 2006-04-03 - Development Version 0.61
+
+
+=head2 2006-03-10-22
+
+Changed C<recNew>: filling from sample moved to C<-recNew0C> back,
+other triggers ordered usually:
+C<-recForm0R>, C<-recEdt0R>, C<-recNew0R>.
+
+New C<-recEdt0R>, 
+renamed C<-recChg0A> and C<recChg1A> -> C<-recEdt0A> and C<-recEdt1A>
+C<Triggers>.
+
+New C<-ddlbloop> C<Field Description>.
+
+New C<-ddlbmsab> C<Field Description>.
+
+New C<-lblhtbr> C<Field Description>.
+
+New C<smtpSend> method.
+
+Extended C<-ldclass>, C<-ldstyle>, C<-fhclass>, C<-fhstyle>, C<-fdclass>, C<-fdstyle> 
+- may be sub{$_} for conditional formatting.
+
+
+
 =head2 2006-02-17 - Development Version 0.60
 
 
@@ -3654,8 +3789,8 @@ bureaucracy and vertical functionary structures.
 
 =head1 AUTHOR
 
-Andrew V Makarow <makarow at mail.com>
-with aids of 
+Andrew V Makarow <makarow at mail.com>,
+thanks to 
 Anton Uemlyanin
 
 =cut

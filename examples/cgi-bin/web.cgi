@@ -3,7 +3,7 @@
 BEGIN {
 #push @INC, $1 .'sitel/lib' if !(grep /sitel/i, @INC) && ($INC[0] =~/(.+?[\\\/])lib$/i)
 }
-#$ENV{HTTP_ACCEPT_LANGUAGE} ='';
+$ENV{HTTP_ACCEPT_LANGUAGE} ='';
 my $wsdir =$^O eq 'MSWin32' ? Win32::GetFullPathName($0) : $0;
    $wsdir =~s/\\/\//g;
    $wsdir =	  $wsdir =~/^(\w:\/inetpub)\//i

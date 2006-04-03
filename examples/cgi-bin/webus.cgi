@@ -41,7 +41,9 @@ my $w =DBIx::Web->new(
 #,-rfa		=>0		# record file attachments (0==off, 1==default)
 #,-httpheader	=>{}		# http header arguments
 #,-htmlstart	=>{}		# html start arguments
-#,-setall	=>1		# full features - under development
+ ,-setall	=>1		# full features on
+#,-smtphost	=>'localhost'	# smtp mail server
+#,-smtpdomain	=>'localhost'	# smtp default domain
  );
 
 $w->set(
@@ -94,16 +96,22 @@ $w->set(
 			,-colspan=>3
 			 }
 		,$w->{-setall}
-		? {-fld=>'mailto'	# !!! unimplemented yet
+		? {-fld=>'mailto'
 			,-flg=>'euq'
 			,-ddlb=>sub{$_[0]->uglist({})}
+			,-ddlbtgt=>[[undef,undef,', ']]
+			,-ddlbmsab=>1
 			 }
 		: ()
-		,{-fld=>$w->tn('-rvcState')	# !!! colour
+		,{-fld=>$w->tn('-rvcState')
 			,-inp=>{-values=>['ok','edit','chk-out','deleted']
-				,-labels_ru=>{'ok'=>'завершено','edit'=>'редакт-е','deleted'=>'удалено'}}
+				,-labels_ru=>{'ok'=>'завершено','edit'=>'редакт-е','deleted'=>'удалено'}
+				# ,-loop=>1
+				}
 			,-flg=>'euql', -null=>undef
 			,-lhstyle=>'width: 5ex'
+			,-ldstyle=>sub{	/^(?:ok)$/
+					? '' : 'color: red; font-weight: bold'}
 			}, ''
 		,{-fld=>'subject'
 			,-flg=>'euqlm', -null=>undef
@@ -114,7 +122,7 @@ $w->set(
 		,"\f"
 		,{-fld=>'comment'
 			,-flg=>'eu'
-			,-lblhtml=>'<b>$_</b><br />'
+			,-lblhtml=>'' # '<b>$_</b><br />'
 			,-inp=>{-htmlopt=>1, -hrefs=>1, -arows=>5, -cols=>70}
 			}
 		,$w->tfsAll() # ,$w->tfdRFD(),$w->tfvVersions(),$w->tfvReferences()		
@@ -124,14 +132,21 @@ $w->set(
 		,-racWriter	=>[$w->tn('-rvcUpdBy'), $w->tn('-rvcInsBy'), 'prole']
 		,-ridRef	=>[qw(idrm comment)]
 		,-rfa		=>1
-		,-recNew0R	=>sub{	$_[2]->{'idrm'} =$_[3]->{'id'}||'';
+		,-recNew0C	=>sub{	$_[2]->{'idrm'} =$_[3]->{'id'}||'';
 					foreach my $n (qw(prole rrole)) {
 						$_[2]->{$n} =$_[3]->{$n} 
-							if $_[3]->{$n};
+							if !$_[2]->{$n} && $_[3]->{$n};
 						$_[0]->recLast($_[1],$_[2],['uuser'],[$n])
 							if !$_[2]->{$n};
 					}
-					$_[2]->{'status'} ='ok';
+					$_[2]->{'status'} ='ok' if !$_[2]->{'status'};
+				}
+		,-recChg0R	=>sub {
+				$_[0]->smtpSend(-to=>$_[2]->{mailto}
+						,-pout=>$_[2], -pcmd=>$_[1])
+					if $_[2]->{mailto}
+					&& ($_[2]->{$_[0]->tn('-rvcState')}
+						=~/^(?:ok|no|do|progress|deleted)$/);
 				}
 		,-query		=>{	 -keyord=>'-dall'
 					,-order=>'utime'
@@ -221,10 +236,11 @@ $w->set(
 			 }
 		,$w->{-setall}
 		?(''
-		 ,{-fld=>'mailto'	# !!! unimplemented yet
+		 ,{-fld=>'mailto'
 			,-flg=>'euq'
 			,-ddlb=>sub{$_[0]->uglist({})}
-			,-ddlbtgt=>[[undef,undef,',']]
+			,-ddlbtgt=>[[undef,undef,', ']]
+			,-ddlbmsab=>1
 			 }, ''
 		 ,{-fld=>'period'
 			,-flg=>'euq'
@@ -232,10 +248,13 @@ $w->set(
 			,-lbl_ru=>'ѕериод', -cmt_ru=>'ѕериодичность (г,м,д,ч) выполнени€ записи'
 			 })
 		: ()
-		,{-fld=>$w->tn('-rvcState')	# !!! colour
+		,{-fld=>$w->tn('-rvcState')
 			,-inp=>{-values=>$w->tn('-rvcAllState')}
 			,-flg=>'euql', -null=>undef
 			,-lhstyle=>'width: 5ex'
+			,-ldstyle=>sub{ # my $v=$_; $v && grep(/^$v$/, @{$_[0]->{-tn}->{-rvcFinState}})
+					/^(?:ok)$/
+					? '' : 'color: red; font-weight: bold'}
 			}, ''
 		,{-fld=>'stime'
 			,-flg=>'euq'
@@ -265,6 +284,7 @@ $w->set(
 		,{-fld=>'object'
 			,-flg=>'euql'
 			,-ddlb=>'gwoobj'	# sub{$_[0]->cgiQuery('gwoobj')}
+		#	,-ddlbloop=>1
 		#	,-form=>'gwo'
 			}
 		,$w->{-setall}
@@ -287,10 +307,11 @@ $w->set(
 			,-inp=>{-asize=>60}
 			,-colspan=>6
 			}
-		,"\f"
+		#,"\f"
 		,{-fld=>'comment'
 			,-flg=>'eu'
-			,-lblhtml=>'<b>$_</b><br />'
+			#,-lblhtml=>'<b>$_</b><br />'
+			,-lblhtbr =>"\f"
 			,-inp=>{-htmlopt=>1, -hrefs=>1, -arows=>5, -cols=>70}
 			}
 		,$w->tfsAll()
@@ -302,11 +323,11 @@ $w->set(
 		,-racWriter	=>[$w->tn('-rvcUpdBy'), $w->tn('-rvcInsBy'), 'puser', 'prole', 'auser', 'arole']
 		,-ridRef	=>[qw(idrm idpr comment)]
 		,-rfa		=>1
-		,-recNew0R	=>sub{
+		,-recNew0C	=>sub{
 				$_[2]->{'idrm'} =$_[3]->{'id'}||'';
 				foreach my $n (qw(puser prole auser arole rrole object)) {
 					$_[2]->{$n} =$_[3]->{$n}
-						if $_[3]->{$n};
+						if !$_[2]->{$n} && $_[3]->{$n}
 				}
 				foreach my $n (qw(puser auser)) {
 					$_[2]->{$n} =$_[0]->user()
@@ -314,16 +335,22 @@ $w->set(
 				}
 				$_[0]->recLast($_[1],$_[2],['auser'],['rrole'])
 					if !$_[2]->{'rrole'};
-				$_[2]->{'status'}='ok';
-				$_[2]->{'stime'} =$_[0]->strtime();
+				$_[2]->{'status'}='ok' if !$_[2]->{'status'};
 			}
-		,-recChg0A	=> sub{ # $_[0]->logRec('recChg0A',@_[1..$#_]);
+		,-recEdt0A	=> sub{ # $_[0]->logRec('recEdt0A',@_[1..$#_]);
 				if (	$_[1]->{-cmd} eq 'recNew'
 				||	$_[2]->{'puser__L'}
 				||	$_[2]->{'auser__L'}) {
 					$_[0]->recLast($_[1],$_[2],['puser'],['prole']);
 					$_[0]->recLast($_[1],$_[2],['auser'],['arole']);
 				}
+			}
+		,-recEdt0R	=> sub{ # $_[0]->logRec('recEdt0A',@_[1..$#_]);
+				$_[2]->{stime} =$_[2]->{ctime} || $_[0]->strtime()
+					if !$_[2]->{stime};
+				$_[2]->{etime} =$_[2]->{utime}
+					if !$_[2]->{etime}
+					|| ($_[3] && $_[3]->{utime} && ($_[2]->{etime} eq $_[3]->{utime}));
 				$_[2]->{stime} =(length($3) <3 ? "20$3" : $3) .'-' .$2 .'-' .$1 .$4
 					if $_[2]->{stime} 
 					&& $_[2]->{stime} =~/^(\d+)\.(\d+)\.(\d+)(.*)/;
@@ -334,11 +361,19 @@ $w->set(
 					= ($_[2]->{stime}, $_[2]->{etime})
 					if $_[2]->{etime}
 					&& $_[2]->{stime}
-					&& ($_[2]->{stime} gt $_[2]->{etime});					
+					&& ($_[2]->{stime} gt $_[2]->{etime});
 			}
+		,-recChg0R	=>sub {
+				$_[0]->smtpSend(-to=>$_[2]->{mailto}
+						,-pout=>$_[2], -pcmd=>$_[1])
+					if $_[2]->{mailto}
+					&& ($_[2]->{$_[0]->tn('-rvcState')}
+						=~/^(?:ok|no|do|progress|deleted)$/);
+				}
 		,-recUpd0R	=>sub {	# $_[0]->logRec('recUpd0R',@_[1..$#_]);
 				if ($_[2]->{period}
-				&&  ('ok' eq $_[2]->{$_[0]->tn('-rvcState')})){
+				&& ($_[2]->{$_[0]->tn('-rvcState')} =~/^(?:ok|no)/)
+				&& ($_[3]->{$_[0]->tn('-rvcState')} !~/^(?:ok|no)/)){
 					my $n ={%{$_[2]}};
 					$n->{stime}=$_[0]->strtime($_[0]->timeadd($_[0]->timestr($n->{stime}), split /,;\s/, $n->{period}))
 						if $n->{stime};
@@ -420,6 +455,7 @@ $w->set(
 				  ,-group	=>'object'
 				  ,-keyord	=>'-aall'
 					}
+		,-limit		=>1024*4
 		,-qhref		=>{-key=>['object'], -form=>'gwo', -cmd=>'recList'}
 		,-frmLsc	=>
 				[{-val=>'alphabetically'}
