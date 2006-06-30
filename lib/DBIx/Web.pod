@@ -245,7 +245,7 @@ C<dsdClone>, C<dsdMk>, C<dsdParse>;
 C<strtime>, C<timestr>, C<timeadd>;
 C<cptran>;
 C<dbiLikesc>, C<dbiQuote>;
-C<ishtml>, C<htmlEscape>, C<htmlUnescape>, C<urlEscape>, C<urlUnescape>, C<urlCat>, C<htlsTag>;
+C<ishtml>, C<htmlEscape>, C<htmlUnescape>, C<urlEscape>, C<urlUnescape>, C<urlCat>, C<urlCmd>, C<htlsTag>;
 C<xmlEscape>, C<xmlAttrEscape>, C<xmlTagEscape>, C<xmlUnescape>, C<xmlsTag>;
 
 
@@ -323,7 +323,7 @@ Some slots may appear at database level also.
 
 
 C<-table>, C<-form>;
-C<-lbl>, C<-cmt>, C<-expr>;
+C<-lbl>, C<-cmt>, C<-hide>, C<-expr>;
 C<-field> (C<Field Description>);
 C<-key>, C<-keycmp>, C<-wkey>, C<-urm>, C<-null>;
 C<-ixcnd>, C<-ixrec>;
@@ -338,8 +338,10 @@ C<-cgvXXX>)
 
 =item Field Description
 
-C<-field> C<Table/Form Description> slot contains array ref of field
-descriptions (hash refs) and formatting strings.
+C<-field> C<Table/Form Description> slot contains reference to array of 
+field descriptions.
+Ordinary field description is a hash ref with a keys listed below.
+Also may be used when display single record form sub{}s and layout markup strings.
 
 C<-fld>, C<-expr>, C<-lbl>, C<-cmt>;
 C<-flg>, C<-null>, C<-chk>, C<-edit>;
@@ -422,7 +424,7 @@ C<recCommit>, C<recRollback>;
 
 C<recNew>, C<recForm>, C<recIns>, C<recUpd>, C<recDel>;
 C<recSel>, C<recList>, C<recRead>, C<recQBF>;
-C<recLast>;
+C<recUtr>, C<recLast>;
 C<recFields>, C<recValues>, C<recData>, C<recKey>, C<recWKey>.
 
 See also C<Database Engines>.
@@ -453,12 +455,12 @@ C<-logo>, C<-icons>, C<-menuchs>, C<-menuchs1>, C<-frmLso>, C<-frmLsc>;
 C<-login>;
 C<-cgvXXX>;
 
-C<cgiRun>, C<cgiParse>, C<cgiQuery>; 
+C<cgiRun>, C<cgiParse>, C<cgiQuery> (and C<cgiQueryFv>); 
 C<urlAuth>, C<urlOpt>;
 C<psParse>, C<psEval>; 
 C<htmlStart>, C<htmlEnd>, C<htmlHidden>, C<htmlMenu>, 
 C<cgiForm> (and also C<htmlField>, C<cgiDDLB>, C<tfvVersions>, C<tfdRFD>, C<tfvReferences>),
-C<cgiList>, 
+C<cgiList> (and C<cgiLst>), 
 C<cgiFooter>.
 
 See also C<Perl Script Pages>, C<Templates>.
@@ -576,7 +578,7 @@ CGI object, if used, created and available via C<cgi> call
 
 =item -cgibus
 
-	=> not exists || CGI::Bus::tm file attachments path
+	=> not exists || sub{}($self) || CGI::Bus::tm file attachments path
 
 (C<Creation and Setup>)
 Switch to L<CGI::Bus::tm|CGI/Bus/tm> example applications behaviour,
@@ -711,6 +713,7 @@ Default behaviour is embedding values quoted as hinted via C<-flg> or analysed.
 
 (C<Field Description>)
 Drop-down list box with editable input and produced on button press selection list.
+C<cgiQuery> or C<cgiQueryFv> calls may be used inside sub{} providing cursor.
 See also C<-ddlbmult>, C<-ddlbtgt>
 
 
@@ -874,9 +877,14 @@ Form label ('th') HTML tag additional properties
 	=> {name => {attributes}} # deprecated
 
 (C<Table/Form Description> - C<Field Description>)
-Array ref contains field descriptions as a hash refs.
+Reference to array of field descriptions.
+Ordinary field description is a hash ref, see C<Field Description>.
+When display a single record form also may be used
+layout markup strings,
+text strings,
+sub{}routines.
 Text or result of sub{} evaluation will be outputted.
-Another type entries are tabular form layout hints:
+Tabular form layout hints:
 '' continues labels and fields in the current row,
 "\n" continues on next row(s),
 "\t" skips cell(s),
@@ -938,7 +946,10 @@ Flags of the field:
 
 	=> not exists || {form name => {form description} }
 
-	=> not exists || form name to display records || true
+	=> not exists	|| form name to display records 
+			|| [?form, ?command, ?key field] 
+			|| sub{$_}() -> url string || ['urlCmd' args]
+			|| false
 
 (C<Form Description>, C<User Interface>)
 User Interface forms descriptions.
@@ -1041,6 +1052,10 @@ Stamped by C<Database Operation> calls along with C<-file>.
 
 (C<Field Description>)
 Hide field condition.
+
+(C<Table/Form Description>)
+Hidden form sign.
+
 
 
 =item -hidel
@@ -1410,7 +1425,8 @@ Output sub{} to be used instead of 'print' by C<output> calls
 
 =item -path
 
-       => "$ENV{DOCUMENT_ROOT}/dbix-web" (see source code for more details)
+       => "$ENV{DOCUMENT_ROOT}/dbix-web"  (see source code for more details)
+       || "{-DocumentRoot|-ServerRoot}/dbix-web"
 
 (C<File Store>)
 Path to File Store.
@@ -2090,7 +2106,7 @@ See source code for default naming.
 
 =item -udflt
 
-	=> not exists || sub{}()
+	=> not exists || sub{$_}()
 
 (C<User Identification>)
 User domains filter sub{} to be evaluated against each domain name in $_.
@@ -2100,7 +2116,7 @@ See also C<-unflt>, C<-ugflt>.
 
 =item -ugadd
 
-	=> not exists || [group names] || {group name => alias,...} || sub{$_}() -> ... 
+	=> not exists || [group names] || {group name => alias,...} || sub{$_}($self) -> ... 
 
 (C<User Identification>)
 Additional user groups names.
@@ -2111,7 +2127,7 @@ Considered in C<ugroups> and C<uglist> default code.
 
 =item -ugflt
 
-	=> not exists || sub{$_}()
+	=> not exists || sub{$_}($self)
 
 (C<User Identification>)
 User groups filter sub{} to be evaluated against each group name in $_.
@@ -2121,7 +2137,7 @@ See also C<-unflt>.
 
 =item -ugroups
 
-	=> not exists || sub{} || [group names]
+	=> not exists || sub{}(ugroups args) || [group names]
 
 (C<User Identification>)
 User groups sub{} or [] value.
@@ -2139,7 +2155,7 @@ See C<unames>.
 
 =item -unflt
 
-	=> not exists || sub{$_}()
+	=> not exists || sub{$_}($self)
 
 (C<User Identification>)
 User names filter sub{} to be evaluated against each name in $_.
@@ -2149,7 +2165,7 @@ See also C<-ugflt>.
 
 =item -urf
 
-	=> "file://{-path}/dbix-web"
+	=> "file://{-path}/dbix-web" || sub{}($self) || '-path'
 
 (C<File Store>)
 Filesystem URL to File Store, see also C<-path>, C<-url>
@@ -2300,6 +2316,16 @@ C<-field> to use instead of C<-data>,
 and C<-display> to use instead of C<-flg> values of C<-field>.
 
 
+
+=item cgiLst (?-options, table / form name, ?{query})
+
+C<User Interface>.
+Simplified C<cgiQuery>/C<cgiLst> combination,
+may be called within C<Field Description> sub{}
+to embed list of records inside C<cgiForm>.
+
+
+
 =item cgiParse ()
 
 C<User Interface>.
@@ -2315,6 +2341,16 @@ C<User Interface>.
 Forms and starts query using C<recSel>. Returns cursor.
 Used by C<cgiRun>, with C<cgiList> follows.
 See C<Table/Form Description>, C<-query>, C<cgiList> and C<recSel> for query and list specifications.
+
+
+
+=item cgiQueryFv (table name || {command} ||false, field ||[field list], ?{command}) -> cursor
+
+C<User Interface>.
+Forms and starts query of field values.
+Alike C<cgiQuery>, but dynamically forms metadata needed.
+May be useful for C<-ddlb> sub{}s to avoid superfluous forms.
+
 
 
 =item cgiRun () -> success
@@ -2438,7 +2474,7 @@ Ends (commits) and cleans operation session or transaction C<start>ed.
 
 =item grep1 (list) -> first non-empty value
 
-=item grep1 (sub{}(), list) -> first non-empty result
+=item grep1 (sub{$_}(), list) -> first non-empty result
 
 C<Misc Data methods>.
 Returns the first non-empty value or true evaluation result.
@@ -2590,7 +2626,7 @@ Creates new DBIx::Web object. Calls C<initialize>(-option=>value,...).
 
 =item orarg (L<-X|perlfunc>, argument,...) -> first succeeded argument
 
-=item orarg (sub{}(), argument,...) -> first succeeded argument
+=item orarg (sub{$_}(), argument,...) -> first succeeded argument
 
 C<Misc Data methods>.
 The value of the first succeeded argument.
@@ -2707,7 +2743,11 @@ Obtains data field names and values from record manipulation hash ref.
 See also C<recFields>, C<recValues>, C<recKey>
 
 
-=item recDel (? -table => name, ? -form => name, ? -key => {original C<recKey>}, ? -where => 'condition') -> successful {command}
+=item recDel (? -table => name
+, ? -form => name
+, ? -key => {original C<recKey>}
+, ? -where => 'condition'
+) -> successful {command}
 
 C<Database Operation>.
 Deletes record(s) into database, under '-key' or '-where' conditions.
@@ -2724,7 +2764,11 @@ Lists field names from record manipulation hash ref.
 See also C<recValues>
 
 
-=item recForm (? -table => name, ? -form => name, ? (-data => {fieldname => value,..}) || (fieldname => value,..), ? -key => {original C<recKey>}) -> formed {field => value,...}
+=item recForm (? -table => name
+, ? -form => name
+, ? (-data => {fieldname => value,..}) || (fieldname => value,..)
+, ? -key => {original C<recKey>}
+) -> formed {field => value,...}
 
 C<Database Operation>.
 Recalculates record, new or existing in database.
@@ -2741,7 +2785,11 @@ Index entry will be deleted if undefined reference to hash of data values.
 Useful for C<-recIndex0R> trigger.
 
 
-=item recIns (? -table => name, ? -form => name, ? (-data => {fieldname => value,..}) || (fieldname => value,..), ? -key => {prototype C<recKey>}) -> successfully inserted {field => value,...}
+=item recIns (? -table => name
+, ? -form => name
+, ? (-data => {fieldname => value,..}) || (fieldname => value,..)
+, ? -key => {prototype C<recKey>}
+) -> successfully inserted {field => value,...}
 
 =item recIns (...? -from => C<recSel> cursor) -> successful {data}
 
@@ -2769,14 +2817,22 @@ Obtains Key fields names and values from record's data hash ref using C<-key>.
 See also C<recData>, C<recWKey>
 
 
-=item recLast (table name||command, data {field=>value,...}, lookup [field name,...],... target [field name,...] || sub{}(self, data) || undef) -> record {field=>value,...}
+=item recLast (table name ||{command} ||false
+, data {field=>value,...}
+, lookup [field name,...]
+,... target [field name,...] || sub{}(self, data) || undef
+) -> record {field=>value,...}
 
 C<Database Operation>.
 Reads newest record from database according to field names described and record data given.
 Attempts including lookup arguments from last.
 Supplies target with values fetched, returns record fetched.
-Useful for fetching default field values.
+Useful for fetching default field values within triggers.
 May be not implemented for non-sql C<Database Engines>.
+Command options used are 
+-table => table name, 
+-version => switch including versions of records, 
+-excl => switch excluding record given.
 
 
 =item recList () -> C<recSel>(@_)
@@ -2786,7 +2842,11 @@ Lists records from database.
 Passes all work to C<recSel> now, may be redesigned.
 
 
-=item recNew (? -table => name, ? -form => name, ? (-data => {fieldname => value,..}) || (fieldname => value,..), ? -key => {prototype C<recKey>}) -> successfully new {field => value,...}
+=item recNew (? -table => name
+, ? -form => name
+, ? (-data => {fieldname => value,..}) || (fieldname => value,..)
+, ? -key => {prototype C<recKey>}
+) -> successfully new {field => value,...}
 
 C<Database Operation>.
 Creates a new data record to be inserted into database.
@@ -2812,9 +2872,9 @@ implemented within C<cgiRun> and C<cgiForm>
 ? -key => {field name=>value,...},
 ? -where => 'condition',
 ? -optrec => false || true,
+? -test => false || true,
 ? -version => false || true
-) 
--> successfully read {fieldname => value,...}
+) -> successfully read {fieldname => value,...}
 
 C<Database Operation>.
 Reads single record from database using C<recSel>, 
@@ -2861,7 +2921,34 @@ methods are supported by cursor.
 See also C<-recSel0C>, C<recList>, C<recRead>.
 
 
-=item recUpd (? -table => name, ? -form => name, ? (-data => {fieldname => value,..}) || (fieldname => value,..), ? -key => {original C<recKey>}, ? -where => 'condition', ? -optrec => false ||true) -> successfully updated {field => value,...}
+
+=item recUtr (table name ||{command} ||false, field name, new value, old value)
+
+=item recUtr (..., [field names], [new values], [old values])
+
+=item recUtr (..., {source field => target field,...}, {new data}, {old data})
+
+=item recUtr (..., {source field => [new value, old value])
+
+=item recUtr (..., {new field => value}, {where field => value})
+
+C<Database Operation>.
+Translates values in actial records. Alike C<recUpd>, but without any triggers.
+To use within triggers.
+Command options used are 
+-table => table name,
+-version => switch including versions of records,
+-excl => switch excluding record given.
+
+
+=item recUpd (? -table => name
+, ? -form => name
+, ? (-data => {fieldname => value,..}) || (fieldname => value,..)
+, ? -key => {original C<recKey>}
+, ? -where => 'condition'
+, ? -optrec => false || true
+, ? -sel => false || true
+) -> successfully updated {field => value,...}
 
 C<Database Operation>.
 Updates record(s) into database, under '-key' or '-where' conditions.
@@ -3249,12 +3336,17 @@ URL to self script authenticated.
 
 =item urlCat (url, name=>value,...) -> escaped URL
 
+=item urlCmd (url, name=>value,...) -> escaped URL
+
 =item urlEscape (strings) -> escaped
 
 =item urlUnescape (string) -> unecaped
 
 C<Misc Data methods>.
 Escapes and unescapes to and from URL format.
+C<urlCat> only escapes and catenates arguments, 
+whereas C<urlCmd>
+replaces leading '-' with '_' in names and stringfies data structures with C<strdata>.
 See also C<htmlEscape>.
 
 
@@ -3491,6 +3583,21 @@ another options may be implemented within script itself.
 =head1 VERSION
 
 =over
+
+=head2 2006-05-04-17
+
+New C<cgiQueryFv>.
+
+New C<recUtr>.
+
+Changed C<-lsthtml> - called always within field border tags.
+
+New C<urlCmd>, C<cgiLst>.
+
+Extended C<-form> field description with sub{} and array ref values.
+
+Improved C<-hidel> behaviour.
+
 
 
 =head2 2006-04-03 - Development Version 0.61
