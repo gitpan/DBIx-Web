@@ -9,7 +9,7 @@ DESCRIPTION
     Based on DBI and DB_File data engines. Based on CGI for user interface.
 
 AUTHOR
-    Andrew V Makarow <makarow at mail.com> with aid of Anton Uemlyanin
+    Andrew V Makarow "makarow at mail.com", thanks to Anton Uemlyanin
 
 COPYRIGHT	
     This program is free software; you can redistribute it and/or modify 
@@ -43,4 +43,7 @@ HOW TO BUILD AND INSTALL
 	- chmod o+rw,g+rw,a+rw '-path'
 	- configure web server according to '-path' files.
 
-
+EXAMPLES MAY BE USEFUL
+	- remake of CGI::Bus examples of Groupware Organizer and Notes,
+          with CGI::Bus compatibility
+	- sample CMDB and Helpdesk application

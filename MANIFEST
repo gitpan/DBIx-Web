@@ -8,7 +8,8 @@ examples/cgi-bin/web.cgi
 examples/webus-sql.pl
 examples/cgi-bin/webus.cgi
 
+examples/cmdb-sql.pl
+examples/cgi-bin/cmdb.cgi
+
 lib/DBIx/Web.pm
 lib/DBIx/Web.pod
-
-

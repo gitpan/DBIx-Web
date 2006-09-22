@@ -1,7 +1,7 @@
 #!perl -w
 #http://localhost/cgi-bin/cgi-bus/webus.cgi
 BEGIN {
-#push @INC, $1 .'sitel/lib' if !(grep /sitel/i, @INC) && ($INC[0] =~/(.+?[\\\/])lib$/i);
+ push @INC, $1 .'sitel/lib' if !(grep /sitel/i, @INC) && ($INC[0] =~/(.+?[\\\/])lib$/i);
 }
 #$ENV{HTTP_ACCEPT_LANGUAGE} ='';
 my $wsdir =$^O eq 'MSWin32' ? Win32::GetFullPathName($0) : $0;
@@ -20,10 +20,11 @@ my $w =DBIx::Web->new(
   -title	=>'DBIx-WeBus'	# title of application
 #,-logo		=>'<img src="/icons/p.gif" border="0" />'
  ,-debug	=>2		# debug level
+#,-log          =>0             # logging
  ,-serial	=>2		# serial operation level
- ,-dbiarg	=>["DBI:mysql:cgibus","cgibus","d83nfmJR971Yv3gVI35"]
+ ,-dbiarg	=>["DBI:mysql:cgibus","cgibus","********"]
 #,-dbiph	=>1		# dbi placeholders usage
- ,-dbiACLike	=>'eq'		# dbi access control comparation, i.e. 'eq lc'
+ ,-dbiACLike	=>'eq'		# dbi access control comparation, i.e. 'eq lc', 'rlike'
  ,-keyqn	=>1		# key query null comparation
  ,-path		=>"$wsdir/dbix-web"	# datastore path
  ,-cgibus	=>"$wsdir/cgi-bus"	# legacy mode
@@ -35,6 +36,7 @@ my $w =DBIx::Web->new(
 #,-login	=>/cgi-bin/ntlm/# login URL
 #,-userln	=>0		# short local usernames (0==off, 1==default)
  ,-ugadd	=>['Everyone','Guests']		# additional user groups
+ ,-udisp	=>'gc'		# display comments as group names
 #,-rac		=>0		# record access control (0==off, 1==default)
 #,-racAdmRdr	=>''		# record access control admin reader
 #,-racAdmWtr	=>''		# record access control admin writer
@@ -66,6 +68,9 @@ $w->set(
 			}, ''
 		,{-fld=>$w->tn('-rvcInsWhen')
 			,-flg=>'q'
+			,-ldstyle=>'width: 20ex'
+                        ,-ldprop=>'nowrap=true'
+			,-lsthtml=>sub{/(?::\d\d)$/ ? $` : $_}
 			}, ''
 		,{-fld=>$w->tn('-rvcInsBy')
 			,-flg=>'q'
@@ -75,14 +80,26 @@ $w->set(
 			,-hide=>$w->tfoHide('id_')
 			},''
 		,{-fld=>$w->tn('-rvcUpdWhen')
-			,-flg=>'wql'
-			,-ldstyle=>'width: 25ex'
+			,-flg=>'wq'
+			,-ldstyle=>'width: 20ex'
 			,-ldprop=>'nowrap=true'
+			,-lsthtml=>sub{/(?::\d\d)$/ ? $` : $_}
 			},''
 		,{-fld=>$w->tn('-rvcUpdBy')
 			,-edit=>0
 			,-flg=>'wql'
 			,-lhstyle=>'width: 10ex'
+			}
+		,{-fld=>'otime'
+			,-flg=>'l', -hidel=>1
+			,-expr=> "CONCAT("
+				."IF(status IN('edit','progress','do'), '', ' ')"
+				.", utime)"
+			,-lbl=>'Execution', -cmt=>'Fulfilment ordering of records'
+			,-lbl_ru=>'Вып-е', -cmt_ru=>'Упорядочение записей по выполнению'
+			,-lhstyle=>'width: 20ex'
+			,-ldprop=>'nowrap=true'
+			,-lsthtml=>sub{/(?::\d\d)$/ ? $` : $_}
 			}
 		,{-fld=>'prole'
 			,-flg=>'euq'
@@ -94,6 +111,7 @@ $w->set(
 			,-flg=>'euq'
 			,-ddlb=>sub{$_[0]->uglist({})}
 			,-colspan=>3
+			,-fnhref=>sub{$_[0]->urlCmd('',-form=>'gwo',-key=>{'rrole'=>$_})}
 			 }
 		,$w->{-setall}
 		? {-fld=>'mailto'
@@ -148,13 +166,20 @@ $w->set(
 					&& ($_[2]->{$_[0]->tn('-rvcState')}
 						=~/^(?:ok|no|do|progress|deleted)$/);
 				}
-		,-query		=>{	 -keyord=>'-dall'
-					,-order=>'utime'
+		,-query		=>{	-display=>[qw(otime uuser status subject)]
 				#	,-frmLso=>['author','hierarchy']
+					,-frmLso=>['hierarchy']
+					,-order=>'otime'
+					,-keyord=>'-dall'
 					}
 		,-frmLsoAdd	=>
 				[['hierarchy',undef,{-qkeyadd=>{'idrm'=>undef}}]
 				]
+                ,-frmLsc        =>
+                                [{-val=>'otime',-cmd=>{}}
+                                ,{-val=>'utime'}
+                                ,{-val=>'ctime'}
+                                ]
 		,-dbd		=>'dbi'
 	}
   ,'gwo'=>{
@@ -175,14 +200,18 @@ $w->set(
 			}, ''
 		,{-fld=>$w->tn('-rvcInsWhen')
 			,-flg=>'q'
-			,-lhstyle=>'width: 25ex'
+			,-lhstyle=>'width: 20ex'
+			,-ldprop=>'nowrap=true'
+			,-lsthtml=>sub{/(?::\d\d)$/ ? $` : $_}
 			}, ''
 		,{-fld=>$w->tn('-rvcInsBy')
 			,-flg=>'q'
 			}, "\n\t\t"
 		,{-fld=>$w->tn('-rvcUpdWhen')
 			,-flg=>'wq'
-			,-lhstyle=>'width: 25ex'
+			,-lhstyle=>'width: 20ex'
+			,-ldprop=>'nowrap=true'
+			,-lsthtml=>sub{/(?::\d\d)$/ ? $` : $_}
 			},''
 		,{-fld=>$w->tn('-rvcUpdBy')
 			,-edit=>0
@@ -205,27 +234,27 @@ $w->set(
 			}
 		,{-fld=>'puser'
 			,-flg=>'euq'
+			,-ddlb=>sub{$_[0]->uglist('-ug',$_[0]->{-pdta}->{'prole'},{})}
 			,-ddlb=>sub{$_[0]->uglist({})}
-			#,-ddlb=>sub{$_[0]->uglist('-ug',$_[0]->{-pdta}->{'prole'},{})}
 			,-ddlbtgt=>[undef,['prole'],['auser'],['arole'],['rrole'],['mailto',undef,',']]
 			}, ''
 		,{-fld=>'prole'
 			,-flg=>'euq'
 			,-ddlb=>sub{$_[0]->uglist({})}
-			#,-ddlb=>sub{$_[0]->uglist('-g',$_[0]->{-pdta}->{'puser'},{})}
+			,-ddlb=>sub{$_[0]->uglist('-g',$_[0]->{-pdta}->{'puser'},{})}
 			,-ddlbtgt=>[undef,['puser'],['auser'],['arole'],['rrole'],['mailto',undef,',']]
 			,-colspan=>3
 			}
 		,{-fld=>'auser'
 			,-flg=>'euql'
+			,-ddlb=>sub{$_[0]->uglist('-ug',$_[0]->{-pdta}->{'arole'},{})}
 			,-ddlb=>sub{$_[0]->uglist({})}
-			#,-ddlb=>sub{$_[0]->uglist('-ug',$_[0]->{-pdta}->{'arole'},{})}
 			,-ddlbtgt=>[undef,['puser'],['prole'],['arole'],['rrole'],['mailto',undef,',']]
 			}, ''
 		,{-fld=>'arole'
 			,-flg=>'euql'
 			,-ddlb=>sub{$_[0]->uglist({})}
-			#,-ddlb=>sub{$_[0]->uglist('-g',$_[0]->{-pdta}->{'auser'},{})}
+			,-ddlb=>sub{$_[0]->uglist('-g',$_[0]->{-pdta}->{'auser'},{})}
 			,-ddlbtgt=>[undef,['puser'],['prole'],['auser'],['rrole'],['mailto',undef,',']]
 			,-colspan=>3
 			}
@@ -253,50 +282,77 @@ $w->set(
 			,-flg=>'euql', -null=>undef
 			,-lhstyle=>'width: 5ex'
 			,-ldstyle=>sub{ # my $v=$_; $v && grep(/^$v$/, @{$_[0]->{-tn}->{-rvcFinState}})
-					/^(?:ok)$/
-					? '' : 'color: red; font-weight: bold'}
+					$_[3]->{-a_t} =$_[0]->strtime() if !$_[3]->{-a_t};
+					(/^(?:ok)$/
+						? '' 
+						: /^(?:do|progress|edit|chk-out)$/ 
+							&& $_[3]->{-rec}->{etime}
+							&& ($_[3]->{-a_t} gt $_[3]->{-rec}->{etime})
+						? 'color: red; font-weight: bold; '
+						: 'color: brown; font-weight: bold;')
+					}
 			}, ''
 		,{-fld=>'stime'
 			,-flg=>'euq'
 			,-lbl=>'Start', -cmt=>'Start time of record described by'
 			,-lbl_ru=>'Начало', -cmt_ru=>'Дата и время начала описываемого записью'
-			,-lhstyle=>'width: 25ex'
+			,-lhstyle=>'width: 20ex'
+			,-ldprop=>'nowrap=true'
+			,-lsthtml=>sub{/(?::\d\d)$/ ? $` : $_}
 			 }, ''
 		,{-fld=>'etime'
 			,-flg=>'euq'
 			,-lbl=>'Finish', -cmt=>'Finish time of record described by'
 			,-lbl_ru=>'Заверш', -cmt_ru=>'Дата и время завершения описываемого записью'
-			,-ldstyle=>'width: 25ex'
+			,-ldstyle=>'width: 20ex'
 			,-ldprop=>'nowrap=true'
+			,-lsthtml=>sub{/(?::\d\d)$/ ? $` : $_}
 			 }
 		,{-fld=>'ftime'
-			,-flg=>'l', -hidel=>1
+			,-flg=>'f', -hidel=>1
 			,-expr=>'COALESCE(etime, utime)'
 			,-lbl=>'Final', -cmt=>'Finish or last updated time of record'
 			,-lbl_ru=>'Завершение', -cmt_ru=>'Дата-время завершения или последнего изменения записи'
-			,-ldstyle=>'width: 25ex'
+			,-ldstyle=>'width: 20ex'
 			,-ldprop=>'nowrap=true'
+			,-lsthtml=>sub{/(?::\d\d)$/ ? $` : $_}
 			 }
+		,{-fld=>'otime'
+			,-flg=>'l', -hidel=>1
+			,-expr=> "CONCAT("
+				."IF(status IN('edit','progress','do'), '', ' ')"
+				.", COALESCE(utime, etime))"
+			,-lbl=>'Execution', -cmt=>'Fulfilment ordering of records'
+			,-lbl_ru=>'Вып-е', -cmt_ru=>'Упорядочение записей по выполнению'
+			,-lhstyle=>'width: 20ex'
+			,-ldprop=>'nowrap=true'
+			,-lsthtml=>sub{/(?::\d\d)$/ ? $` : $_}
+                         }
 		,{-fld=>'record'
 			,-inp=>{-values=>['', qw(note log --- incident problem experim --- object query change upgrade install move delete serve --- draft paper manual --- msg contact address)]}
 			,-flg=>'euql'
 			}, ''
 		,{-fld=>'object'
 			,-flg=>'euql'
-			,-ddlb=>'gwoobj'	# sub{$_[0]->cgiQuery('gwoobj')}
+			,-ddlb=>sub{$_[0]->cgiQuery('gwoobj')}
+			,-ddlb=>'gwoobj'
+			,-ddlb=>sub{$_[0]->cgiQueryFv('','object')}
 		#	,-ddlbloop=>1
 		#	,-form=>'gwo'
+			,-fdstyle=>'font-size: larger'
 			}
 		,$w->{-setall}
 		?(''
 		 ,{-fld=>'doctype'
 			,-flg=>'euq'
 			,-ddlb=>'gwodoc'
+			,-fdstyle=>'font-size: larger'
 			}
 		 ,"\n\t\t"
 		 ,{-fld=>'project'
 			,-flg=>'euq'
 			,-ddlb=>'gwoprj'
+			,-fdstyle=>'font-size: larger'
 			}, ''
 		 ,{-fld=>'cost'
 			,-flg=>'euq'
@@ -306,11 +362,11 @@ $w->set(
 			,-flg=>'euqlm', -null=>undef
 			,-inp=>{-asize=>60}
 			,-colspan=>6
+			,-fdstyle=>'font-size: larger'
 			}
 		#,"\f"
 		,{-fld=>'comment'
 			,-flg=>'eu'
-			#,-lblhtml=>'<b>$_</b><br />'
 			,-lblhtbr =>"\f"
 			,-inp=>{-htmlopt=>1, -hrefs=>1, -arows=>5, -cols=>70}
 			}
@@ -387,26 +443,31 @@ $w->set(
 					sleep(1) if $_[0]->{-cgibus};
 				}
 			}
-		,-query		=>{-keyord=>'-dall'
-				, -order=>'ftime'
-				, -data=>[qw(ftime status auser arole object subject id)]
-				, -display=>[qw(ftime status object subject auser arole)]
+		,-query		=>{-display=>[qw(otime status object subject auser arole)]
+			#	, -data=>[qw(otime status auser arole object subject id)]
 			#	, -frmLso=>['author','hierarchy']
+			#	, -frmLso=>['actor']
+				, -order=>'otime'
+				, -keyord=>'-dall'
 				}
 		,-frmLsoAdd	=>
 				[{-val=>'hierarchy', -cmd=>{-qkeyadd=>{'idrm'=>undef}}}
 				]
 		,-frmLsc	=>
-				[{-val=>'ftime'}
+                                [{-val=>'otime',-cmd=>{}}
+                                ,['ftime',undef
+                                        ,sub {  $_[3]->{-order} ='ftime';
+						$_[3]->{-display}->[0] ='ftime'}]
 				,['utime',undef
 					,sub {	$_[3]->{-order} ='utime';
-						$_[3]->{-data}->[0] 
-						=$_[3]->{-display}->[0] ='utime'}]
+						$_[3]->{-display}->[0] ='utime'}]
 				,['ctime',undef
 					,sub {	$_[3]->{-order} ='ctime';
-						$_[3]->{-data}->[0] 
-						=$_[3]->{-display}->[0] ='ctime'}]
+						$_[3]->{-display}->[0] ='ctime'}]
 				]
+		#,-frmLso1C	=>sub {$_[0]->htmlMQH(-label=>'test',-qurole=>'author',-qkey=>{"status"=>['ok',{'record'=>'note'}]},-qorder=>'otime')
+		#			.'<br />' .($_[4]||'')
+		#			}
 		,-dbd		=>'dbi'
 	}
 	,!$w->{-cgibus} 
@@ -419,29 +480,35 @@ $w->set(
 	 'default'	=>{-subst=>'index'}
 	,$w->tvdIndex()
 	,$w->tvdFTQuery()
-	,1 ? ('noteshier'	=>{
-		 -lbl		=>'Notes hierarchy'
-		,-cmt		=>'Notes hierarchy'
-		,-lbl_ru	=>'Заметки - иерархически'
-		,-cmt_ru	=>'Иерархия записей заметок'
+	,'notesmy'	=>{
+		 -lbl		=>'Notes   my'
+		,-cmt		=>'My notes'
+		,-lbl_ru	=>'Заметки   мои'
+		,-cmt_ru	=>'Мои заметки'
 		,-table		=>'notes'
-		,-query		=>{-keyord=>'-dall'
-				  ,-key=>{'idrm'=>undef}
-				  ,-order=>'utime'}
-		#,-qfilter	=>sub{!$_[4]->{'idrm'}}
-		,-frmLsoAdd	=>undef
-		}) : ()
-	,1 ? ('gwohier'	=>{
-		 -lbl		=>'Organizer hierarchy'
-		,-cmt		=>'Groupware organizer hierarchy'
-		,-lbl_ru	=>'Органайзер - иерархически'
-		,-cmt_ru	=>'Иерархия записей органайзера'
+		,-query		=>{	-frmLso=>['hierarchy','actor']
+					}
+		}
+	,'gwomy'	=>{
+		 -lbl		=>'Organizer   my'
+		,-cmt		=>'My todos in organizer'
+		,-lbl_ru	=>'Органайзер   мой'
+		,-cmt_ru	=>'Мои дела в органайзере'
 		,-table		=>'gwo'
-		,-query		=>{-keyord=>'-dall'
-				  ,-key=>{'idrm'=>undef}
-				  ,-order=>'ftime'}
-		,-frmLsoAdd	=>undef
-		}) : ()
+		,-query		=>{	-frmLso=>['actor']
+					}
+		# ,-frmLsoAdd	=>undef
+		}
+	,'gwosel'	=>{
+		 -lbl		=>'Organizer selections'
+		,-cmt		=>'Groupware organizer classification via queries'
+		,-lbl_ru	=>'Органайзер - выборки'
+		,-cmt_ru	=>'Классификация записей органайзера средствами запросов'
+		,-table		=>'gwo'
+		,-query		=>{-where=>"gwo.record IN('query','object') OR gwo.comment LIKE '<where>\%'"
+				  ,-frmLso=>['hierarchy']
+					}
+		}
 	,'gwoobj'	=>{
 		 -lbl		=>'Organizer objects'
 		,-cmt		=>'Groupware organizer objects'
@@ -458,7 +525,7 @@ $w->set(
 		,-limit		=>1024*4
 		,-qhref		=>{-key=>['object'], -form=>'gwo', -cmd=>'recList'}
 		,-frmLsc	=>
-				[{-val=>'alphabetically'}
+				[{-val=>'alphabetically',-cmd=>{}}
 				,['utime',undef, {-order=>'utime',-keyord=>'-dall'}]
 				,['ctime',undef, {-order=>'ctime',-keyord=>'-dall'}]
 				]
@@ -479,7 +546,7 @@ $w->set(
 					}
 		,-qhref		=>{-key=>['doctype'], -form=>'gwo', -cmd=>'recList'}
 		,-frmLsc	=>
-				[{-val=>'alphabetically'}
+				[{-val=>'alphabetically',-cmd=>{}}
 				,['utime',undef, {-order=>'utime',-keyord=>'-dall'}]
 				,['ctime',undef, {-order=>'ctime',-keyord=>'-dall'}]
 				]
@@ -501,7 +568,7 @@ $w->set(
 					}
 		,-qhref		=>{-key=>['project'], -form=>'gwo', -cmd=>'recList'}
 		,-frmLsc	=>
-				[{-val=>'alphabetically'}
+				[{-val=>'alphabetically',-cmd=>{}}
 				,['utime',undef, {-order=>'utime',-keyord=>'-dall'}]
 				,['ctime',undef, {-order=>'ctime',-keyord=>'-dall'}]
 				]

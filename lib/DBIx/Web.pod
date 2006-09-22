@@ -241,7 +241,7 @@ C<lng>, C<lnghash>
 
 C<max>, C<min>, C<dwnext>, C<orarg>, C<grep1>;
 C<strpad>, C<strquot>; C<strdata>, C<strdatah>, C<datastr>;
-C<dsdClone>, C<dsdMk>, C<dsdParse>;
+C<dsdClone>, C<dsdMk>, C<dsdQuot>, C<dsdParse>;
 C<strtime>, C<timestr>, C<timeadd>;
 C<cptran>;
 C<dbiLikesc>, C<dbiQuote>;
@@ -287,12 +287,12 @@ C<smtpSend>
 
 C<-user>, C<-unames>, C<-ugroups>; 
 C<-AuthUserFile>, C<-AuthGroupFile>;
-C<-userln>, C<-usernt>;
+C<-userln>, C<-usernt>, C<-udisp>;
 C<-udflt>, C<-unflt>, C<-ugflt>, C<-ugadd>;
 
 C<user>, C<userln>, C<unames>, C<ugroups>, C<ugnames>, C<udisp>, C<uglist>;
 C<ugrexp>, C<ugmember>, C<uguest>, C<uadmrdr>, C<uadmwtr>, C<uadmin>;
-C<w32IISdpsn>, C<w32adhi>, C<w32agf>
+C<w32IISdpsn>, C<w32adhi>, C<w32agf>, C<w32user>, C<w32umail>
 
 
 =item Database Options
@@ -328,9 +328,9 @@ C<-field> (C<Field Description>);
 C<-key>, C<-keycmp>, C<-wkey>, C<-urm>, C<-null>;
 C<-ixcnd>, C<-ixrec>;
 C<-optrec>;
-C<-dbd>;
+C<-dbd>, C<-dbiACLike>;
 C<Triggers>;
-C<User Interface> (C<-cgcXXX>; C<-subst>, C<-recXXX>;
+C<User Interface> (C<-cgiRun0A>, C<-cgcXXX>; C<-subst>, C<-recXXX>;
 C<-query>, C<-frmLso>, C<-frmLsc>; 
 C<-qfilter>, C<-qhref>, C<-qhrcol>, C<-qfetch>, C<-limit>; 
 C<-cgvXXX>)
@@ -350,6 +350,7 @@ C<-lblhtml>, C<-lblhtbr>, C<-fhclass>, C<-fhstyle>, C<-fhprop>;
 C<-inp>, C<-inphtml>, C<-fdstyle>, C<-fdclass>, C<-fdprop>;
 C<-ddlb>, C<-ddlbmult>, C<-ddlbtgt>, C<-ddlbloop>, C<-ddlbmsab>;
 C<-form>;
+C<-fnhref>, C<-fnhtml>, C<-fvhref>;
 C<-lsthtml>, C<-lhclass>, C<-lhstyle>, C<-lhprop>, C<-ldclass>, C<-ldstyle>, C<-ldprop>
 
 
@@ -405,6 +406,7 @@ C<-end0>, C<-endh>, C<-end1>;
 
 C<Triggers Interface>;
 
+C<-cgiRun0A>;
 C<-recTrim0A>;
 C<-recForm0A>, C<-recForm0C>, C<-recForm0R>, C<-recForm1C>, C<-recForm1A>;
 C<-recEdt0A>, C<-recEdt0R>, C<-recChg0R>, C<-recEdt1A>;
@@ -423,7 +425,7 @@ C<start>, C<end>;
 C<recCommit>, C<recRollback>;
 
 C<recNew>, C<recForm>, C<recIns>, C<recUpd>, C<recDel>;
-C<recSel>, C<recList>, C<recRead>, C<recQBF>;
+C<recSel>, C<recList>, C<recUnion>, C<recRead>, C<recQBF>;
 C<recUtr>, C<recLast>;
 C<recFields>, C<recValues>, C<recData>, C<recKey>, C<recWKey>.
 
@@ -446,6 +448,7 @@ Start review with C<cgiRun>.
 C<Table/Form Description>;
 C<-pcmd>, C<-pdta>, C<-pout>;
 C<-form>;
+C<-cgiRun0A>,
 C<-cgcXXX>;
 C<-subst>,
 C<-recXXX> (C<-recNew>, C<-recForm>, C<-recIns>, C<-recUpd>, C<-recDel>, C<-recRead>, C<-recList>,...);
@@ -455,8 +458,8 @@ C<-logo>, C<-icons>, C<-menuchs>, C<-menuchs1>, C<-frmLso>, C<-frmLsc>;
 C<-login>;
 C<-cgvXXX>;
 
-C<cgiRun>, C<cgiParse>, C<cgiQuery> (and C<cgiQueryFv>); 
-C<urlAuth>, C<urlOpt>;
+C<cgiRun>, C<cgiParse>, C<cgiQuery> (and C<cgiQueryFv>, C<cgiSel>); 
+C<urlAuth>, C<urlOpt>, C<htmlMQH>;
 C<psParse>, C<psEval>; 
 C<htmlStart>, C<htmlEnd>, C<htmlHidden>, C<htmlMenu>, 
 C<cgiForm> (and also C<htmlField>, C<cgiDDLB>, C<tfvVersions>, C<tfdRFD>, C<tfvReferences>),
@@ -585,6 +588,17 @@ Switch to L<CGI::Bus::tm|CGI/Bus/tm> example applications behaviour,
 may be useful about redesign and migration.
 
 
+=item -cgiRun0A
+
+	=> not exists || sub{}($self, {command})
+
+(C<User Interface>: C<Database Description>, C<Table Description>, C<Form Description> - all executed)
+
+The first trigger executed before ('0A') 
+any C<User Interface> action as soon as possible by C<cgiRun>.
+Recommended only for modification of user interface specifications.
+
+
 =item -cgvXXX
 
 	=> not exists || sub{}($self, 'name', {metadata}, $s->{-pcmd}, $s->{-pdta}) || 'filename.psp' || 'perl filename'
@@ -678,7 +692,7 @@ DBI object, if used, created and available via C<dbi> call, using C<-dbiarg> to 
 
 	=> not exists || '' || rlike regexp ~* similar regexp_like like eq|=; lc; filter|sub
 
-(C<SubObjects>, C<Record level Access Control>)
+(C<SubObjects>, C<Table Description>, C<Record level Access Control>)
 DBI LIKE operation options for access control fields comparation.
 There may be MySQL 'rlike' or 'regexp' operator, 
 PostgreSQL '~*' operator, 
@@ -709,7 +723,7 @@ Default behaviour is embedding values quoted as hinted via C<-flg> or analysed.
 
 =item -ddlb
 
-	=> not exists || form name || sub{}(self, {field}) -> ddlb || [value,...[value=>labels],...] || {value=>label,..., value=>[labels],...} || cursor
+	=> not exists || form name || sub{$_}($self,{field},'eqp' mode,{record}) -> ddlb || [value,...[value=>labels],...] || {value=>label,..., value=>[labels],...} || cursor
 
 (C<Field Description>)
 Drop-down list box with editable input and produced on button press selection list.
@@ -772,7 +786,7 @@ C<set>(-die=>'core'||'perl'||'Module name') call sets also C<-warn>.
 
 =item -edit
 
-	=> not exists || sub{}({self},{field},edit,query,value) || boolean
+	=> not exists || sub{}($self,{field},'eqp' mode,value) || boolean
 
 (C<Field Description>)
 Editable field condition. Otherways field will be readonly.
@@ -828,17 +842,23 @@ Field name for application is explained as C<-fld>.
 
 =item -fdclass
 
+	=> not exists || string || sub{$_}($self,{field},'eqp' mode,{record}) -> string
+
 (C<Field Description>)
-Form data ('td') HTML tag class - string or sub{$_}($self, command, record)
+Form data ('td') HTML tag class(es)
 
 
 =item -fdstyle
 
+	=> not exists || string || sub{$_}($self,{field},'eqp' mode,{record}) -> string
+
 (C<Field Description>)
-Form data ('td') HTML tag style - string or sub{$_}($self, command, record)
+Form data ('td') HTML tag style
 
 
 =item -fdprop
+
+	=> not exists || HTML tag properties string
 
 (C<Field Description>)
 Form data ('td') HTML tag additional properties
@@ -854,17 +874,23 @@ Distinguish from C<-affected>
 
 =item -fhclass
 
+	=> not exists || string || sub{$_}($self,{field},'eqp' mode,{record}) -> string
+
 (C<Field Description>)
-Form label ('th') HTML tag class - string or sub{$_}($self, command, record)
+Form label ('th') HTML tag class(es)
 
 
 =item -fhstyle
 
+	=> not exists || string || sub{$_}($self,{field},'eqp' mode,{record}) -> string
+
 (C<Field Description>)
-Form label ('th') HTML tag style - string or sub{$_}($self, command, record)
+Form label ('th') HTML tag style
 
 
 =item -fhprop
+
+	=> not exists || HTML tag properties string
 
 (C<Field Description>)
 Form label ('th') HTML tag additional properties
@@ -919,9 +945,8 @@ Database field name or expression may be explained by C<-expr>.
 (C<Field Description>)
 Flags of the field:
 
-'a'll operation below, except 'h'yperlink, 'k'ey, 'w'key, quoting; default
-
-'h'yperlink hint
+'a'll operation below, except 'h'yperlink, 'k'ey, 'w'key, quoting, excluding; 
+default
 
 'k'ey - primary key, C<-key> preffered
 
@@ -933,13 +958,34 @@ Flags of the field:
 
 'm'andatory value
 
+'h'yperlink hint
+
 'q'uery form, may be used to form query condition
 
 'l'istable, may be used in lists of records
 
+'f'etchable alongside 'l'istables together with 'akwq'
+
 'n'umeric quoting
 
+'9' numeric quoting
+
 '"' string quoting
+
+'-' exclude implicitly
+
+
+=item -fnhref
+
+	=> not exists || sub{$_}($self,{field},'eqp' mode,{record}) -> URL
+
+=item -fnhtml
+
+	=> not exists || sub{$_}($self,{field},'eqp' mode,{record}) -> HTML
+
+(C<Field Description>)
+Form footnote URL or HTML to append to display of field.
+
 
 
 =item -form
@@ -961,7 +1007,8 @@ Form to display records by field value.
 =item -frmLsc
 
 	=> not exists
-	|| [{-val=>option, ? -lbl=>title
+	|| [	{-val => fieldname}
+		|| {-val=>option, ? -lbl=>title
 			, ? -cmd=> {'cgiList' options} 
 				|| sub{}(self, name, {metadata}, {query}, option)}
 		|| [option, ? title, ? {'cgiList' options} || sub{}],...]
@@ -993,23 +1040,23 @@ sorting and grouping orders (C<-order>, C<-group>).
 
 =item -frmLso1C
 
-	=> not exists || sub{}(self, name, meta, command, option, comment) -> html
+	=> not exists || sub{}(self, name, meta, command, menu comment) -> html
 
 =item -frmLso2C
 
-	=> not exists || sub{}(self, name, meta, command, option) -> html
+	=> not exists || sub{}(self, name, meta, command) -> html
 
 (C<Table/Form Description> - C<User Interface>)
 C<htmlMenu> form query options, default provided by C<cgiQuery>
 as C<-urole> C<recSel> clause.
 
-C<-frmLso0A> trigger may be used to change C<-pcmd> 
-emulating user defined query parameters.
-C<-frmLso0C> trigger may be used to modify immediate C<cgiSel> arguments.
+C<-frmLso0A> trigger will be called for each C<-frmLso> value and 
+may be used to change C<-pcmd> emulating user defined query parameters.
+C<-frmLso0C> trigger may be used to modify immediate arguments of Ñ<cgiQuery> issue.
 
 C<-frmLso1C> and C<-frmLso2C> triggers may be used to modify 
 C<htmlMenu> comment and C<cgiList> first column header.
-C<urlOpt> method may be useful.
+C<urlOpt> and C<htmlMQH> methods may be useful.
 
 
 =item -fsrdr
@@ -1046,9 +1093,18 @@ Record file attachments updatable sign.
 Stamped by C<Database Operation> calls along with C<-file>.
 
 
+=item -fvhref
+
+	=> not exists || false || sub{$_}($self,{field},'eqp' mode,{record}) -> URL
+
+(C<Field Description>)
+Form value URL to underline display of field.
+
+
+
 =item -hide
 
-	=> not exists || sub{$_}({self},{field},edit,query,value) || boolean
+	=> not exists || sub{$_}($self,{field},'eqp' mode,{record}) || boolean
 
 (C<Field Description>)
 Hide field condition.
@@ -1060,7 +1116,7 @@ Hidden form sign.
 
 =item -hidel
 
-	=> not exists || sub{$_}({self},{field},edit,query,value) || boolean
+	=> not exists || sub{$_}($self,{field},'eqp' mode,{record}) || boolean
 
 (C<Field Description>)
 Hide field condition with left shift of following layout.
@@ -1155,7 +1211,7 @@ otherwise		# text field
 
 =item -inphtml
 
-	=> not exists || html text || sub{$_}({self},{field},edit,query,value) -> html
+	=> not exists || html text || sub{$_}($self,{field},'eqp' mode,{record}) -> html
 
 (C<Field Description>)
 HTML presentation of field entry, use it together with C<-inp>.
@@ -1237,7 +1293,7 @@ See C<-field> for values possible.
 
 =item -lblhtml
 
-	=> not exists || html text || sub{$_}({self},{field},edit,query,value) -> html
+	=> not exists || html text || sub{$_}($self,{field},'eqp' mode,{record}) -> html
 
 (C<Field Description>)
 HTML presentation of field label, use it together with C<-lbl>.
@@ -1247,16 +1303,23 @@ Sub{} will be evaluated to produce HTML string.
 
 =item -ldclass
 
+	=> not exists || string || sub{$_}($self,, ?hyperlink, cursor, [record]) -> string
+
 (C<Field Description>)
-List data ('<td>') HTML tag class - string or sub{$_}($self, cursor)
+List data ('<td>') HTML tag class(es)
 
 
 =item -ldstyle
 
+	=> not exists || string || sub{$_}($self,, ?hyperlink, cursor, [record]) -> string
+
 (C<Field Description>)
-List data ('<td>') HTML tag style - string or sub{$_}($self, cursor)
+List data ('<td>') HTML tag style
+
 
 =item -ldprop
+
+	=> not exists || HTML tag properties string
 
 (C<Field Description>)
 List data ('<td>') HTML tag additional properties
@@ -1264,17 +1327,23 @@ List data ('<td>') HTML tag additional properties
 
 =item -lhclass
 
+	=> not exists || string
+
 (C<Field Description>)
 List heading ('<th>') HTML tag class
 
 
 =item -lhstyle
 
+	=> not exists || string
+
 (C<Field Description>)
 List heading ('<th>') HTML tag style
 
 
 =item -lhprop
+
+	=> not exists || HTML tag properties string
 
 (C<Field Description>)
 List heading ('<th>') HTML tag additional properties
@@ -1287,7 +1356,16 @@ List heading ('<th>') HTML tag additional properties
 (C<Database Options>, C<Table/Form Description>)
 Limit of rows to be retrieved from the database query result set.
 Distinguish from C<-affect>.
-See also C<-fetched>, C<-limited>.
+See also C<-limlb>, C<-fetched>, C<-limited>.
+
+
+=item -limlb
+
+	=> not exists (default -limit or greater then 512) || number
+
+(C<Database Options>, C<Table/Form Description>)
+Great limit of rows to be retrieved from the database query result set to listboxes.
+
 
 
 =item -limited
@@ -1349,7 +1427,7 @@ Logotype to display in the button bar
 
 =item -lsthtml
 
-	=> not exists || sub{$_}($self, cursor, [record]) -> HTML # local $_ =value
+	=> not exists || sub{$_}($self,, ?hyperlink, cursor, [record]) -> HTML string
 
 (C<Field Description>)
 Conversion of field value to HTML in the list of records via C<cgiList>.
@@ -1518,14 +1596,21 @@ C<-data> and C<-display> arrays of field names or C<-field>
 - for C<cgiQuery> and C<cgiList>
 instead of C<-field> C<-flg> values from C<-table> or C<-form>.
 
+C<-datainc> array of field names
+- to be included to C<-data> and useful with implicit C<-data>.
+
 C<-frmLso> value, array or sub
 - in C<cgiQuery> as default C<-frmLso> selection(s) 
-before C<-query>-&gt;{C<-urole>}.
+before C<-query>->{C<-urole>}.
 
 C<-qkey> and C<-qwhere> values or subs
 - as C<recQBF> defaults,
 because all C<-query> clauses may be overwritten via C<recQBF> 
 except C<-key> and C<-where> catenations.
+
+Note C<-frmLso>, C<-qkey>, C<-qwhere> considered as a
+default conditions will not be used when 
+some of C<-qkey>, C<-qwhere>, C<-qurole> specified in C<-pcmd> request.
 
 Consider also separate from C<-query> C<Table/Form Description>
 slots C<-qhref>, C<-qhrcol>, C<-qfetch>, C<-qfilter>
@@ -1732,11 +1817,11 @@ C<-recXXX> for particular substitutions.
 Record display triggers starting ('0A') or ending ('1A') any record edit or display action,
 except C<recDel> ending and C<recQBF>.
 Called by C<User Interface>,
-C<-recForm0A> after C<-recTrim0A> but before C<-recChg0A>,
-C<-recForm1A> after C<-recChg1A>.
+C<-recForm0A> after C<-recTrim0A> but before C<-recEdt0A>,
+C<-recForm1A> after C<-recEdt1A>.
 
 May be used to provide computed for display values.
-See also C<-recChg0A>, C<-recChg0R>, C<-recChg1A>; 
+See also C<-recEdt0A>, C<-recChg0R>, C<-recEdt1A>; 
 C<-recForm0C>, C<-recForm0R>, C<-recForm1C>.
 
 
@@ -1915,7 +2000,7 @@ C<recSel> before command trigger.
 The first trigger executed before ('0A') record data action
 by C<User Interface>
 to trim starting and ending spaces from field values
-before C<-recChg0A>.
+before C<-recEdt0A>.
 
 
 =item -recUpd
@@ -2112,6 +2197,17 @@ See source code for default naming.
 User domains filter sub{} to be evaluated against each domain name in $_.
 Considered in C<w32agf>.
 See also C<-unflt>, C<-ugflt>.
+
+
+=item -udisp
+
+	=> not exists || '+' || 'gc'
+	|| sub{}(self) -> {system => display name} 
+	|| sub{self, user} -> display name
+
+(C<User Identification>)
+C<udisp> operation mode or implementation.
+To extend ('+') C<udisp> to use 'c'omments as display names for 'g'roups.
 
 
 =item -ugadd
@@ -2341,7 +2437,7 @@ C<User Interface>.
 Forms and starts query using C<recSel>. Returns cursor.
 Used by C<cgiRun>, with C<cgiList> follows.
 See C<Table/Form Description>, C<-query>, C<cgiList> and C<recSel> for query and list specifications.
-
+See also C<cgiQueryFv> and C<cgiSel>.
 
 
 =item cgiQueryFv (table name || {command} ||false, field ||[field list], ?{command}) -> cursor
@@ -2376,6 +2472,15 @@ form and html footers.
 
 Also implements '-reindex' (run C<recReindex>(1)) and '-setup' (run C<setup>)
 service command line options, see also C<Command Line>.
+
+
+=item cgiSel ({name => value,...} || name => value,...) ->  -> cursor
+
+C<User Interface>.
+Alike C<recSel>, but using C<User Interface> specifications
+to produce cursor for C<cgiList>.
+Alike C<cgiQuery>, but without user dependent parameters and options.
+
 
 
 =item class () -> class name
@@ -2457,6 +2562,14 @@ C<Misc Data methods>.
 Restores data structure from stringified format of C<dsdMk> result.
 Uses L<Data::Dumper|Data/Dumper>.
 Alike C<datastr>.
+
+
+=item dsdQuot (?hash pairs delimiter, data structure) -> stringified data structure
+
+C<Misc Data methods>.
+Prettily stringifies a data structure, more prettily then C<dsdMk>.
+C<dsdParse> may be used to achieve data structure.
+See also C<strdata> and C<strquot>.
 
 
 =item dwnext (string, ? min length) -> next alphanumeric string value
@@ -2548,6 +2661,22 @@ Uses C<-pcmd>.
 C<User Interface>.
 Generates menu bar HTML to C<output> by C<cgiRun>
 Uses C<-pcmd>, C<-pdta>, C<-pout>.
+
+
+=item htmlMQH (-option=>value,...) -> menu query hyperlink html
+
+C<User Interface>.
+Generates menu bar styled hyperlink HTML with query options.
+Hyperlink will be highlited if current query matches options defined.
+May be used within C<-frmLso1C>.
+Display value may be defined using -label option for text or 
+immediate -html option.
+HTML hyperlink options: -title, -style, -class, -target.
+Query options: -qwhere, -qkey, -qurole, -quname, -qorder, -qkeyord.
+Query exclusion options: -xpar => 0 excluding 
+| 1 excluding some | 2 excluding all
+| -option name | [-option names];
+-xkey => -qkey key | [-qkey keys].
 
 
 =item htmlStart () -> http and html headers string
@@ -2845,7 +2974,8 @@ Passes all work to C<recSel> now, may be redesigned.
 =item recNew (? -table => name
 , ? -form => name
 , ? (-data => {fieldname => value,..}) || (fieldname => value,..)
-, ? -key => {prototype C<recKey>}
+, ? -key => {prototype key} || prototype key
+, ? -proto => {prototype field => value,...}
 ) -> successfully new {field => value,...}
 
 C<Database Operation>.
@@ -2853,7 +2983,8 @@ Creates a new data record to be inserted into database.
 Given field values are used to initiate new record's hash ref;
 C<-recForm0C> and C<-recNew0C> triggers are executed;
 C<-rvcInsBy> C<-rvcUpdBy>, C<-rvcInsWhen>, C<-rvcUpdWhen> fields are filled.
-Prototype's field values may be obtained via C<recRead>(-table=>name, -key=>{prototype C<recKey>}),
+Prototype's field values may be obtained 
+from '-proto' or via C<recRead>(-table=>name, -key=>{prototype key}),
 but are not used instead of C<-recNew0R>.
 C<-recForm0R>, C<-recEdt0R>, C<-recNew1C>, C<-recForm1C> triggers are executed at last.
 The following calls may be C<recForm> and C<recIns>.
@@ -2899,14 +3030,16 @@ See also C<recCommit>.
 
 
 =item recSel (
--table => 'from clause' || [table name, [table, alias], [table, alias, join],...],
+-table => 'FROM clause' || [table name, [table, alias], [table, alias, join],...],
+? -join[01] => 'left or right addition to FROM clause'
 ? -data => [field, [field => alias], {-fld => alias, -expr => formula,..},...],
 ? -key => {field name => value,...},
-? -where => 'where clause' || ['where clause',...],
+? -where => 'WHERE clause' || ['WHERE clause',...],
 ? -urole => 'author'||'authors'||'actors'||'principals'||'user'||'users',
 ? -uname => 'role username'
 ? -ftext => 'full-text search string',
 ? -version => false ||true,
+? -group => 'GROUP BY clause' || ['GROUP BY clause'...]
 ? -order => string || [field, [field => order],...],
 ? -keyord => -(a|f|d|b)(all|eq|ge|gt|le|lt),
 ? -filter=> sub{}(cursor, undef, {field=>value,...})
@@ -2919,6 +3052,23 @@ Cursor's slot C<-rfr> contains array ref with references to values in C<-rec> in
 At least C<fetch>, C<fetchrow_arrayref>, C<fetchrow_hashref>, C<finish>, C<close> 
 methods are supported by cursor.
 See also C<-recSel0C>, C<recList>, C<recRead>.
+
+
+
+=item recUnion (option=>value,... cursor||[array]||{hash},...) -> cursor
+
+C<Database Operation>.
+UNION operation at cursor level, may be used within C<-ddlb>, etc.
+Source cursors may be produced via C<recSel>, C<cgiQuery>, C<cgiQueryFv>, etc.
+Options available are:
+
+ -all	=> false (default)	|| true - not unique records
+ -asc	=> true	(default)	|| false - descending order
+ -lc	=> true	(default)	|| false - case insensitive ordering compare
+ -rl	=> false (default)	|| true - right to left fields compare
+ -rec	=> {...}	- last fetched values
+ -rfr	=> [...]	- last fetched values
+ NAME	=> [...]	- column names, default from first cursor listed
 
 
 
@@ -3270,17 +3420,21 @@ just C<ugmember>(C<-racAdmWtr>).
 C<User Identification>.
 Returns display name for user or group name given.
 Returns name given if cannot translate.
+See C<-udisp> to extend default behaviour.
 
 
-=item uglist (? '-ug<>', ? filter username || groupname || sub{}(self,name), ? container [] || {}) -> [user and group names]
+=item uglist (? '-ugdc<>', ? filter username || groupname || sub{}(self,name), ? container [] || {}) -> [user and group names]
 
 C<User Identification>.
 Returns user ('-u') and group ('-g') names 
 using filter given 
 in array ([]) or hash ({}) ref;
-'<>' option forces comment notation for hash ref.
+'<>' option forces comment notation for hash ref
+'d' is used for C<udisp>,
+'c' forms group comments to display names.
 Default is both ('-ug') in array ref ([]).
 Uses C<-AuthUserFile> and C<-AuthGroupFile>, or C<w32agf>.
+Considers C<-userln> and C<-usernt>.
 
 
 =item ugmember (group name strings or array refs) -> is current user a member?
@@ -3361,7 +3515,7 @@ Self URL using C<-pcmd> values with options given added / replaced.
 C<User Identification>.
 Returns name of the current user.
 Uses C<-user> sub{} or value.
-Translates 'domain\\user' form to 'user@domain'.
+Considers C<-userln> and C<-usernt>.
 
 
 =item userln () -> current user local name
@@ -3426,6 +3580,18 @@ C<User Identification>.
 Deimpersonation of authenticated user session on Microsoft IIS.
 See C<-w32IISdpsn>.
 See source for details and warnings.
+
+
+=item w32user (name) -> Win32 AD user Win32::OLE object
+
+C<User Identification>.
+Returns L<Win32::OLE|Win32/OLE> AD object for user name given.
+
+
+=item w32umail (name(s) string) -> email(s)
+
+C<User Identification>.
+Returns string of e-mail addresses for string of user names given.
 
 
 =item warn (message string) -> warning raise
@@ -3583,6 +3749,83 @@ another options may be implemented within script itself.
 =head1 VERSION
 
 =over
+
+
+=head2 2006-09-22 - Development Version 0.63
+
+
+=head2 2006-09-08
+
+
+New C<-proto> parameter for C<recNew>.
+Changed C<htmlMenu> to create a new record using hyperlink 
+and minimum inheritance from record current.
+
+New C<-datainc> parameter for C<-query>.
+
+Extended SQL generated with default field aliaces and table qualifiers.
+C<dbiSel> changed and corrected.
+
+New 'f' and '-' values for C<-flg> attribute of C<-field>.
+Reviewed usage of C<-flg>.
+
+New C<dsdQuot>.
+
+Changed C<cgiQuery>,C<dbiSel>,C<htmlMenu>,C<cgiForm> 
+to nest C<-qkey> hashes within arrays recursivelly: 
+-qkey=>{name=>value,... name=>[OR value,...{name=>AND value,...}]}
+
+Fixed C<ugnames>(name) using "local C<-userln>=undef"
+
+
+
+=head2 2006-08-04-24
+
+Changed C<-frmLso1C> specification from sub{}(self, name, meta, command, option, comment),
+corrected C<-frmLso2C> specifications from sub{}(self, name, meta, command, option).
+
+New C<htmlMQH>.
+
+Arranged C<cgiQuery>, C<cgiForm>, C<htmlHidden>, C<htmlMenu> handling
+C<-qkey>, C<-qwhere>, C<-urole> as defaults for user defined query arguments, 
+considering also C<-uname>, C<-frmLso>, C<-frmLsc>.
+
+Changed C<cgiQuery> - improved inheritance from table C<-query> parameters.
+
+New C<recUnion>.
+
+Fixed C<tfvReferences>: C<-flg>=>'l' not needed when C<-query>->{C<-data>/C<-display>}.
+
+Changed C<-ldclass>, C<-ldstyle>, C<-lsthtml> specs from sub{$_}($self,cursor,[record]).
+
+Changed C<-fdclass>, C<-fdstyle>, C<-fhclass>, C<-fhstyle> specs from sub{$_}($self,{command},{record}).
+
+Changed C<-ddlb> spec from sub{$_}($self, {field}).
+
+New C<-fnhtml>, C<-fnhref>, C<-fvhref>.
+
+Changed C<cgiQuery> query defaults usage:
+C<-query>{C<-frmLso>, C<-qwhere>, C<-qkey>} will not be used
+if C<-pcmd>{C<-qwhere>, C<-qkey>, C<-qurole>} specified.
+
+New C<-cgiRun0A>.
+
+New C<-udisp>.
+
+Added C<-dbiACLike> to C<Table Description>.
+
+New C<-limlb>.
+
+Fixed C<-ldprop> to work without C<-ldstyle>.
+
+Added C<-frmLsc> default C<-cmd> behaviour, required now C<-val> only.
+
+New C<w32umail>.
+
+
+
+=head2 2006-06-30 - Development Version 0.62
+
 
 =head2 2006-05-04-17
 
