@@ -1,0 +1,46 @@
+NAME
+    DBIx::Web - Active Web Database Layer
+
+DESCRIPTION
+    This is a database layer for Perl scripts, implementing triggers, record
+    versioning, access control at the record level, file attachments to
+    records, materialised views. There is a web user interface also.
+
+    Based on DBI and DB_File data engines. Based on CGI for user interface.
+
+AUTHOR
+    Andrew V Makarow <makarow at mail.com> with aid of Anton Uemlyanin
+
+COPYRIGHT	
+    This program is free software; you can redistribute it and/or modify 
+    it under the same terms as Perl itself.
+
+    Without specially written agreement prohibited using completely, 
+    partially or in ideas for impairing nature, wood and timber, mining, 
+    cosmic industries in Archangel region; Russian kgbists, bureaucracy 
+    and vertical functionary structures.
+	
+PREREQUISITES
+    Currently implemented and tested on Win32 Active Perl 5.6, Apache, IIS.
+
+HOW TO BUILD AND INSTALL
+
+    Type:
+	
+	perl Makefile.PL
+	make
+	make install
+    Or:
+	copy ./lib/DBIx/* into perl/site/lib/DBIx
+
+    See examples, which should be configured and installed manually:
+	- copy 'web.cgi' to 'cgi-bin' directory.
+	- edit 'web.cgi' source, set appropriate '-path', '-url', '-urf', 
+	  another settings.
+	- create '-icons' by downloading Apache icons if Microsoft IIS
+	- start 'web.cgi -setup'. File store path and 
+	  sample web server configuration will be created.
+	- chmod o+rw,g+rw,a+rw '-path'
+	- configure web server according to '-path' files.
+
+
