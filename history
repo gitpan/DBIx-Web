@@ -1,3 +1,26 @@
+# 2006-12-14 cgiForm/recQBF/URL: empty only one of qw(qkey qwhere qurole)
+# 2006-12-14 cgiDDLB() patched to obtain field label from form/table current
+# 2006-12-13 cgiForm/recQBF: added -frmLso, -frmLsc confitions
+# 2006-12-12 -qkey visited empty alike -qwhere and -qurole, changed:
+#		cgiParse()	# delete $c->{-qkey} if !%{$c->{-qkey}};
+#		htmlHid()	# ($_ !~/^(?:qwhere|qurole)$/))
+#		htmlMenu()	# $c->{-qkey} ||($om->{-query} && $om->{-query}->{-qkey})
+#		cgiQDflt()	# unless ($c->{-qkey}; $c->{-qkey} ? $c->{-qkey}
+# 2006-12-12 doc -print, -mail, -hist, -xml, -ui, -cmd, -cmg, -style, -frame, -login
+# 2006-12-11 provided recQBF(-qdisplay) experimental
+# 2006-12-09 htmlMenu() button urls expanded: frmCall, recXML
+# 2006-12-09 htmlMenu() button urls changed: recPrint, recXML, recHist
+# 2006-12-09 dbmSeek() corrected for array keys
+# 2006-12-09 new -rvcVerWhen, conditionally for ttoRVC() compatibility
+# 2006-12-05 ui: changes display implemented
+# 2006-12-05 new recHist(), strHTML(), strDiff()
+# 2006-12-03 started recHist(), strHTML(), strDiff()
+# 2006-11-29 new dbiConnect() with local DBI::ProxyServer autostart
+# 2006-11-28 collecting all "<script for=window event=onload>" with -jswload
+# 2006-11-22 new  -recChg0W, immediate before 'w'rite, after -recInsID, for smtpSend()
+# 2006-11-21 targeting bottom -> top frame
+# 2006-11-17 targeting header, form, menu, instead of individual hyperlinks
+# 2006-11-17 listing current hyperlink mark
 # 2006-11-03 rfdStamp() - TakeOwnership added
 # 2006-10-31 ugf_w32() correction in domain controller case
 # 2006-10-30 -usernt vals changed to undef, 0, 1, to translate '@' or '\\'

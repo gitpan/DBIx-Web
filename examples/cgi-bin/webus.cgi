@@ -166,7 +166,7 @@ $w->set(
 					}
 					$_[2]->{'status'} ='ok' if !$_[2]->{'status'};
 				}
-		,-recChg0R	=>sub {
+		,-recChg0W	=>sub {
 				$_[0]->smtpSend(-to=>$_[2]->{mailto}
 						,-pout=>$_[2], -pcmd=>$_[1])
 					if $_[2]->{mailto}
@@ -428,7 +428,7 @@ $w->set(
 					&& $_[2]->{stime}
 					&& ($_[2]->{stime} gt $_[2]->{etime});
 			}
-		,-recChg0R	=>sub {
+		,-recChg0W	=>sub {
 				$_[0]->smtpSend(-to=>$_[2]->{mailto}
 						,-pout=>$_[2], -pcmd=>$_[1])
 					if $_[2]->{mailto}

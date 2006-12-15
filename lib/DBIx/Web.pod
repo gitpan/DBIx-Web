@@ -49,6 +49,11 @@ too complex and surplus in architecture and setup.
 L<WODA|WODA> has a very interesting database metaphor, 
 but not many features.
 
+L<WIKI|WIKI>s are good in hypertext metaphor and records versioning,
+but may be without database records metaphor, 
+file attachments,
+access control at the record level.
+
 
 =head1 CONCEPTS
 
@@ -125,7 +130,7 @@ Or this may be considered as a kind of application servers?
 =item Database Engines
 
 Why sole engine should be core?
-There may be many data sources and several engines.
+Another data engines or sources may be interesting.
 
 
 =item WEB COLLABORATIVE TOOLS
@@ -148,7 +153,7 @@ Any case, this database has several disadvantages too:
 
 =item Effectiveness
 
-Triggers level implementation is not very efficient.
+Triggers level implementation is not very efficacious.
 
 One of the problems is repeating cursor loops in
 C<recUpd> (one for '0R' trigger and one inside C<dbiUpd>)
@@ -156,8 +161,8 @@ and C<recDel> (for '0R' trigger and C<dbiDel> or C<recUpd>).
 The last loop is always effectively implemented inside L<DBI|DBI> SQL databases,
 but for L<DB_File|DB_File>s it should be implemented implicitly inside 
 C<dbiUpd> or C<dbiDel>.
-To implement '1R' triggers inside C<recUpd> or C<recDel>, 
-and also for effectiveness of L<DB_File|DB_File>s, 
+To implement efficacious '1R' triggers inside C<recUpd> or C<recDel>, 
+and also for effectiveness of L<DB_File|DB_File>s,
 C<dbiUpd> and C<dbiDel> should not be oriented to the groups of rows,
 or there should be a fast additional single row oriented interface.
 Also C<recDel> should use a fast single row oriented interface of C<recUpd>.
@@ -366,7 +371,7 @@ C<-editable>
 =item Record level Version Control
 
 C<-rvcInsBy>, C<-rvcInsWhen>, C<-rvcUpdBy>, C<-rvcUpdWhen>,
-C<-rvcActPtr>, C<-rvcChgState>, C<-rvcCkoState>, C<-rvcDelState>.
+C<-rvcActPtr>, C<-rvcVerWhen>, C<-rvcChgState>, C<-rvcCkoState>, C<-rvcDelState>.
 
 See also C<ttoRVC>
 
@@ -410,7 +415,7 @@ C<Triggers Interface>;
 C<-cgiRun0A>;
 C<-recTrim0A>;
 C<-recForm0A>, C<-recForm0C>, C<-recForm0R>, C<-recForm1C>, C<-recForm1A>;
-C<-recEdt0A>, C<-recEdt0R>, C<-recChg0R>, C<-recEdt1A>;
+C<-recEdt0A>, C<-recEdt0R>, C<-recChg0R>, C<-recChg0W>, C<-recEdt1A>;
 C<-recNew0C>, C<-recNew0R>, C<-recNew1C>;
 C<-recIns0C>, C<-recIns0R>, C<-recInsID>, C<-recIns1R>, C<-recIns1C>;
 C<-recUpd0C>, C<-recUpd0R>, C<-recUpd1C>;
@@ -710,7 +715,11 @@ Default operation depends on database driver name.
 	=> not exists || 'arguments' || [arguments]
 
 (C<SubObjects>)
-DBI connection arguments string or array, used in C<dbi> call
+DBI connection arguments string or array, used in C<dbi> call.
+Started with 'DBI:Proxy:hostname=127.0.0.1...' connection string
+starts L<DBI::ProxyServer|DBI/ProxyServer> process if not found connecting,
+i.e. 'dbi:Proxy:hostname=127.0.0.1;port=3334;proxy_no_finish=1;dsn=DBI:mysql:...'.
+
 
 
 =item -dbiph
@@ -1766,7 +1775,21 @@ See also C<tvmReferences>, C<tfvReferences>.
 Record changing trigger before each row.
 Executed in C<recIns> and C<recUpd> before C<-recIns0R> and C<-recUpd0R>.
 May be used to provide absolutely computed values when record storing.
-See also C<-recEdt0R>.
+See also C<-recChg0W>, C<-recEdt0R>.
+
+
+
+=item -recChg0W
+
+	=> not exists || sub{}($self, {command}, new {field => value}, ? prev {field => value})
+
+(C<Database Description>, C<Table Description>, C<Form Description>; all executed)
+Record changing trigger before each row written.
+Executed immediatelly before writing record to database, 
+in C<recIns> and C<recUpd>, after C<-recChg0R>, C<-recIns0R>, C<-recUpd0R>, C<-recInsID>.
+May be used when key generated for new record needded, i.e. for C<smtpSend>.
+See also C<-recChg0R>, C<-recEdt0R>.
+
 
 
 =item -recDel
@@ -2149,6 +2172,16 @@ Field to store name of user record updated.
 
 (C<Database Description>, C<Table/Form Description> - C<Record level Version Control>)
 Field for time record updated when
+
+
+=item -rvcVerWhen
+
+	=> not exists || 'field name'	
+
+(C<Database Description>, C<Table/Form Description> - C<Record level Version Control>)
+Field for time version record written when.
+To keep the end of actuality period of version record started with C<-rvcUpdWhen>.
+C<recUpd> fills this field with C<-rvcUpdWhen> of actual record when recording its old version.
 
 
 =item -serial
@@ -2994,8 +3027,8 @@ Data to be inserted may be given from
 prototype record via C<recRead>(-table=>name, -key=>{original C<recKey>}),
 or C<recSel> cursor.
 After all given values applied,
-C<-recForm0R>, C<-recEdt0R>, <-recChg0R>, C<-recIns0R>, C<-recInsID> triggers executed
-and record is inserted into database.
+C<-recForm0R>, C<-recEdt0R>, <-recChg0R>, C<-recIns0R>, C<-recInsID>, C<-recChg0W>
+triggers executed and record is inserted into database.
 At last, <-recIns1R> and C<-recForm1C> triggers are executed.
 
 See also C<recNew> and C<recForm>, but they are not required to prepare data to be inserted.
@@ -3167,7 +3200,7 @@ Updates record(s) into database, under '-key' or '-where' conditions.
 With '-optrec', record will be inserted if not present.
 Returns record updated if one only, or data hash ref if zero or more then one record updated.
 See also C<-recForm0C>, C<-recUpd0C>, C<-recForm0R>, C<-recChg0R>, 
-C<-recUpd0R>, C<-recUpd1C>, C<-recForm1C> triggers.
+C<-recUpd0R>, C<-recChg0W>, C<-recUpd1C>, C<-recForm1C> triggers.
 
 
 =item recValues ({-keyword ||fieldname => value,...}) -> field values
@@ -3308,6 +3341,24 @@ Use C<datastr> to restore data structure from string.
 
 C<Misc Data methods>.
 Stringifies hash, see C<strdata> also.
+
+
+=item strDiff (-opt, string1, string2) -> stringified diff
+
+C<Misc Data methods>.
+Stringified difference of strings given.
+Uses L<Algorithm::Diff|Algorithm/Diff>::sdiff(arg1, arg2).
+Options: 
+'h'tml conversion if C<ishtml>;
+'w'ords, 'r'ows, 's'entences input break;
+'b'rief, 'p'lain output.
+
+
+=item strHTML (html) -> pure text
+
+C<Misc Data methods>.
+Stringifies HTML to pure text.
+
 
 
 =item strpad (string, ?pad char, ?min length) -> left padded string
@@ -3762,21 +3813,53 @@ Common trigger sub{} arguments are
 ($self, {command}, {new field => value}, {prev field => value})
 
 Previous values are available only in 'by-row' triggers for existed records.
-Special additional command attributes may be: 
+Special additional parameters of command may be: 
 
 -cmd	=> command or method name,
 
--cmdf	=> form metadata, 
-
--cmdt	=> table metadata;
-
-and from C<User Interface>:
+-table	=> table name,
 
 -form	=> form name,
 
--ui => user interactive sign (C<-pcmd>, C<-pdta>, C<-pout> may be looked),
+-cmdf	=> form metadata, 
 
--edit => editing sign.
+-cmdt	=> table metadata,
+
+and see also below C<User Interface Command Parameters>:
+
+
+=back
+
+
+=head1 User Interface Command Parameters
+
+=over
+
+=item User Interface Command Parameters
+
+C<User Interface> introduces additions to special parameters of C<-pcmd>
+mentioned in C<Triggers Interface>.
+Also, some of parameters may be used within URLs replacing leading '-' with '_'.
+
+-cmg	=> enclosing (global) command name,
+
+-ui	=> user interactive sign (C<-pcmd>, C<-pdta>, C<-pout> may be looked),
+
+-edit	=> editing sign,
+
+-print	=> printable presentation,
+
+-mail	=> e-mailing presentation,
+
+-hist	=> historical changes presentation,
+
+-xml	=> XML presentation,
+
+-style	=> stylesheet to use,
+
+-frame	=> target frame to use ('set' special value produces 'TOP'/'BOTTOM' frameset),
+
+-login	=> perform login
 
 
 =back
@@ -3788,12 +3871,13 @@ and from C<User Interface>:
 
 =item Perl Script Pages
 
-This is HTML (may be XML?) files with embedded Perl code.
+This is HTML files with embedded Perl code.
 This may be CGI scripts with HTML following '__END__'.
 There is simplest and shortest implementation.
 
 C<psParse> method translates perl script string into perl source;
 '@_' will contain application object, options, filename, base URL, additional args.
+
 C<psEval> method executes perl script file by parsing, compiling into sub{}, evaluating.
 
 
@@ -3823,6 +3907,27 @@ another options may be implemented within script itself.
 =head1 VERSION
 
 =over
+
+=head2 2006-12-15 - Development Version 0.65
+
+
+=head2 2006-11-16 - 12-14
+
+New C<-rvcVerWhen>, conditionally for C<ttoRVC> compatibility.
+
+Some corrections of JavaScript for Mozilla/Firefox.
+
+Added record changes display, using L<Algorithm::Diff|Algorithm/Diff>.
+
+New C<strDiff>, C<strHTML>.
+
+Extended C<-dbiarg> with 'DBI:Proxy:hostname=127.0.0.1...' case.
+
+New C<-recChg0W>.
+
+Improved frameset behaviour.
+
+
 
 =head2 2006-11-05 - Development Version 0.64
 

@@ -1223,7 +1223,7 @@ $w->set(
 				$_[0]->die('Not configured process')
 			}
 			}
-		,-recChg0R	=>sub {
+		,-recChg0W	=>sub {
 				$_[0]->smtpSend(-to=>$_[2]->{mailto}
 						,-pout=>$_[2], -pcmd=>$_[1])
 					if $_[2]->{mailto}
@@ -1356,7 +1356,7 @@ $w->set(
 
 #$w->set(-index=>1);
 #$w->set(-setup=>1);
-$w->cgiRun() if ((caller())[1]) !~/migr/;
+$w->cgiRun();
 
 ##############################
 
@@ -1503,9 +1503,9 @@ sub a_hdesk_stbar {
 				? ', ^' .($acn->{$avp->{$k}->{severity}} ||$avp->{$k}->{severity}) 
 				: '')
 		, $k eq 'auser' 
-		? (-qwhere=>$s->dbi->quote($s->user) .' IN(auser,puser)')
+		? (-qwhere=>$s->dbi->quote($s->user) .' IN(hdesk.auser,hdesk.puser)')
 		: $k eq 'auser+'
-		? (-qwhere=>$s->dbi->quote($s->user) .' IN(auser,puser,cuser,uuser)')
+		? (-qwhere=>$s->dbi->quote($s->user) .' IN(hdesk.auser,hdesk.puser,hdesk.cuser,hdesk.uuser)')
 		: (-frmLso=>'actor', -quname=>$avp->{$k}->{auser})
 		,-urm=>$avp->{$k}->{utime} ||''
 		,-style=>'background-color: '

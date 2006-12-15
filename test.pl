@@ -1,7 +1,7 @@
 #!perl -w
 use strict;
 use Test;
-BEGIN { plan tests => 18 }
+BEGIN { plan tests => 19 }
 
 if (1) {
    print "\nRequired modules:\n";
@@ -15,7 +15,8 @@ if (1) {
    print "\nOptional modules, dependent on features used:\n";
    foreach my $m ('Apache'
    , 'DBI'
-   , 'DB_File') {
+   , 'DB_File'
+   , 'Algorithm::Diff') {
      print "use $m\t";
      skip(!eval("use $m; 1"), 1);
    }
