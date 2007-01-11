@@ -1,3 +1,31 @@
+# 2007-01-08 trURLtxt(): new BracketName [[url]] and [[url|label]] notations
+# 2007-01-08 trURLtxt(), trURLhtm(): new 'key://' special URL protocol
+# 2007-01-08 recHist() file attachments arrangement corrected using mtime
+# 2007-01-07 tfdRFD()  corr: rfdPath(-xxx=>$s->{-pout}->{-file}) # rfdPath(-xxx=>$s->{-pcmd}, $s->{-pout})
+# 2007-01-07 htmlRFD() corr: rfdPath(-xxx=>$c, $d) -> rfdPath(-xxx=>$d->{-file})
+# 2007-01-07 recIns(), recUpd(): rfdStamp() applies utime(last editable) to directory
+# 2007-01-07 osCmd() corrested: 'problematic programs' for perlis.dll only
+# 2007-01-07 recUpd() corrected: rfdStamp('+') added for prev ver backup
+# 2006-12-27 changed xmlTagEscape() - '&' escaped
+# 2006-12-22 new htmlRFDimg() - to display icons for file attachments
+# 2006-12-22 changed htmlRFD() - sorted files list
+# 2006-12-22 new pthGlobns()
+# 2006-12-22 chaged cgi(): no warnings; $_[0]->{-cgi} =eval('CGI->new')
+# 	# Use of uninitialized value in hash element at C:/B/Perl/lib/CGI.pm line 547.
+#	#	# sub parse_params {
+#	# 547	# push (@{$self->{$param}}, $value);
+#	#	# == $param undefined ==
+#	#	# $SIG{__WARN__} =sub {print $_[0], ' ', join(' ',caller(0))};
+#	#	# ------ sub new { ... sub init { ... $self->parse_params($query_string);
+# 2006-12-21 pending -wikn: URL parsing
+# 2006-12-21 removed urlCGBtr(), new trURLtxt(), trURLhtm(), trURLhref()
+# 2006-12-19 pending -wikn: code experimenting
+# 2006-12-19 addition cgiAction(): $oc->{-key} =$s->recKey($oc->{-table}, $s->{-pout}) if $oa =~/^rec(?:Read)/
+# 2006-12-19 changed htmlRFD(): href file names not escaped
+# 2006-12-19 <html xmlns="http://www.w3.org/1999/xhtml" lang="ru-RU">
+# 2006-12-19 <html xmlns="http://www.w3.org/1999/xhtml" lang="lang()">
+# 2006-12-19 new lang() based on application's language, instead of lng() on user's
+# 2006-12-16 'local' not needed for '$a->{-cmd}...' within recNew, recForm, recIns, recUpd, recDel, recSel, recRead, recHist
 # 2006-12-14 cgiForm/recQBF/URL: empty only one of qw(qkey qwhere qurole)
 # 2006-12-14 cgiDDLB() patched to obtain field label from form/table current
 # 2006-12-13 cgiForm/recQBF: added -frmLso, -frmLsc confitions

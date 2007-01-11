@@ -135,11 +135,11 @@ Another data engines or sources may be interesting.
 
 =item WEB COLLABORATIVE TOOLS
 
-Alike Wiki, have several disadvantages:
-
-Forms, views and queries may be added without metaphor changes,
-but implementation changes may be great.
-And what about file attachments?
+Alike Wikis, may include 
+record level access control, file attachments, forms, views and queries,
+may progress towards database metaphor.
+But transition from from initial hypertext metaphor to database
+may require a great effort in implementation.
 
 
 =item THIS DATABASE
@@ -305,7 +305,7 @@ C<w32IISdpsn>, C<w32adhi>, C<w32user>, C<w32umail>;
 
 C<-serial>, C<-autocommit>, 
 C<-limit>, C<-affect>, C<-affected>, C<-fetched>, C<-limited>,
-C<-host>, C<-recInsID>, C<-idsplit>
+C<-host>, C<-recInsID>, C<-idsplit>, C<-wikn>
 
 
 =item Database Description
@@ -331,7 +331,7 @@ Some slots may appear at database level also.
 C<-table>, C<-form>;
 C<-lbl>, C<-cmt>, C<-hide>, C<-expr>;
 C<-field> (C<Field Description>);
-C<-key>, C<-keycmp>, C<-wkey>, C<-urm>, C<-null>;
+C<-key>, C<-keycmp>, C<-wkey>, C<-wikn>, C<-urm>, C<-null>;
 C<-ixcnd>, C<-ixrec>;
 C<-optrec>;
 C<-dbd>, C<-dbiACLike>;
@@ -1196,7 +1196,15 @@ not exists		# text field
 
 -htmlopt=> boolean	# html may be, determined via C<ishtml>
 
--hrefs	=> boolean	# hyperlinks, including 'urlh://' for host relative, 'urlr://' for script relative, 'urlf://' for record file attachments directory relative URLs
+-hrefs	=> boolean	# hyperlinks highlight, including special protocol values:
+
+			# 'urlh://' - host relative, 
+			# 'urlr://' - script relative, 
+			# 'urlf://' - record file attachments directory,
+			# 'key://'  - reference to record: id or table//id,
+			# 'wikn://' - reference to record: wiki name (see '-wikn')
+			#	And bracket notations:
+			# [[xxx://...]], [[xxx://...][label]], [[xxx://...|label]]
 
 -cols	=> number	# text area
 
@@ -1212,7 +1220,7 @@ not exists		# text field
 
 -values	=> sub{}(self) ||[value,...]		# list box, optional if '-labels'
 
--loop   => boolean  or  -ddlbloop => boolean	# C<recForm> on list box choice change
+-loop   => boolean  or  -ddlbloop => boolean	# call C<recForm> after list box choice change
 
 -rfd	=> boolean	# record file attachments widget
 
@@ -2421,6 +2429,23 @@ Warning sub{}: warn / carp  / cluck; using &{$s->{-warn}}('warning') inside.
 See also C<-die>
 
 
+
+=item -wikn
+
+C<Database Options>
+
+	=> ['name', 'subject'] || [field names] || field name || false
+
+C<Table Description>
+
+	=> not exists || field name || false
+
+Fields one of may be used to search for record by its wiki name.
+Default candidates are defined at database level.
+Table may be excluded from search using false value.
+See also C<-opt> for '-hrefs' and 'wikn://'.
+
+
 =item -wkey
 
 	=> not exists || [field name,...]
@@ -3192,7 +3217,7 @@ Command options used are
 , ? -key => {original C<recKey>}
 , ? -where => 'condition'
 , ? -optrec => false || true
-, ? -sel => false || true
+, ? -sel => true || false
 ) -> successfully updated {field => value,...}
 
 C<Database Operation>.
@@ -3908,6 +3933,32 @@ another options may be implemented within script itself.
 
 =over
 
+
+=head2 2007-01-11 - Development Version 0.66
+
+
+=head2 2007-01-07 - 09
+
+Added bracket notation for hyperlinks highlight for C<-inp>/'-hrefs'.
+
+New 'key://' special URL protocol for C<-inp>/'-hrefs'.
+
+Record changes display corrected in 
+file attachments arrangement using C<-rvcUpdWhen> and 'mtime'.
+
+
+=head2 2006-12-24
+
+New C<-wikn> option and new 'wikn://' special URL protocol for C<-inp>/'-hrefs'.
+
+Improvements in file attachments field; added icons for files.
+
+Improvements in special URLs (C<-inp>/'-hrefs') translation and display.
+
+Improvements in '<html ... lang>'.
+
+
+
 =head2 2006-12-15 - Development Version 0.65
 
 
@@ -3917,7 +3968,8 @@ New C<-rvcVerWhen>, conditionally for C<ttoRVC> compatibility.
 
 Some corrections of JavaScript for Mozilla/Firefox.
 
-Added record changes display, using L<Algorithm::Diff|Algorithm/Diff>.
+Added record changes display, using L<Algorithm::Diff|Algorithm/Diff>,
+but with wrong processing of file attachments.
 
 New C<strDiff>, C<strHTML>.
 

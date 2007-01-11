@@ -202,3 +202,13 @@ CREATE TABLE hdesk (
 #
 #
 #
+{"2006-12-22 'cmdbm' add fields"
+ ###########################
+}
+# 
+ALTER TABLE cmdbm ADD COLUMN idold varchar(60) AFTER id;
+ALTER TABLE cmdbm ADD COLUMN stmt varchar(80) AFTER definition;
+ALTER TABLE cmdbm ADD COLUMN vtime datetime AFTER utime;
+#
+#
+#
