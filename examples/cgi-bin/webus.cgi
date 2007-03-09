@@ -319,7 +319,7 @@ $w->set(
 			 }
 		,{-fld=>'ftime'
 			,-flg=>'f', -hidel=>1
-			,-expr=>'COALESCE(etime, utime)'
+			,-expr=>'COALESCE(gwo.etime, gwo.utime)'
 			,-lbl=>'Final', -cmt=>'Finish or last updated time of record'
 			,-lbl_ru=>'Завершение', -cmt_ru=>'Дата-время завершения или последнего изменения записи'
 			,-ldstyle=>'width: 20ex'
@@ -329,8 +329,8 @@ $w->set(
 		,{-fld=>'otime'
 			,-flg=>'l', -hidel=>1
 			,-expr=> "CONCAT("
-				."IF(status IN('edit','progress','do'), '', ' ')"
-				.", COALESCE(utime, etime))"
+				."IF(gwo.status IN('edit','progress','do'), '', ' ')"
+				.", COALESCE(gwo.utime, gwo.etime))"
 			,-lbl=>'Execution', -cmt=>'Fulfilment ordering of records'
 			,-lbl_ru=>'Вып-е', -cmt_ru=>'Упорядочение записей по выполнению'
 			,-lhstyle=>'width: 20ex'

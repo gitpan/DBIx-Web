@@ -244,7 +244,7 @@ C<lng>, C<lnghash>
 
 =item Misc Data methods
 
-C<max>, C<min>, C<dwnext>, C<orarg>, C<grep1>;
+C<max>, C<min>, C<dwnext>, C<orarg>, C<grep1>, C<shiftkeys>, C<splicekeys>;
 C<strpad>, C<strquot>; C<strdata>, C<strdatah>, C<datastr>;
 C<dsdClone>, C<dsdMk>, C<dsdQuot>, C<dsdParse>;
 C<strtime>, C<timestr>, C<timeadd>;
@@ -433,7 +433,7 @@ C<recCommit>, C<recRollback>;
 C<recNew>, C<recForm>, C<recIns>, C<recUpd>, C<recDel>;
 C<recSel>, C<recList>, C<recUnion>, C<recRead>, C<recQBF>;
 C<recUtr>, C<recLast>;
-C<recFields>, C<recValues>, C<recData>, C<recKey>, C<recWKey>.
+C<recFields>, C<recValues>, C<recData>, C<recKey>, C<recWKey>
 
 See also C<Database Engines>.
 
@@ -468,7 +468,7 @@ C<cgiRun>, C<cgiParse>, C<cgiQuery> (and C<cgiQueryFv>, C<cgiSel>);
 C<urlAuth>, C<urlOpt>, C<htmlMQH>;
 C<psParse>, C<psEval>; 
 C<htmlStart>, C<htmlEnd>, C<htmlHidden>, C<htmlMenu>, 
-C<cgiForm> (and also C<htmlField>, C<cgiDDLB>, C<tfvVersions>, C<tfdRFD>, C<tfvReferences>),
+C<cgiForm> (and also C<htmlField> and C<cgiDDLB>, C<htmlFVUT> and C<htmlFVUH>, C<tfvVersions>, C<tfdRFD>, C<tfvReferences>),
 C<cgiList> (and C<cgiLst>), 
 C<cgiFooter>.
 
@@ -2755,6 +2755,21 @@ Empty name means readonly.
 See C<-inp> for metadata.
 
 
+=item htmlFVUH (table name, {record data}, html to translate) -> html
+
+C<User Interface>.
+Converts HTML value to HTML translating URLs alike C<htmlField>.
+See C<-inp> for special URL protocol values.
+
+
+=item htmlFVUT (table name, {record data}, text to translate) -> html
+
+C<User Interface>.
+Converts text value to HTML with URLs highlighted alike C<htmlField>.
+See C<-inp> for special URL protocol values.
+
+
+
 =item htmlHidden () -> hidden fields html string
 
 C<User Interface>.
@@ -3306,6 +3321,13 @@ See examples source for details.
 
 
 
+=item shiftkeys ([key=>value,..., value,...], condition sub{}(self, $_==key) | regexp string) -> (key=>value,...)
+
+C<Misc Data methods>.
+Matching keys removes first 'key=>value' pairs from array and returns them.
+
+
+
 =item smtp () -> SMTP connection object
 
 =item smtp (undef) -> close SMTP connection
@@ -3342,6 +3364,12 @@ I.e., within trigger, $_[0]->smtpSend(-to=>$_[2]->{mailto}, -pcmd=>$_[1], -pout=
 -html => message body option.
 
 -text => message body option.
+
+
+=item splicekeys ([key=>value,..., value,...], condition sub{}(self, $_==key) | regexp string) -> (key=>value,...)
+
+C<Misc Data methods>.
+Matching keys removes any 'key=>value' pairs from array and returns them.
 
 
 
@@ -3453,7 +3481,7 @@ may be added to the end of C<-field> form layout.
 See source code.
 
 
-=item tfvReferences (?[fields definitions] ||undef, -option=>value,...) -> sub{records references embedded view template}
+=item tfvReferences (?[fields definitions add] ||undef, ? -option=>value | sub{}(self, table, ...), ...) -> sub{records references embedded view template}
 
 C<Templates>.
 Template for Field with embedded View of References to records;
@@ -3462,7 +3490,7 @@ See source code.
 See also C<tvmReferences>
 
 
-=item tfvVersions (?[fields definitions] ||undef, -option=>value,...) -> sub{records versions embedded view template}
+=item tfvVersions (?[fields definitions add] ||undef, ? -option=>value | sub{}(self, table, ...), ...) -> sub{records versions embedded view template}
 
 C<Templates>.
 Template for Field with embedded View of Versions of records;
@@ -3509,7 +3537,7 @@ Template View Definition for Index page,
 enumerating all C<-menuchs> entries.
 
 
-=item tvmHistory (?[fields definitions] ||undef, -option=>value,...) -> (database history materialized view template)
+=item tvmHistory (?[fields definitions add] ||undef, ? -option=>value,...) -> (database history materialized view template)
 
 C<Templates>.
 Template for Materialized View of database History (or news);
@@ -3517,7 +3545,7 @@ Template for Materialized View of database History (or news);
 See source code.
 
 
-=item tvmReferences (?[fields definitions] ||undef, -option=>value,...) -> (records references materialized view template)
+=item tvmReferences (?[fields definitions add] ||undef, ? -option=>value,...) -> (records references materialized view template)
 
 C<Templates>.
 Template for Materialized View of References to records,
@@ -3525,7 +3553,7 @@ Template for Materialized View of References to records,
 See source code.
 
 
-=item tvmVersions (?[fields definitions] ||undef, -option=>value,...) -> (records versions materialized view template)
+=item tvmVersions (?[fields definitions add] ||undef, ? -option=>value,...) -> (records versions materialized view template)
 
 C<Templates>.
 Template for Materialized View of Versions of records, 
@@ -3932,6 +3960,45 @@ another options may be implemented within script itself.
 =head1 VERSION
 
 =over
+
+
+=head2 2007-03-09 - Development Version 0.67
+
+
+
+=head2 2007-02-28
+
+Changed C<recQBF>, new C<-qjoin>/C<-join2> to use joins with query conditions.
+
+Fixed C<cgiList> XML.
+
+Fixed C<xmlEscape>, C<xmlTagEscape>.
+
+
+
+=head2 2007-02-06
+
+Changed C<-cgibus> calculation to support key:// and wikn:// hyperlinks.
+
+
+
+=head2 2007-02-02
+
+Restyled HTML for scaling.
+New 'Body' and 'Input' HTML classes. Changed class definitions.
+
+Changed HTML table current row indication using 'tr.onclick'.
+
+
+
+=head2 2007-01-19
+
+Improved frameset behaviour.
+
+Extended C<tfvVersions> and C<tfvReferences> using C<shiftkeys> to add some options inside C<cgiList> args.
+
+New C<shiftkeys>, C<splicekeys>, C<htmlFVUT>, C<htmlFVUH>.
+
 
 
 =head2 2007-01-11 - Development Version 0.66
@@ -4385,12 +4452,10 @@ you can use redistribute it and/or modify it
 under the same terms as Perl itself.
 
 Without specially written agreement
-prohibited using completely, partially or in ideas
-for impairing nature, wood and timber, mining, cosmic
-industries
-in Archangel region;
-Russian kgbists,
-bureaucracy and vertical functionary structures.
+prohibited to use completely, partially or in ideas
+for impairing nature industries
+in Archangel region (wood and timber, geological and mining, space);
+Russian procrastination structures and kgbists.
 
 
 =head1 AUTHOR

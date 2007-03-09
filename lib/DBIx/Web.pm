@@ -9,6 +9,7 @@
 # - !!! ??? review
 # - code review
 # - cmdb application implementation
+# - root hierarchical record functionality: -ridRoot
 # - record references finder via 'wikn://', 'key://', bracket notation
 # - mail-in interface - records and message browser source
 # - logfile reading interface - message browser source
@@ -25,14 +26,15 @@
 # - store for users preferences, homepages, notes, etc.
 #
 # ToDo:
+# - cmdb - improve 'tvfReferences'/'vsubjectx' long display 
+#	- may be long for works and short for requests
 # - cgiHelp() function
+# - cmdb/cgi - restrict 'work' editing / deleting, add 'task' more restricted
 # - dbmSeek() -key=>{[{}]} syntax of cgiForm(recQBF)/cgiQKey
 # - test examples: behaviour, versioning, checkouts, attachments, triggers
 #
 # Done:
-#
-# ... see 'history' file
-# 2003-09-16 started
+# 2007-03-09 publishin 0.67 version
 #
 
 
@@ -45,7 +47,7 @@ use Fcntl qw(:DEFAULT :flock :seek :mode);
 
 use vars qw($VERSION @ISA @EXPORT @EXPORT_OK %EXPORT_TAGS $AUTOLOAD $SELF $CACHE $LNG $IMG);
 
-	$VERSION= '0.66';
+	$VERSION= '0.67';
 	$SELF   =undef;				# current object pointer
 	$CACHE	={};				# cache for pointers to subobjects
 	*isa    = \&UNIVERSAL::isa; isa('','');	# isa function
@@ -109,6 +111,7 @@ $LNG ={
 	,'recQBFReset'	=>['Reset',	'Reset query conditions to default']
 
 	,'-qkeyord'	=>['SEEK',	'Key seek relation']
+	,'-qjoin'	=>['JOIN',	'FROM database query clause addition to use for WHERE']
 	,'-qwhere'	=>['WHERE',	'WHERE database query clause']
 	,'-qurole'	=>['UROLE',	'Role of User']
 	,'-quname'	=>['UNAME',	'Name of User']
@@ -230,6 +233,7 @@ $LNG ={
 	,'recQBFReset'	=>['Сброс',	'Сброс условия выборки данных в умолчания']
 
 	,'-qkeyord'	=>['SEEK',	'Направление поиска по ключу']
+	,'-qjoin'	=>['JOIN',	'Дополнение к конструкции запроса FROM, для WHERE']
 	,'-qwhere'	=>['WHERE',	'Конструкция запроса WHERE']
 	,'-qurole'	=>['UROLE',	'Роль пользователя']
 	,'-quname'	=>['UNAME',	'Имя пользователя']
@@ -657,15 +661,12 @@ sub initialize {
 		: './';
 	$opt{-path} =$pth .'dbix-web';
  }
-
- $opt{-cgibus}	=&{$opt{-cgibus}}($s)
-	if ref($opt{-cgibus});
-
- $opt{-url}	=$opt{-cgibus} ? '/cgi-bus' : '/dbix-web'
-	if !$opt{-url};
+ $RISM2 ='.rfd'; # for set(-cgibus)
 
  $s->set(%opt);
 
+ $s->{-url} =cgibus($s) ? '/cgi-bus' : '/dbix-web'
+	if !$s->{-url};
  $s->set(-locale=>POSIX::setlocale(&POSIX::LC_CTYPE()))
 	if !$s->{-locale};
  $s->set(-die=>($ENV{GATEWAY_INTERFACE}||'') =~/CGI/ ? 'CGI::Carp qw(fatalsToBrowser warningsToBrowser)' : 'Carp')
@@ -756,14 +757,13 @@ sub set {
  if (exists $opt{-autocommit}) {
 	$s->{-dbi}->{AutoCommit} =$opt{-autocommit} if $s->{-dbi};
  }
- if ($opt{-cgibus}) {
+ if ($opt{-cgibus} && !ref($opt{-cgibus})) {
 	$s->{-recInsID} =sub{	# recIns() row ID generation trigger
 				# cgi-bus 'gwo.cgi'
 		$_[2]->{'id'} =($_[0]->user =~/^([^@]+)@(.+)$/
 					? $2 .'\\' .$1
 					: $_[0]->user)
-				.'/' .$_[0]->strtime('yyyymmddhhmmss')}
-		if !$s->{-recInsID};
+				.'/' .$_[0]->strtime('yyyymmddhhmmss')};
 	$s->{-rfdName} =sub{	# convert record's key into directory name
 				# cgi-bus 'gwo.cgi', '-ksplit, tmsql::fsname()
 				# 'rfdName()'/'-rfdName'
@@ -783,7 +783,7 @@ sub set {
 					else {return()}
 					} substr($_,0,4),substr($_,4,2),substr($_,6,2),substr($_,8,2),substr($_,10));
 			$r
-		};	
+		};
 	$RISM2  ='$';		# record identification end   special mark 
 				# tmsql	'sub fsname'
 				# rmlIdSplit() / -idsplit, cgiForm(), ui...
@@ -794,11 +794,24 @@ sub set {
  if ($opt{-urf} && (substr($opt{-urf},0,1) eq '-')) {
 	$s->{-urf}	= $opt{-urf} ne '-path'
 			? $s->{$opt{-urf}}
-			: $s->{-cgibus}
-			?('file://' .$s->{-cgibus})
+			: $s->{-cgibus} && cgibus($s)
+			?('file://' .cgibus($s))
 			:('file://' .$s->{$opt{-urf}})
  }
  $s
+}
+
+
+sub cgibus {	# (self, set) -> is cgi-bus mode?
+ return($_[0]->{-cgibus}) if !ref($_[0]->{-cgibus});
+ local $_;
+ $_ =&{$_[0]->{-cgibus}}($_[0]
+	, $_ =$_[0]->{-pcmd} && ($_[0]->{-pcmd}->{-table} || $_[0]->{-pcmd}->{-form})
+	  || $_[0]->cgi->param('_table') || $_[0]->cgi->param('_form') || $_[0]->cgi->param('_key')
+	  || 'default'
+	, $_[1]);
+ $_[0]->set(-cgibus=>$_) if $_[1];
+ $_
 }
 
 
@@ -1050,6 +1063,44 @@ sub grep1 {	# first non-empty value
 	foreach (@_[2..$#_]) {$t =&{$_[1]}(); return $t if $t}
  }
  return(())
+}
+
+
+sub shiftkeys {	# shift keys from array
+ my ($s,$a,$e) =@_;	# (self, array, string regexp | sub{} condition)
+ local $_;
+ my @r;
+ while (scalar(@$a)) {
+	if (	ref($e)
+		? &$e($s, $_ =$a->[0], 0)
+		: $a->[0] =~/^(?:$e)$/) {
+		push @r, shift @$a, shift @$a;
+	}
+	else {
+		last
+	}
+ }
+ @r
+}
+
+
+sub splicekeys { # splice keys from array
+ my ($s,$a,$e) =@_;	# (self, array, string regexp | sub{} condition)
+ local $_;
+ my $i =0;
+ my @r;
+ while (scalar(@$a) && ($i <=$#$a)) {
+	if (	ref($e)
+		? &$e($_[0], $_ =$a->[$i], $i)
+		: $a->[$i] =~/^(?:$e)$/) {
+		push @r, $a->[$i], $a->[$i+1];
+		splice @$a,$i,2;
+	}
+	else {
+		$i++
+	}
+ }
+ @r
 }
 
 
@@ -1539,9 +1590,10 @@ sub urlCmd {
 sub xmlEscape {
  join '',
  map {	my $v =$_; return('') if !defined($v);
-	$v =~s/([\\"<])/\\$1/g;
-      # $v =~s/([^\w\d ,<.>\/?:;"'\[\]{}`~!@#$%^&*()-_=+\\|])/ ord($1) < 0x20 ? sprintf('\\x%02x',ord($1)) : $1/eg;
-	$v =~s/([\x00-\x1F])/sprintf('\\x%02x',ord($1))/eg;
+	$v =~s/([\\"<>])/sprintf('\\x%02x',ord($1))/ge;
+      # $v =~s/([\\"<])/\\$1/g;
+      # $v =~s/([^\w\d ,<.>\/?:;"'\[\]{}`~!@#$%^&*()-_=+\\|])/ ord($1) < 0x20 ? sprintf('\\x%02x',ord($1)) : $1/ge;
+	$v =~s/([\x00-\x1F])/sprintf('\\x%02x',ord($1))/ge;
 	$v
  } @_[1..$#_]
 }
@@ -1555,7 +1607,8 @@ sub xmlAttrEscape {
 sub xmlTagEscape {
  join '',
  map {	my $v =$_; return('') if !defined($v);
-	$v =~s/([\\"<])/\\$1/g;
+	$v =~s/([\\"<>])/sprintf('\\x%02x',ord($1))/ge;
+      # $v =~s/([\\"<])/\\$1/g;
       # $v =~s/([^\w\d\s\n ,<.>\/?:;"'\[\]{}`~!@#$%^&*()-_=+\\|])/ ord($1) < 0x20 ? sprintf('\\x%02x',ord($1)) : $1/eg;
 	$v =~s/([\x00-\x08\x0B-\x0C\x0E-\x1F]|[&])/sprintf('\\x%02x',ord($1))/eg;
 		# \t=0x09; \n=0x0A; \r=0x0D;
@@ -3912,7 +3965,8 @@ sub rmlKey {  # Record's '-key' clause value
  ? $_[1]->{-key}
  : $_[1]->{-where}				# not needed using '-where'
  ? $_[1]->{-key}
- : $_[0]->{-table}->{$_[1]->{-table}}->{-key}	# key described
+ : $_[1]->{-table}				# key described
+	&& $_[0]->{-table}->{$_[1]->{-table}}->{-key}
  ? {(map {($_=>$_[2]->{$_})} 
 	@{$_[0]->{-table}{$_[1]->{-table}}->{-key}})}
  : $_[2]->{'id'}				# 'id' field present
@@ -5703,7 +5757,9 @@ sub recUnion {	# UNION cursor / container operation
 sub dbiSel {    # Select records from database
 		# -data		=>[fields] | [field, [field=>alias], {-fld=>alias, -expr=>formula,..}]
 		# -table	=>[tables] | [[table=>alias], [table=>alias,join]]
+		# -join[01]	=>string
 		# -join		=>string
+		# -join2	=>string
 		# -key		=>{field=>value}
 		# -where	=>string   | [strings]
 		# -ftext	=>string
@@ -5760,8 +5816,15 @@ sub dbiSel {    # Select records from database
 						: ',')} @$t)[0..-1])
 			: dbiTblExpr($s, $t)
 			)
-		. ( $a->{-join1} ? $a->{-join1} .' ' : '')
-		. ( $a->{-join}  ? $a->{-join}  .' ' : '')
+		. ( $a->{-join1} ? $a->{-join1} : '')
+		. join(''
+			, map {	!$a->{$_}
+				? ()
+				: $a->{$_} =~/^\s*(?:,|CROSS|JOIN|INNER|STRAIGHT_JOIN|LEFT|NATURAL|RIGHT|OUTER)\b/i
+				? (' ' .$a->{$_} .' ')
+				: (', ' .$a->{$_} .' ')
+				} qw(-join -join2)
+			)
 		. ' WHERE '					# Where
 		. join(' AND '
 			, dbiKeyWhr($s, 0, $a, @cn)		# Key condition
@@ -6081,10 +6144,10 @@ sub cgiRun {	# Execute CGI query
 			.($s->{-pcmd}->{-form} eq 'default'
 			? $s->htmlEscape($s->cgi->url())
 			: $s->htmlEscape($s->urlOpt(-frame=>'BOTTOM'))
-			)
+			)			# !!! Mozilla no OnLoad target
 			.'">',"\n"
 		,'<frame name="BOTTOM" src="' 
-			. $s->htmlEscape($s->cgi->url() .'?_frame=TOP')
+			.$s->urlCat($s->cgi->url())
 			.'">',"\n"
 		,'</frameset>',"\n"
 		,'</html>',"\n");
@@ -6097,9 +6160,15 @@ sub cgiRun {	# Execute CGI query
 	if ($v) {
 		$s->{-pcmd}->{-key}	=$v->{-key};
 		$s->{-pcmd}->{-form}	=$v->{-table};
-		$s->{-pcmd}->{-table}	=$v->{-table} if $s->{-pcmd}->{-table};
-		$on =$s->{-pcmd}->{-form};
+		$s->{-pcmd}->{-table}	=$v->{-table};
+		$on =$s->{-pcmd}->{-form} if $s->{-pcmd}->{-form};
 	}
+ }
+		# Encoded form / table
+ if ((!$s->{-pcmd}->{-form} || ($s->{-pcmd}->{-form} eq 'default')) 
+ &&  ($s->{-pcmd}->{-key} || $s->{-pdta})) {
+	$s->rmlKey($s->{-pcmd}, $s->{-pdta});
+	$on =$s->{-pcmd}->{-form} if $s->{-pcmd}->{-form};
  }
 
 		# Determine / Delegate operation object requested / Execute
@@ -6136,6 +6205,7 @@ sub cgiRun {	# Execute CGI query
 			,$og =~/^rec(.+)/ ? $1 : $og, 'Call') {
 		next if !defined($e);
 		last if !$e;
+		$s->cgibus(1);
 		$_ =$s;
 		$r =	ref($e) 
 			? &$e($s, $on, $om, $s->{-pcmd}, $s->{-pdta})
@@ -6169,6 +6239,7 @@ sub cgiRun {	# Execute CGI query
  }
 
 		# Execute action
+ $s->cgibus(1);
  if	(ref(my $e =$om->{"-$oa"}) eq 'CODE') {
 	$s->{-pout} =&$e($s, $on, $om, $s->{-pcmd}, $s->{-pdta});
  }
@@ -6236,7 +6307,7 @@ sub cgiParse {	# Parse CGI call parameters
 	elsif($k =~/^_(new|file)$/) {		# record attribute
 		$s->{-pdta}->{"-$k"} =$d->{$k}
 	}
-	elsif ($k =~/^_(cmd|cmg|frmCall|frmName\d*|frmLso|frmLsc|recNew|recRead|recPrint|recXML|recHist|recEdit|recIns|recUpd|recDel|recForm|recList|recQBF|submit.*|app.*|form|key|wikn|proto|urm|qkey|qwhere|qurole|quname|qftext|qversion|qorder|qkeyord|qlist|qlimit|qdisplay|qftwhere|qftord|qftlimit|edit|backc|login|print|xml|hist|refresh|style|frame)(?:\.[xXyY]){0,1}$/i) {
+	elsif ($k =~/^_(cmd|cmg|frmCall|frmName\d*|frmLso|frmLsc|recNew|recRead|recPrint|recXML|recHist|recEdit|recIns|recUpd|recDel|recForm|recList|recQBF|submit.*|app.*|form|key|wikn|proto|urm|qjoin|qkey|qwhere|qurole|quname|qftext|qversion|qorder|qkeyord|qlist|qlimit|qdisplay|qftwhere|qftord|qftlimit|edit|backc|login|print|xml|hist|refresh|style|frame)(?:\.[xXyY]){0,1}$/i) {
 		my ($c, $v) =($1, $d->{$k});	# command
 		$v =$1	if ($k !~/^_(key|proto|qkey|qftext)/i)
 			&& ($v =~/^\s*(.+?)\s*$/);
@@ -6294,7 +6365,7 @@ sub cgiParse {	# Parse CGI call parameters
 		if ($frm ne ($c->{-form}||'')) {
 			# !!! query parameters for current view only, not table
 			map {delete $c->{$_}
-				} qw (-frmLso -frmLsc -qkey -qwhere -qurole -quname -qversion -qorder -qkeyord);
+				} qw (-frmLso -frmLsc -qjoin -qkey -qwhere -qurole -quname -qversion -qorder -qkeyord);
 			$g->delete('_frmLso');
 			delete $c->{-key}
 				if ($c->{-cmd} eq 'recList')
@@ -6314,7 +6385,7 @@ sub cgiParse {	# Parse CGI call parameters
 	$c->{-cmd}  ='recRead'
  }
  elsif	($c->{-cmd} eq 'recQBFReset') {
-	foreach my $k (qw(-qkey -qwhere -qurole -quname -frmLso -frmLsc)) {
+	foreach my $k (qw(-qjoin -qkey -qwhere -qurole -quname -frmLso -frmLsc)) {
 		delete $c->{$k};
 	}
 	$c->{-cmd}  ='recList';
@@ -6671,23 +6742,24 @@ sub htmlStart {	# HTTP/HTML/Form headers
 					? '<meta http-equiv="refresh" content=' .$s->{-pcmd}->{-refresh} .'>' 
 					: '')
 			,-lang	=> $s->lang(0,'-lang')
-			,-style	=> ".Form {margin-top:0px; font-size: 8pt; font-family: Verdana, Helvetica, Arial, sans-serif; }\n"
-				#."input.Form {padding: 0px;}\n"
+			,-style	=> ''
+				.".Body {font-size: 70%; font-family: Verdana, Helvetica, Arial, sans-serif; }\n"
+				.".Input {font-size: 100%; font-family: Verdana, Helvetica, Arial, sans-serif; }\n"
+				.".Form {margin-top:0px; }\n"
 				."td.Form {border-style: none; border-width: 0px; padding: 0px;}\n"
 				."th.Form {border-style: none; border-width: 0px; padding: 0px;}\n"
-				."td.ListTable {border-style: inset; border-bottom-width: 1px; border-top-width: 0px; border-left-width: 0px; border-right-width: 0px; padding-top: 0;}\n"
-				."th.ListTable {border-style: inset; border-bottom-width: 1px; border-top-width: 0px; border-left-width: 0px; border-right-width: 0px;}\n"
-				.".ListTableFocus {border-style: double; border-width: 3px; border-color: black; zoom: 1; }\n"
-				#.".ListTableFocus {border-style: inset; border-width: 2px; border-color: buttonshadow; zoom: 1.001; }\n"
-					# background-color: buttonface; zoom: 1.1;
-				#.".MenuArea {background-color: navy; color: white; text-decoration:none; font-size: 7pt}"
+				."table.ListTable {border-collapse: collapse; }\n"
+				."th.ListTable {border-style: inset; border-color: buttonface; border-width: 0px; border-bottom-width: 1px; }\n"
+				."td.ListTable {border-style: inset; border-color: buttonface; border-width: 0px; border-bottom-width: 1px; padding: 0px; padding-left: 2px; padding-right: 1px; padding-top: 2px;}\n"
+				.".ListTableFocus {background-color: buttonface;}\n"
+				#.".MenuArea {background-color: navy; color: white;}\n"
 				.".MenuButton {background-color: buttonface; color: black; text-decoration:none; font-size: 7pt}\n"
-				#."td.MenuButton {background-color: activeborder;}\n"
+				.".MenuInput {font-size: 8pt}\n"
 				.".htmlMQHsel {text-decoration: none; font-weight: bolder; border-style: inset;}"
 			,-title	=> (do{	my $v =eval{$om && $s->lnglbl($om)};
 					$v ? $v .' - ' : ''})
 				.($s->{-title} ||$s->cgi->server_name())
-			,-class	=> $cs
+			,-class	=> "Body $cs"
 			,$s->{-pcmd}->{-frame}
 			? (-target=>$s->{-pcmd}->{-frame})
 			: (-target=>'_self')
@@ -6708,7 +6780,7 @@ sub htmlStart {	# HTTP/HTML/Form headers
 			, 'xmlns'=>$s->cgi->url
 			, '0')
 		: $s->cgi()->start_multipart_form(-method=>($s->{-pcmd}->{-refresh} ? 'get' : 'post')
-			,-class	=> $cs
+			,-class	=> "$cs"
 			,-action=> $s->cgi()->url()
 			,-target=> '_self'
 			,-name=>'DBIx_Web'
@@ -6728,7 +6800,16 @@ sub htmlEnd {	# End of HTML/HTTP output
  else {
 	return($s->cgi()->endform()
 	,"\n"
-	,$s->htmlOnLoadW("{var e=document.getElementsByTagName('BASE'); if(e && e[0] && (e[0].target=='_self')){e[0].target=(self.name=='BOTTOM' ? 'TOP' : self.name=='TOP' ? 'BOTTOM' : e[0].target)}}")
+	,$s->htmlOnLoadW(
+		!$s->{-c}->{-jswload}
+		|| !(grep {($_=~/\.target/) && ($_=~/'BASE'/)} @{$s->{-c}->{-jswload}})
+		? "{var e=document.getElementsByTagName('BASE'); if(e && e[0] && (e[0].target=='_self')){e[0].target=(self.name=='BOTTOM' ? 'TOP1' : self.name=='TOP' ? 'BOTTOM'"
+			.($s->{-pcmd}->{-frame}
+				? " : self.name=='" .$s->{-pcmd}->{-frame} ."' ? 'TOP1'"
+				 ." : self.name!='" .$s->{-pcmd}->{-frame} ."' ? '" .$s->{-pcmd}->{-frame} ."'"
+				: '')
+			." : e[0].target)}}"
+		: ())
 	,$s->cgi()->end_html())
  }
 }
@@ -6772,7 +6853,7 @@ sub htmlHidden {# Common hidden fields
 		  .'" />')
 		} qw(edit backc key style frame)
 		,($s->{-pcmd}->{-cmg} ne 'recQBF'
-		? qw(qkey qwhere qurole quname qversion qorder qkeyord qlimit qdisplay)
+		? qw(qkey qjoin qwhere qurole quname qversion qorder qkeyord qlimit qdisplay)
 		: qw(qlist))
 		)
 	) ."\n"
@@ -6789,8 +6870,9 @@ sub htmlMenu {	# Screen menu bar
  my $e =$c->{-edit};
  my $d =$s->{-pdta};
  my $n =$d->{-new} ||($c->{-cmg} eq 'recNew');
- my $cs=($s->{-c}->{-htmlclass} ? $s->htmlEscape($s->{-c}->{-htmlclass}) .' ' : '')
-	.'MenuArea';
+ my $cs=join(' '
+	,$s->{-c}->{-htmlclass} ? $s->htmlEscape($s->{-c}->{-htmlclass}) : ()
+	,'MenuArea');
  local $c->{-cmdt} =$ot || $om;	# table metadata
  local $c->{-cmdf} =$om || $ot;	# form  metadata
  my @r =();
@@ -6813,7 +6895,7 @@ sub htmlMenu {	# Screen menu bar
 		if !$s->{-menuchs};
       # push @r, htmlMB($s, 'recForm');
 	push @r, htmlML($s, 'frmName',  $s->{-menuchs}
-			, !$c->{-frame} || ($c->{-frame} =~/^(?:top|bottom)$/i)
+			, !$c->{-frame} || ($c->{-frame} =~/^(?:TOP|BOTTOM)$/)
 				? '-frame=set'
 				: ()
 			)	if $s->{-menuchs};
@@ -6822,9 +6904,10 @@ sub htmlMenu {	# Screen menu bar
 				? &{$om->{-frmLso}}($s, $on, $om, $c, exists($c->{-frmLso}) ? $c->{-frmLso} ||'' : ())
 				: $om->{-frmLso}
 			) if $om->{-frmLso};
-	push @r, htmlMB($s,  htmlField($s, '_qftext', lng($s,1,'-qftext'), {-asize=>5, -class=>$cs .' MenuInput'}, $s->{-pcmd}->{-qftext}))
+	push @r, htmlMB($s,  htmlField($s, '_qftext', lng($s,1,'-qftext'), {-asize=>5, -class=>'Input ' .$cs .' MenuInput'}, $s->{-pcmd}->{-qftext}))
 							if $s->{-menuchs};
 	push @r, htmlML($s, 'frmName1', $s->{-menuchs1})if $s->{-menuchs1};
+	local $c->{-frame} =undef;
 	push @r, htmlMB($s, 'frmCall',	['', $s->urlOptl(-cmd=>'frmCall')])
 							if $s->{-menuchs};
 	push @r, htmlMB($s, 'recXML',	['', $s->urlOptl(-cmd=>'frmCall',-xml=>1)]);
@@ -6914,6 +6997,7 @@ sub htmlMenu {	# Screen menu bar
 		: ()
 		, htmlEscape($s, $c->{-qkeyord}	? lng($s, 0, '-qkeyord')  .' ' .lng($s, 0, $c->{-qkeyord} =~/^-*[db]/ ? 'desc' : 'asc') : '')
 		, htmlEscape($s, $c->{-qwhere}||'')
+		, htmlEscape($s, $c->{-qjoin}	? ($c->{-qjoin} =~/^\s*(?:CROSS|JOIN|INNER|STRAIGHT_JOIN|LEFT|NATURAL|RIGHT|OUTER)\b/i ? '' : (lng($s, 0, '-qjoin') .' ')) .$c->{-qjoin} : '')
 		, htmlEscape($s, $c->{-qurole}	? lng($s, 0, '-qurole')   .' ' .$c->{-qurole} .' /*' .$s->mddUrole($om, $c->{-qurole}) .'*/' : '')
 		, htmlEscape($s, $c->{-quname}	? lng($s, 0, '-quname')   .' ' .$c->{-quname} : '')
 		, htmlEscape($s, $c->{-qftext}	? lng($s, 0, '-qftext')   .' ' .$c->{-qftext} : '')
@@ -6975,7 +7059,7 @@ sub htmlMB {	# CGI menu bar button
 		$_[1]
 	}
 	elsif ($_[1] eq 'back') {
-		 '<input type="submit" class="' .$cs .'" name="_' .$_[1] .'" '
+		 '<input type="submit" class="Input ' .$cs .'" name="_' .$_[1] .'" '
 		.' value="' .htmlEscape($_[0],lng($_[0], 0, $_[1])) .'" '
 		.' onclick="{'
 		.(!$_[3] ||$_[3] <2
@@ -6985,7 +7069,7 @@ sub htmlMB {	# CGI menu bar button
 		.' title="' .htmlEscape($_[0],lng($_[0], 1, $_[1])) .'" />'
 	}
 	else {
-		 '<input type="submit" class="' .$cs .'" name="_' .$_[1] .'" '
+		 '<input type="submit" class="Input ' .$cs .'" name="_' .$_[1] .'" '
 		.' value="' .htmlEscape($_[0],lng($_[0], 0, $_[1])) .'" '
 		.' title="' .htmlEscape($_[0],lng($_[0], 1, $_[1])) .'" />'
 	}
@@ -7018,7 +7102,7 @@ sub htmlMB {	# CGI menu bar button
  }
  elsif ($_[1] eq 'home') {
 	my $jc =' onclick="{window.document.open(\'' 
-		.htmlEscape($_[0],$_[0]->cgi->url) 
+		.$_[0]->urlCat($_[0]->cgi->url(),$_[0]->{-pcmd}->{-frame} ? ('_frame'=>$_[0]->{-pcmd}->{-frame}) : ())
 		."','_self','',false); return(false)}\" ";
 	my $tl =htmlEscape($_[0], lng($_[0], 1, 'home'));
         $td0 
@@ -7055,15 +7139,17 @@ sub htmlMB {	# CGI menu bar button
 	.' /></a>' ."\n</nobr></td>"
  }
  else {
+	my $hl =defined($_[2]) && !$_[2]
+		? undef
+		: urlCat($_[0], !$_[2] ? ('', '_form'=>$_[0]->{-pcmd}->{-form},'_cmd'=>$_[1]) : ref($_[2]) ? @{$_[2]} : $_[2]);
 	my $jc =' onclick="{'
-		.(($_[1] eq 'recNew') && !$_[2] 
-			&& $_[0]->{-pcmd}->{-frame}
-			&& ($_[0]->{-pcmd}->{-cmd} eq 'recList')
-		? "{window.document.open('" .$_[0]->cgi->url() ."?_cmd=" .$_[1] .";_form="
-			.$_[0]->htmlEscape($_[0]->{-pcmd}->{-form}) ."','"
-			.$_[0]->{-pcmd}->{-frame} ."', '', false); return(false)};"
-		: ''
-		) 
+		.($hl && ($_[1] =~/^(?:recRead|recPrint|recXML|recHist|recEdit|recNew)$/)
+		? "if((self.name=='BOTTOM') || (self.name=='TOP') ||document.getElementsByName('_frame').length){window.document.open('"
+                        .(($_[1] =~/^(?:recNew)$/ && ($hl =~/_proto=/))
+			? (do {my $v=$hl; $v =~s/([?&;])_proto=/${1}_key=/; $v})
+			: $hl)
+			."','_blank','',false); return(false)}\n"
+		: '')
 		.'window.document.DBIx_Web._cmd.value=&quot;' .$_[1] .'&quot;; window.document.DBIx_Web.submit(); return(false)}" ';
 	my $tl =htmlEscape($_[0],lng($_[0], 1, $_[1]));
 	$td0 .' title="' .$tl .'"'
@@ -7071,12 +7157,11 @@ sub htmlMB {	# CGI menu bar button
 	.'<input type="image" name="_' .$_[1] .'" '
 	.' src="' .$_[0]->{-icons} .'/' .($IMG->{$_[1]}||'none') .'" '
 	.' align="bottom" title="' .$tl .'" class="' .$cs .'" style="cursor: default;"/>'
-	.(defined($_[2]) && !$_[2]
+	.(!$hl
 	?('<span class="' .$cs .'" style="cursor: default;"'
 	 .' title="' .$tl .'">' .htmlEscape($_[0],lng($_[0], 0, $_[1])) .'</span>')
 	 .($tdb ? '' : $jc)
-	:('<a tabindex=-1 href="' .urlCat($_[0], !$_[2] ? ('', '_form'=>$_[0]->{-pcmd}->{-form},'_cmd'=>$_[1]) : ref($_[2]) ? @{$_[2]} : $_[2]) .'"'
-	 .' class="' .$cs .'" target="_self" '
+	:('<a tabindex=-1 href="' .$hl .'" class="' .$cs .'" target="_self" '
 	 .($tdb ? '' : $jc)
 	 .' title="' .$tl .'">'
 	 .htmlEscape($_[0],lng($_[0], 0, $_[1]))
@@ -7088,8 +7173,10 @@ sub htmlMB {	# CGI menu bar button
 
 sub htmlML {	# CGI menu bar list
  use locale;	# (self, name, values, ? add values)
- my $cs =($_[0]->{-c}->{-htmlclass} ? $_[0]->htmlEscape($_[0]->{-c}->{-htmlclass}) .' ' : '')
-	.'MenuArea';
+ my $cs =join(' '
+	,'Input'
+	,$_[0]->{-c}->{-htmlclass} ? $_[0]->htmlEscape($_[0]->{-c}->{-htmlclass}) : ()
+	,'MenuArea');
  my $i =  $_[1] eq 'frmName'
 	? $_[0]->cgi->param('_'  .$_[1]) 
 	||$_[0]->{-pcmd}->{'-' .$_[1]}
@@ -7110,20 +7197,15 @@ sub htmlML {	# CGI menu bar list
   ? 'if (_frmLso.value==&quot;recQBF&quot;) {window.document.DBIx_Web._cmd.value=_frmLso.value; _frmLso.value=&quot;' .$_[0]->htmlEscape($i) .'&quot;; window.document.DBIx_Web.submit(); return(true);} else {window.document.DBIx_Web._cmd.value=&quot;frmCall&quot;; window.document.DBIx_Web.submit(); return(false);}}">'
   : 1 && ($_[1] eq 'frmName1')
   ? ("var v=_frmName1.value; _frmName1.value=''; window.document.open('" .$_[0]->cgi->url() ."?_cmd=frmCall;_frmName1=' +encodeURIComponent(v)"
-	.($_[0]->{-pcmd}->{-frame} && ($_[0]->{-pcmd}->{-cmd} eq 'recList')
-		? ", '" .$_[0]->{-pcmd}->{-frame} ."'"
-		: ", '_self'") 
+	.",self.name.match(/^(?:TOP|BOTTOM)\$/) || document.getElementsByName('_frame').length ? '_blank' : '_self'"
 	.", '', false); return(true);}\">")
   : 1 && ($_[1] eq 'frmName')
   ? ('window.document.DBIx_Web._cmd.value=&quot;frmCall&quot;; '
 	.($_[0]->{-menuchs1} && ($_[1] eq 'frmName') 
 		? '_frmName1.value=&quot;&quot;; ' 
 		: '')
-	.($_[0]->{-pcmd}->{-frame} && ($_[0]->{-pcmd}->{-cmd} eq 'recList')
-	? "if(self.name=='TOP' && _frmName.value=='-frame=set'){window.document.DBIx_Web.target='_parent'; _frmName.value=_form.value ? _form.value : ''; _frame.value=''};"
-	 ."if(_frmName.value.match(/\\+\$/)){var v=_frmName.value; _frmName.value=_form.value ? _form.value : ''; window.document.open('" .$_[0]->cgi->url() ."?_cmd=frmCall;_frmName=' +encodeURIComponent(v), '"
-		.$_[0]->{-pcmd}->{-frame} ."', '', false); return(true)};"
-	: '')
+	."if(self.name=='TOP' && _frmName.value=='-frame=set'){window.document.DBIx_Web.target='_parent'; _frmName.value=_form.value ? _form.value : ''; if (document.getElementsByName('_frame').length) {_frame.value=''}};"
+	."if((self.name.match(/^(?:TOP|BOTTOM)\$/) || document.getElementsByName('_frame').length) && _frmName.value.match(/\\+\$/)){var v=_frmName.value; _frmName.value=_form.value ? _form.value : ''; window.document.open('" .$_[0]->cgi->url() ."?_cmd=frmCall;_frmName=' +encodeURIComponent(v), '_blank', '', false); return(true)};"
 	.'window.document.DBIx_Web.submit(); return(false);}">')
   : 'return(true)}')
  ."\n\t"
@@ -7730,6 +7812,12 @@ sub cgiForm {	# Print CGI screen form
 		, '</font>'
 		, "</td></tr>\n")
 		if $qk;
+	$s->output(&$th($s, '-qjoin'), $td
+		, htmlField($s, '_qjoin', lng($s,1,'-qjoin')
+			, {-size=>50}
+			, $c->{-qjoin})
+		, "</td></tr>\n")
+		if $de eq 'dbi';
 	$s->output(&$th($s, '-qwhere'), $td
 		, htmlField($s, '_qwhere', lng($s,1,'-qwhere') .': '
 			. ($de eq 'dbm'	? "Perl: {fieldname} (eq|[gl][et]) 'value' and|or {fieldname} <>==value..." 
@@ -7835,7 +7923,7 @@ sub cgiForm {	# Print CGI screen form
 				  , ref($c->{"-$_"})
 				  ? $s->strdata($c->{"-$_"})
 				  : $c->{"-$_"})
-				} qw(qkey qkeyord qwhere qurole quname qftext qversion qorder qlimit qdisplay frmLso frmLsc style xml)
+				} qw(qkey qkeyord qjoin qwhere qurole quname qftext qversion qorder qlimit qdisplay frmLso frmLsc style xml)
 
 		  ));
 	$s->output(&$th($s, '-qurl')
@@ -7856,6 +7944,7 @@ sub htmlField {	# Generate field widget HTML
 		# self, field name, title, meta, value
  my ($s, $n, $t, $m, $v) =@_;
  my $wgp ='';
+ my $cs =$n && $s->{-c}->{-htmlclass} ? 'Input ' .$s->{-c}->{-htmlclass} : 'Input';
  $v ='' if !defined($v);
  if	(!$n)	{				# View only
 	if	(ref($m) ne 'HASH')	{			# Textfield
@@ -7906,7 +7995,7 @@ sub htmlField {	# Generate field widget HTML
 		.'" title="'	.htmlEscape($s, $t)
 		.'" size="'	.$l
 		.'" value="'	.htmlEscape($s, $v)
-		.($s->{-c}->{-htmlclass} ? '" class="' .htmlEscape($s,$s->{-c}->{-htmlclass}) : '')
+		.($cs ? '" class="' .htmlEscape($s,$cs) : '')
 		.'" />'
  }
  elsif (ref($m) eq 'HASH') {
@@ -7938,14 +8027,14 @@ sub htmlField {	# Generate field widget HTML
 			$wgp .='<br />' if $wgp;
 		}
 		$wgp .=$s->cgi->textarea(
-			 ($s->{-c}->{-htmlclass} ? (-class=>$s->{-c}->{-htmlclass}) : ())
+			 ($cs ? (-class=>$cs) : ())
 			,(map {($_ =>	(ref($a->{$_}) eq 'CODE' 
 					? &{$a->{$_}}($s,$a,local($_)=$v)
 					: $a->{$_}))} keys %$a)
 			,-name=>$n, -title=>$t, -default=>$v, -override=>1);
 		$wgp .="<input type=\"submit\" name=\"${n}__b\" value=\"R\" "
 		."title=\"Rich/Text edit: ^Bold, ^Italic, ^Underline, ^hyperlinK, Enter/shift-Enter, ^(shift)T ident, ^Z undo, ^Y redo.\" "
-		.($s->{-c}->{-htmlclass} ? 'class="' .htmlEscape($s,$s->{-c}->{-htmlclass}) .'" ': '')
+		.($cs ? 'class="' .htmlEscape($s,$cs) .'" ': '')
 		."style=\"font-style: italic;\" "
 		."onclick=\"{if(${n}__b.value=='R') {${n}__b.value='T'; $n.style.display='none'; "
 		."\n var r; r =document.createElement('<span contenteditable=true id=&quot;${n}__r&quot; title=&quot;MSHTML Editing Component&quot; ondeactivate=&quot;{$n.value=${n}__r.innerHTML}&quot;></span>'); ${n}__b.parentNode.insertBefore(r, $n)\n"
@@ -7958,7 +8047,7 @@ sub htmlField {	# Generate field widget HTML
 	}
 	elsif	(exists $m->{-asize}) {			# Textfield
 		$wgp  =$s->cgi->textfield(
-			 ($s->{-c}->{-htmlclass} ? (-class=>$s->{-c}->{-htmlclass}) : ())
+			 ($cs ? (-class=>$cs) : ())
 			,(map {	  $_ ne '-asize'
 				? ($_=>ref($m->{$_}) ne 'CODE' 
 					? $m->{$_} 
@@ -7987,7 +8076,7 @@ sub htmlField {	# Generate field widget HTML
 		unshift @$tv, $v if defined($v) && ($v ne '') && !grep {$_ eq $v} @$tv;
 		unshift @$tv, '' if $s->{-pcmd}->{-cmg} eq 'recQBF';
 		$wgp	=$s->cgi->popup_menu(
-			 ($s->{-c}->{-htmlclass} ? (-class=>$s->{-c}->{-htmlclass}) : ())
+			 ($cs ? (-class=>$cs) : ())
 			,$m->{-ddlbloop}||$m->{-loop}
 				? (-onchange => '{window.document.DBIx_Web._cmd.value="recForm"; window.document.DBIx_Web.submit(); return(false)}')
 				: ()
@@ -8006,7 +8095,7 @@ sub htmlField {	# Generate field widget HTML
 	}
 	else {						# Textfield
 		$wgp =$s->cgi->textfield(
-			 ($s->{-c}->{-htmlclass} ? (-class=>$s->{-c}->{-htmlclass}) : ())
+			 ($cs ? (-class=>$cs) : ())
 			,(map {($_ =>	(ref($m->{$_}) eq 'CODE' 
 					? &{$m->{$_}}($s,$m,local($_)=$v)
 					: $m->{$_}))} keys %$m)
@@ -8084,7 +8173,7 @@ sub trURLhtm {	# Translate text with URLs
  my($s, $vt, $ct, $cu) =@_;
  my $vr=$ct ? '' : [];
  my $f;
- while ($vt =~/(\s+href\s*=\s*")([^"]+)/i) {
+ while ($vt =~/(\s+(?:href|src)\s*=\s*")([^"]+)/i) {
 	my($u0,$u,$u1) =($2,$2);
 	$vt =$';
 	$vr .=&$ct($s,$` .$1) if !ref($vr);
@@ -8151,6 +8240,33 @@ sub trURLhref {	# Translate URL to hyperlink
 }
 
 
+sub htmlFVUT {	# HTML of text field value with URLs embedded
+	my $v =$_[3];	# (self, table, record, value)
+	$_[0]->rfdStamp($_[1],$_[2])
+		if !exists($_[2]->{-file})
+		&& ($v =~/\b(?:fsurl|urlf):\/{2,}/);
+	$_[0]->trURLtxt($v
+		, sub {	my $v =$_[1];
+			$v =htmlEscape($_[0], $_[1]);
+			$v =~s/( {2,})/'&nbsp;' x length($1)/ge;
+			$v =~s/\n/<br \/>\n/g; 
+			$v =~s/\r//g;
+			$v
+			}
+		, \&trURLhref);
+}
+
+
+sub htmlFVUH {	# HTML of html field value with URLs embedded
+	my $v =$_[3];	# (self, table, record, value)
+	$_[0]->rfdStamp($_[1],$_[2])
+		if !exists($_[2]->{-file})
+		&& ($v =~/\b(?:fsurl|urlf):\/{2,}/);
+	$_[0]->trURLhtm($v,sub{$_[1]},sub{$_[1]})
+}
+
+
+
 sub htmlRFD {	# RFD widget html
  my ($s, $n, $m, $c, $d) =@_;
      $n =$s->{-pcmd}->{-form} if !$n || $n=~/^\d*$/;
@@ -8182,24 +8298,25 @@ sub htmlRFD {	# RFD widget html
  if ($edt) {				# Edit widget
 	my $fo =($s->cgi->param($fno)||$s->cgi->param($fnc))
 		&& $s->nfopens($pth,{});
+	my $cs =$s->{-c}->{-htmlclass} ? 'Input ' .$s->{-c}->{-htmlclass} : 'Input';
 	$r .=$s->cgi->filefield(-name=>$fnu
-		,($s->{-c}->{-htmlclass} ? (-class=>$s->{-c}->{-htmlclass}) : ())
+		,($cs ? (-class=>$cs) : ())
 		, -title=>$s->htmlEscape($s->lng(1,'rfauplfld')))
 	.$s->cgi->submit(-name=>$fnf
-		,($s->{-c}->{-htmlclass} ? (-class=>$s->{-c}->{-htmlclass}) : ())
+		,($cs ? (-class=>$cs) : ())
 		, -value=>$s->lng(0,'rfaupdate')
 		, -title=>$s->lng(1,'rfaupdate')
 		, -style=>"width: 3em;")
 	.(!$fo && $^O eq 'MSWin32'
 		? $s->cgi->submit(-name=>$fno
-			,($s->{-c}->{-htmlclass} ? (-class=>$s->{-c}->{-htmlclass}) : ())
+			,($cs ? (-class=>$cs) : ())
 			, -value=>$s->lng(0,'rfaopen')
 			, -title=>$s->lng(1,'rfaopen')
 			, -style=>"width: 2em;")
 		: '')
 	.($fo	? $s->cgi->scrolling_list(-name=>$fnc, -override=>1, -multiple=>'true'
 			, -title=>$s->lng(1,'rfaopen')
-			,($s->{-c}->{-htmlclass} ? (-class=>$s->{-c}->{-htmlclass}) : ())
+			,($cs ? (-class=>$cs) : ())
 			, -values=>	['--- ' .$s->lng(0,'rfaclose') .' ---'
 					,ref($fo) eq 'HASH' ? sort keys %$fo : @$fo]
 			, ref($fo) eq 'HASH' ? (-labels=>$fo) : ())
@@ -8221,7 +8338,7 @@ sub htmlRFD {	# RFD widget html
 	$r .=join('; ', 
 		map {	$s->cgi->a({-href=>"$url/$_", -target=>'_blank'}
 			, $s->cgi->checkbox(-name=>$fnl
-				,($s->{-c}->{-htmlclass} ? (-class=>$s->{-c}->{-htmlclass}) : ())
+				,($cs ? (-class=>$cs) : ())
 				, -value=>$_
 				, -label=>$_
 				, -title=>$s->lng(1,'rfadelm')))
@@ -8309,6 +8426,8 @@ sub cgiDDLB {	# CGI Drop-down list box
  my $ne=$nf .'__S';	# Set	button
  my $nr=$nf .'__R';	# Reset	button
  my $rf=undef;		# Rows fetched
+ my $cs =$s->{-c}->{-htmlclass} ? 'Input ' .$s->{-c}->{-htmlclass} : 'Input';
+ my $csc=($cs ? 'class="' .htmlEscape($s, $cs) .'"' : '');
 
  if	($s->{-pdta}->{$ne}) {		# real assignment in 'cgiParse'
 	$s->{-pout}->{$tg} =$s->{-pdta}->{$nl};
@@ -8356,7 +8475,7 @@ sub cgiDDLB {	# CGI Drop-down list box
 	,"</script><script language=\"jscript\"></script>");
 	}
 	$s->output($s->cgi->submit(-name=>$no
-	,($s->{-c}->{-htmlclass} ? (-class=>$s->{-c}->{-htmlclass}) : ())
+	,($cs ? (-class=>$cs) : ())
 	, $f->{-ddlbmsab} && $s->cgi->user_agent('MSIE')
 		? (-OnClick=>"if(${no}O('$nf')) {return(false)};")
 		: ()
@@ -8407,22 +8526,20 @@ sub cgiDDLB {	# CGI Drop-down list box
  $s->output('<script for="' .$nf .'" event="onkeypress" >' .&$fs(0) ."</script>")
 	if !$ml;
  $s->output($s->cgi->submit(-name=>$nr
-		,($s->{-c}->{-htmlclass} ? (-class=>$s->{-c}->{-htmlclass}) : ())
+		,($cs ? (-class=>$cs) : ())
 		, -value=>$s->lng(0,'ddlbreset')
 		, -title=>$s->lng(1,'ddlbreset')
 		, -style=>"width: 2em;"))
 		if $f->{-ddlbloop}
 		&& (defined($s->{-pout}->{$nf}) && ($s->{-pout}->{$nf} ne ''));
  $s->output($s->cgi->submit(-name=>$nc
-		,($s->{-c}->{-htmlclass} ? (-class=>$s->{-c}->{-htmlclass}) : ())
+		,($cs ? (-class=>$cs) : ())
 		, -value=>$s->lng(0,'ddlbclose')
 		, -title=>$s->lng(1,'ddlbclose')
 		, -style=>"width: 2em;")
 		, "<br />\n");
  my $sl='<select name="' .$nl . '" size="10"'
-	.($s->{-c}->{-htmlclass} 
-		? ' class="' .htmlEscape($s, $s->{-c}->{-htmlclass}) .'"'
-		: '')
+	." $csc"
 	.' ondblclick="{' 
 		.($ml	
 		? ($ne . '.click();') 
@@ -8445,7 +8562,8 @@ sub cgiDDLB {	# CGI Drop-down list box
 	$rf =0;
 	foreach my $e (@$d) {
 		$s->output(
-		 '<option value="' .htmlEscape($s, (ref($e) ? $e->[0] : $e)) .'">'
+		 '<option ', $csc
+		,' value="', htmlEscape($s, (ref($e) ? $e->[0] : $e)), '">'
 		,htmlEscape($s, &$fmt(ref($e) ? join(' - ', @$e) : $e))
 		,"</option>\n");
 		$rf +=1
@@ -8460,7 +8578,8 @@ sub cgiDDLB {	# CGI Drop-down list box
 			cmp  lc(ref($d->{$b}) ? join(' - ',@{$d->{$b}}) : $d->{$b})} 
 			keys %$d) {
 		$s->output(
-		 '<option value="' .htmlEscape($s, (ref($e) ? $e->[0] : $e)) .'">'
+		 '<option ', $csc
+		,' value="', htmlEscape($s, (ref($e) ? $e->[0] : $e)), '">'
 		,htmlEscape($s, &$fmt(ref($d->{$e}) ? join(' - ', @{$d->{$e}}) : $d->{$e}))
 		,"</option>\n");
 		$rf +=1
@@ -8501,7 +8620,7 @@ sub cgiDDLB {	# CGI Drop-down list box
 		  -value=>$l
 		,$n1 ? (-name => $n1) : ()
 		, -title=>$s->lng(1,'ddlbsubmit')
-		,($s->{-c}->{-htmlclass} ? (-class=>$s->{-c}->{-htmlclass}) : ())
+		,($cs ? (-class=>$cs) : ())
 		, -onClick=>"{var fs =window.document.DBIx_Web.$nl; "
 			."var ft =window.document.DBIx_Web.$w; "
 			."var i  =fs.selectedIndex; i =i <0 ? 0 : i; "
@@ -8517,25 +8636,25 @@ sub cgiDDLB {	# CGI Drop-down list box
  }
  else {
 	$s->output($s->cgi->submit(-name=>$ne
-		,($s->{-c}->{-htmlclass} ? (-class=>$s->{-c}->{-htmlclass}) : ())
+		,($cs ? (-class=>$cs) : ())
 		, -value=>$s->lng(0,'ddlbsubmit')
 		, -title=>$s->lng(1,'ddlbsubmit')));
  }
  $s->output($s->cgi->button(-value=>$s->lng(0,'ddlbfind')
-		,($s->{-c}->{-htmlclass} ? (-class=>$s->{-c}->{-htmlclass}) : ())
+		,($cs ? (-class=>$cs) : ())
 		,-title=>$s->lng(1,'ddlbfind')
 		,-onClick=>&$fs(3)
 		,-style=>"width: 2em;"
 	));
  $s->output($s->cgi->submit(-name=>$nr
-		,($s->{-c}->{-htmlclass} ? (-class=>$s->{-c}->{-htmlclass}) : ())
+		,($cs ? (-class=>$cs) : ())
 		, -value=>$s->lng(0,'ddlbreset')
 		, -title=>$s->lng(1,'ddlbreset')
 		, -style=>"width: 2em;"))
 		if $f->{-ddlbloop}
 		&& (defined($s->{-pout}->{$nf}) && ($s->{-pout}->{$nf} ne ''));
  $s->output($s->cgi->submit(-name=>$nc
-		,($s->{-c}->{-htmlclass} ? (-class=>$s->{-c}->{-htmlclass}) : ())
+		,($cs ? (-class=>$cs) : ())
 		, -value=>$s->lng(0,'ddlbclose')
 		, -title=>$s->lng(1,'ddlbclose')
 		, -style=>"width: 2em;"),"\n");
@@ -8830,6 +8949,7 @@ sub cgiQuery {	# Query records
 
  $a{-meta}	=$m;                            # Query Other Clauses
  $a{-table}	=$m->{-table} ||$n	if !$a{-table};
+ $a{-join2}	=$c->{-qjoin}		if exists($c->{-qjoin}) && $c->{-qwhere};
  $a{-urole}	=$c->{-qurole}		if exists($c->{-qurole});
  $a{-uname}	=$c->{-quname}		if $c->{-quname};
  $a{-ftext}	=$c->{-qftext}		if exists($c->{-qftext});
@@ -8841,6 +8961,10 @@ sub cgiQuery {	# Query records
 		? $c->{-qdisplay}
 		: [split /\s*[,;]\s*/, $c->{-qdisplay}]
 					if $c->{-qdisplay};
+ $a{-datainc}	=ref($c->{-qdatainc})
+		? $c->{-qdatainc}
+		: [split /\s*[,;]\s*/, $c->{-qdatainc}]
+					if $c->{-qdatainc};
 
  if (exists($m->{-frmLsc}) ? $m->{-frmLsc} : ($m->{-frmLsc} ||$t->{-frmLsc})) {
 	my $lsc =$m->{-frmLsc} ||$t->{-frmLsc};
@@ -8916,6 +9040,11 @@ sub cgiQDflt {	# Default query arguments fulfill
 			||$s->mdeTable($n ||$c->{-table} ||$c->{-form})
 			if !$m;
 	my $q =$m->{-query};
+	$c->{-qjoin} =	  defined($c->{-qwhere}) && defined($c->{-qjoin})
+			? $c->{-qjoin}
+			: ($q &&( ref($q->{-qjoin}) eq 'CODE'
+			? &{$q->{-qjoin}}($s, $n, $m, $c)
+			: $q->{-qjoin}));
 	$c->{-qkey}	= defined($c->{-qkey})
 			? $c->{-qkey}
 			: ref($q->{-qkey}) eq 'CODE'
@@ -8963,7 +9092,7 @@ sub cgiQDflt {	# Default query arguments fulfill
 			: ref($q->{-frmLsc})
 			? [@{$q->{-frmLsc}}]
 			: $q->{-frmLsc};
-	foreach my $k (qw(-qkey -qwhere -qurole -quname -qftext -frmLso -frmLsc)) {
+	foreach my $k (qw(-qjoin -qkey -qwhere -qurole -quname -qftext -frmLso -frmLsc)) {
 		delete $c->{$k} if !defined($c->{$k});
 	}
  }
@@ -9170,11 +9299,11 @@ sub htmlMQH {	# Menu Query Hyperlink
 		: $vq;
 	$qw->{$k} =$vq if length($s->urlCmd('', %$qw)) >$ql;
  }
- local $a->{-href}  = $s->urlCmd('', %$qw
+ local $a->{-href}  = $s->urlCmd('', %$qw);
+ local $a->{-OnClick}=$s->urlCmd('', %$qw
 			, $s->{-pcmd}->{-frame}
 			? (-frame=>$s->{-pcmd}->{-frame})
-			: ()
-		);
+			: ());		# !!! Mozilla no OnLoad target
  local $a->{-target}= '_self'
 		if !$a->{-target};
  local $a->{-class} =
@@ -9197,7 +9326,12 @@ sub htmlMQH {	# Menu Query Hyperlink
 		,($a->{-style} ? $a->{-style} : ())
 		);
  $s->cgi->a({(map {$a->{$_} ? ($_ => $a->{$_}) : ()
-		} qw (-class -style -target -href -title))}
+		} qw (-class -style -target -href -title))
+		, $a->{-OnClick}
+		? (-OnClick=>"window.document.open('" 
+			.$a->{-OnClick} ."','_self','',false); return(false)"
+			)
+		: ()}
 	, defined($a->{-html}) 
 	? $a->{-html} 
 	: defined($a->{-label}) 
@@ -9258,11 +9392,13 @@ sub cgiList {	# List queried records
  my $limit =$c->{-qlimit} || ($m->{-query} && $m->{-query}->{-limit}) ||$m->{-limit} ||$s->{-limit} ||$LIMRS;
  my $tcf0 ='<script language="Javascript">var DBIxWebListTableTCFv;'
 	.'function DBIxWebListTableTCF(tc){'
-	."if(DBIxWebListTableTCFv){var o; o=DBIxWebListTableTCFv; o.className=o.className.replace(' ListTableFocus', ''); o.className=o.className.replace('ListTableFocus', '')};"
-	."tc.className=tc.className +' ' +'ListTableFocus';"
+	#."if(DBIxWebListTableTCFv){var o; o=DBIxWebListTableTCFv; o.className=o.className.replace(' ListTableFocus', ''); o.className=o.className.replace('ListTableFocus', '')};"
+	#."tc.className=tc.className +' ' +'ListTableFocus';"
+	."if(DBIxWebListTableTCFv){var o; o=DBIxWebListTableTCFv; o.className=''};"
+	."tc.className='ListTableFocus';"
 	."DBIxWebListTableTCFv=tc;"
-	."}</script>\n";
- my $tcf1 ='onfocus="DBIxWebListTableTCF(this)"';
+	."return(true)}</script>\n";
+ my $tcf1 ='onclick="DBIxWebListTableTCF(this)"'; # onfocus=
  $b =	# bondaries:
 	# 0<table>  1<tr>  2<td> 3<url>  4</url> 5' '  6'' 7</td> 8</tr> 9</table>
 	# 0<table>  1<tr>  2<td> 3<a"    4">     5</a> 6'' 7</td> 8</tr> 9</table>
@@ -9273,11 +9409,13 @@ sub cgiList {	# List queried records
 		,"<tr>\n", '<td>', '<url>', '</url>', ' ', '', "</td>\n", "</tr>\n", "</table>\n"]
 	: !$b
 	? ["\n$tcf0<table $hstl >\n"
-		, "<tr>\n", "<td align=\"left\" valign=\"top\" $hstl>"
-		, "<a $hstl $tcf1 href=\"", '">'
+		, "<tr $tcf1>\n"
+		, "<td align=\"left\" valign=\"top\" $hstl>"
+		, "<a $hstl href=\"", '">'
 		, '</a>', '', "</td>\n", "</tr>\n", "</table>\n"]
 	: $b =~/<select/ # !"</select>\n"
-	? [$b, '<option value="', '',	'">', '', '', ' - ', '', "</option>\n", "</select>"]
+	? [$b, '<option ' .($b =~/\b(class\s*=\s*"[^"]+")/i ? "$1 " : '')
+		.'value="', '',	'">', '', '', ' - ', '', "</option>\n", "</select>"]
 	: ["<span $hstl>", ' ', ' ', " <a $hstl href=\"",'">', '</a> ', '', ' ', "$b\n", "</span>\n"]
 	if !ref($b);
 
@@ -9496,6 +9634,7 @@ sub cgiList {	# List queried records
 		|| ($mt->{-frmLsc} && !exists($m->{-frmLsc}))) {
 			my $lsc =$m->{-frmLsc} ||$mt->{-frmLsc};
 			my $lsf =$mt->{-mdefld} ||{};
+			my $hstl1 =$hstl =~/(class=")/ ? $` .$1 .'Input ' .$' : $hstl;
 			$tho =[@{$colf[0]}];
 			$tho->[2] = sub{
 				use locale;
@@ -9504,7 +9643,7 @@ sub cgiList {	# List queried records
 						? $lsc->[0]->{-val} 
 						: $lsc->[0]->[0]);
 				'<select name="_frmLsc" '
-				.$hstl
+				.$hstl1
 				."onchange=\"{window.document.DBIx_Web._cmd.value='recList'; window.document.DBIx_Web.submit()}\">\n"
 				.join('', map {	
 					my ($v,$l) =ref($_) eq 'HASH' 
@@ -9516,8 +9655,8 @@ sub cgiList {	# List queried records
 						if !$l;
 					'<option'
 					.($v eq $lsq ? ' selected' : '')
-					.' ' .$hstl
-					.'" value="'
+					.' ' .$hstl1
+					.' value="'
 					.$_[0]->htmlEscape($v)
 					.'">'
 					.$_[0]->htmlEscape($l)
@@ -9577,7 +9716,7 @@ sub cgiList {	# List queried records
 		, "\n"
 		, (map {xmlsTag($s, $_->[0]
 				, ''=>	  ref($_->[1])
-					? &{$_->[1]}($s, $cargo, undef, $r)
+					? &{$_->[1]}($s, $cargo, undef, $i, $r)
 					: ref($r)
 					? $r->[$_->[1]]
 					: $r
@@ -9633,7 +9772,7 @@ sub cgiLst {	# Simplified 'cgiList' to embed into 'cgiForm'
  foreach my $k (qw(urole uname)) {
 	$q->{"-q$k"} =$q->{"-$k"} if exists($q->{"-$k"}) && !exists($q->{"-q$k"})
  }
- foreach my $k (qw(key where ftext version order keyord limit)) {
+ foreach my $k (qw(key where ftext version order keyord limit display datainc)) {
 	$q->{"-q$k"} =$q->{"-$k"} if $q->{"-$k"} && !$q->{"-q$k"}
  }
  $s->cgiList($o, $f, undef, $q ||{}
@@ -9732,11 +9871,17 @@ sub tfdRFD {	# Template Field Definition for Record File Directory
 	.(	  $s->rfdPath(-urf=>$s->{-pout}->{-file})
 		||$s->rfdPath(-url=>$s->{-pout}->{-file}))
 	.'" target="_blank" '
-	.' title="' .$s->htmlEscape($s->lng(1,'rfafolder')) 
-	.'" style="behavior:url(\'#default#httpFolder\')">'
+	.' title="' .$s->htmlEscape($s->lng(1,'rfafolder')) .'"'
+	.($s->cgi->user_agent('MSIE')
+	 ? ' style="behavior:url(\'#default#httpFolder\')"'
+	 : '')
+	.'>'
 	.($s->{-icons} && $IMG->{'rfafolder'}
-	 ? '<img src="' .$s->{-icons} .'/' .$IMG->{'rfafolder'} .'" border=0 style="behavior:url(\'#default#httpFolder\')"/>'
-		.'</a> '
+	 ? '<img src="' .$s->{-icons} .'/' .$IMG->{'rfafolder'} .'" border=0'
+		.($s->cgi->user_agent('MSIE')
+		 ? ' style="behavior:url(\'#default#httpFolder\')"'
+		 : '')
+		.'/></a> '
 	 : $s->htmlEscape($s->lng(0,'rfafolder')) .'</a>: ');
  }
  ,-inp=>{-rfd=>1}
@@ -9764,7 +9909,7 @@ sub ttoRVC {	# Template Table Option for Record Version Control
 
 sub tvmVersions {	# Template for Materialized View of Versions of records
 			# 'versions' materialized view default definition
-			# self, ? fields, ? definitions
+			# self, ? fields add, ? definitions add
 	my $s =$_[0]; 
 	my $tn=$s->{-tn};
 	return($tn->{'tvmVersions'}=>
@@ -9822,15 +9967,16 @@ sub tvmVersions {	# Template for Materialized View of Versions of records
 
 
 sub tfvVersions {	# Template for Field View of Versions of records
- my ($s, $f, @o) =@_;	# (self, ? fields, ? definitions)
- sub{	
+ my ($s, $f, @a) =@_;	# (self, ? fields add, ? definitions add | sub{}(self, table, definitions add))
+ sub{
 	return('')	if ($_[0]->{-pcmd}->{-cmg} eq 'recQBF')
 			|| !$_[0]->{-pcmd}->{-table}
 			|| !$_[0]->{-pout}->{'id'}
 			|| $_[0]->{-pcmd}->{-print};
-	my $v =$s->{-tn}->{'tvmVersions'};
+	my $v =$_[0]->{-tn}->{'tvmVersions'};
 	my $q =($_[0]->{-table}->{$_[0]->{-pcmd}->{-table}}->{-dbd} ||$_[0]->{-dbd}) eq 'dbi';
 	$v =$_[0]->{-pcmd}->{-table} if $q;
+	my @o =ref($a[0]) eq 'CODE' ? &{$a[0]}($_[0], $v, @a[1..$#a]) : @a;
 	my $u= $q
 		? {-key=>{$_[0]->{-tn}->{-rvcActPtr}=>$_[0]->{-pout}->{'id'}}
 		  ,-version=>1} 
@@ -9851,12 +9997,12 @@ sub tfvVersions {	# Template for Field View of Versions of records
 						} keys %$u)}
 			,$_[0]->lng(0,'tvmVersions') .':') .' ')
 		: $_[0]->cgi->hr();
-	local $s->{-uiclass} ='tfvVersions';
-	local $s->{-uistyle} ='font-size: small' if 0;
+	local $_[0]->{-uiclass} ='tfvVersions';
+	local $_[0]->{-uistyle} ='font-size: small' if 0;
 	$_[0]->cgiList('-!h'
 		,$v
 		,undef
-		,{-qhrcol=>1, -qflghtml=>$h}
+		,{-qhrcol=>1, -qflghtml=>$h, $_[0]->shiftkeys(\@o,'-qhrcol|-qflghtml')}
 		,{$u ? %$u : ()
 		 ,-table=>$v
 		 ,-order=>$q ? $_[0]->{-tn}->{-rvcUpdWhen} . ' desc' : '-deq'
@@ -9878,7 +10024,7 @@ sub tfvVersions {	# Template for Field View of Versions of records
 
 sub tvmHistory {	# Template for Materialized View of database History
 			# 'history' materialized view default definition
-			# self, ? fields, ? definition
+			# self, ? fields add, ? definitions add
 	my $s =$_[0]; 
 	my $tn=$s->{-tn};
 	return($tn->{'tvmHistory'}=>
@@ -10086,17 +10232,18 @@ sub tvmReferences {	# Template for Materialized View of References to records
 
 
 sub tfvReferences {	# Template for Field embedded View of References to record
- my ($s, $f, @o) =@_;	# (self, ? fields, ? definitions)
+ my ($s, $f, @a) =@_;	# (self, ? fields add, ? definitions add | sub{}(self, table, definitions add))
  sub{
 	return('')
 		if ($_[0]->{-pcmd}->{-cmg} eq 'recQBF')
 		|| !$_[0]->{-pcmd}->{-table}
 		|| !$_[0]->{-pout}->{'id'};
-	my $v =$s->{-tn}->{'tvmReferences'};
+	my $v =$_[0]->{-tn}->{'tvmReferences'};
 	my $q =(($_[0]->{-table}->{$_[0]->{-pcmd}->{-table}}->{-dbd} ||$_[0]->{-dbd}) 
 			eq 'dbi')
 		&& !$_[0]->{-table}->{$v};
 	$v =$_[0]->{-pcmd}->{-table} if $q;
+	my @o =ref($a[0]) eq 'CODE' ? &{$a[0]}($_[0], $v, @a[1..$#a]) : @a;
 	my $qe =$_[0]->{-pout}->{comment} && $_[0]->{-table}->{$v} && $_[0]->{-table}->{$v}->{-mdefld} && $_[0]->{-table}->{$v}->{-mdefld}->{comment};
 	   $qe =$qe && $qe->{-inp} && ($qe->{-inp}->{-htmlopt} || $qe->{-inp}->{-hrefs}) 
 		&& $_[0]->{-pout}->{comment};
@@ -10130,12 +10277,12 @@ sub tfvReferences {	# Template for Field embedded View of References to record
 			,$_[0]->lng(0,'tvmReferences') .':'))
 		#. '</div>'
 		: $_[0]->cgi->hr();
-	local $s->{-uiclass} ='tfvReferences';
-	local $s->{-uistyle} ='font-size: small' if 0;
+	local $_[0]->{-uiclass} ='tfvReferences';
+	local $_[0]->{-uistyle} ='font-size: small' if 0;
 	$_[0]->cgiList('-!h'
 	,$v
 	,undef
-	,{-qhrcol=>0, -qflghtml=>$h}
+	,{-qhrcol=>0, -qflghtml=>$h, $_[0]->shiftkeys(\@o,'-qhrcol|-qflghtml')}
 	,{$u ? %$u : ()
 	 ,-table=>$v
 	 ,-version=>0
@@ -10144,9 +10291,10 @@ sub tfvReferences {	# Template for Field embedded View of References to record
 	   (map {$_[0]->{-table}->{$v}->{-query} && $_[0]->{-table}->{$v}->{-query}->{$_}
 			? ($_ => $_[0]->{-table}->{$v}->{-query}->{$_})
 			: ()
-			} qw (-display -data -order -keyord))
+			} qw (-display -data -datainc -order -keyord))
 	# ,-order=>$_[0]->{-tn}->{-rvcUpdWhen}
 	# ,-keyord=>'-dall'
+	  ,$_[0]->shiftkeys(\@o,'-display|-data|-datainc|-where|-key|-order|-keyord')
 		)
 	 :(-field=>[{-fld=>'ir',			-flg=>'q'}
 		 ,{-fld=>'id',				-flg=>'q'}
@@ -10183,9 +10331,7 @@ sub tvdIndex {	# Template View Definition for Index page
 		&& $s->htmlMenu(@_[1,2])	# Menu bar
 		,"\n<table class=\"ListTable\">\n"
 		);
-	my ($tgt, $tgu) =$s->{-pcmd}->{-frame} && ($s->{-pcmd}->{-frame} eq 'TOP')
-			? ('', 'BOTTOM')
-			: ('_self', $s->{-pcmd}->{-frame});
+	$s->htmlOnLoad("{var e=document.getElementsByTagName('BASE'); if(e && e[0] && (self.name.match(/^(?:TOP|BOTTOM)\$/) || document.getElementsByName('_frame').length)){e[0].target='_blank'}}");
 	foreach my $e	(($s->{-menuchs} ? @{$s->{-menuchs}} : ())
 			,($s->{-menuchs1}? @{$s->{-menuchs1}}: ())
 			) {
@@ -10194,22 +10340,24 @@ sub tvdIndex {	# Template View Definition for Index page
 		my ($o, $a) = $n =~/^(.+?)([+&.]+)$/ ? ($1, $2) : ($n, $n);
 		my $l0 =$s->lnglbl($s->{-form}->{$o} ||$s->{-table}->{$o} ||{}, $o)||'';
 		my $l1 =$s->lngcmt($s->{-form}->{$o} ||$s->{-table}->{$o} ||{}, $o)||'';
+		my $ur1=$s->urlCat('','_form'=>$n,'_cmd'=>'frmCall');
+		my $ur2=$s->{-pcmd}->{-frame}
+			? $s->urlCat('','_form'=>$n,'_cmd'=>'frmCall','_frame'=>$s->{-pcmd}->{-frame})
+			: $ur1;
 		$s->output('<tr><th align="left" valign="top"><nobr>'
 			, $n
-			? $s->cgi->a({-href=>$s->urlCat('','_form'=>$n
-					,'_cmd'=>'frmCall'
-					,$tgu
-					?('_frame'=>$tgu)
-					:()
-					)
+			? $s->cgi->a({-href=>$ur1
 				,-title=>  $a =~/[+]/ 
 					? $s->lng(1,'frmCallNew') ." '$l0'"
 					: $a =~/[&.]/
 					? $s->lng(0,'frmCallOpn') ." '$l0'"
 					: $s->lng(0,'frmCallOpn') ." '$l0'"
-				,$tgt
-				? (-target=>$tgt)
-				: ()
+				, $a =~/[+]/
+				? (-OnClick=>"window.document.open('$ur1', self.name.match(/^(?:TOP|BOTTOM)\$/) || document.getElementsByName('_frame').length ? '_blank' : '_self','',false); return(false)"
+					)
+				: (-target=>'_self'
+				  ,-OnClick=>"window.document.open('$ur2', self.name=='TOP' ? '_self': self.name=='BOTTOM' ? 'TOP' : '_self','',false); return(false)"
+					)
 				}
 				,(!$s->{-icons}
 				? ''

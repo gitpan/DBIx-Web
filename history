@@ -1,3 +1,78 @@
+# 2007-02-28 itroducing -qjoin/-join2
+# 2007-02-28 cmdb.cgi - fix final datetime greater now
+# 2007-02-28 cmdb.cgi - fix priority inheritance
+# 2007-02-28 cmdb.cgi - 'vsubjectx', 'tvfReferences'
+# 2007-02-28 fixed xmlEscape(), xmlTagEscape() to $v =~s/([\\"<>])/sprintf('\\x%02x',ord($1))/ge;
+# 2007-02-28 fixed cgiList() XML to &{$_->[1]}($s, $cargo, undef, $i, $r)
+# 2007-02-08 fixing frames: tvdIndex, htmlMB including separate -OnClick and -href
+# 2007-02-07 fixing frames: htmlMQH, cgiRun including _frame considering non-MSIE
+# 2007-02-06 fixing: remove _frame name from URLs, wrong open in new window
+#   changes:
+#+	htmlMenu:	+ local $c->{-frame} =undef;
+#+	htmlMB:		+ ||document.getElementsByName('_frame').length
+#+	htmlMQH:	+  && ($s->{-pcmd}->{-frame} !~/^(?:TOP|BOTTOM)$/)
+#+	htmlML		+ (self.name=='TOP') || document.getElementsByName('_frame').length
+#+	htmlEnd		+ conditional base.target
+#+	tvdIndex	+ self/self, self/new; excuded top/new
+#+	cgiRun		- off _frame
+#   frame, _frame, -frame: ('i'gnoring, 'c'hanging):
+#i	smtpSend	# undef
+#c	cgiRun:		# Frameset creation
+#c	htmlStart	(-target=>$s->{-pcmd}->{-frame}) || (-target=>'_self')
+#i	htmlHidden	# hidden field
+#c	htmlMenu	!$c->{-frame} || ($c->{-frame} =~/^(?:top|bottom)$/i) ? '-frame=set'
+#i	  urlOptl (& urlOpt) # may be excluded
+#c	htmlML		js match (TOP|BOTTOM): ($_[0]->{-pcmd}->{-frame} && ($_[0]->{-pcmd}->{-cmd} eq 'recList')
+#			js match (TOP|BOTTOM): ($_[0]->{-pcmd}->{-frame} && ($_[0]->{-pcmd}->{-cmd} eq 'recList')
+#c	htmlMQH		$s->{-pcmd}->{-frame} ? (-frame=>$s->{-pcmd}->{-frame})
+#???	tvdIndex	list: self | TOP
+#			new:  self | new
+#		chg htmlEnd
+#k	htmlEnd		e[0].target=(self.name=='BOTTOM' ?
+# 2007-02-06 fixed -cgibus calculation: new cgibus() changed init(), set(), cgiRun()
+# 2007-02-05 fixing -cgibus condition sub{} for key:// and wikn:// hyperlinks
+#	$RISM2		ok	changed in set()
+#	-rfdName	ok	default encoded in rfdName(); changed in set()
+#	-recInsID	chg	remove set(){ if !$s->{-recInsID}
+#	-url		?	set by -cgibus(){}
+#	-urf		?	set by -cgibus(){}
+#   total:
+#	init defined:	$RISM2
+#	init undef:	-urf, -rfdName
+#	init if!:	-url, -recInsID
+#	set -cgibus:	-rfdName, $RISM2
+#	set cnd:	-urf
+#	set app:	-urf = -path / sub{} ; -url = '/cgi-bus' (webus)
+#   init():
+#	$opt{-cgibus}	=&{$opt{-cgibus}}($s) if ref($opt{-cgibus});
+#	$opt{-url}	=$opt{-cgibus} ? '/cgi-bus' : '/dbix-web' if !$opt{-url};
+#	$s->set(%opt);
+#   set():
+#	if ($opt{-cgibus}) {
+#		$s->{-recInsID} =sub{ ...	if !$s->{-recInsID};
+#		$s->{-rfdName}  =sub{ ...;
+#		$RISM2 = '$';
+#	}
+#	$s->{-urf} = ... $opt{-urf} ne '-path' ? ... : $s->{-cgibus} ? ...
+#   init():
+#	$s->set(-recInsID=>sub{ ... if !$s->{-recInsID}
+#   rfdPath():
+#	-url, -urf, -rfdName
+#   use -cgibus:
+#	pthForm(), rfdName(), rfdPath(), trURLtxt(), trURLhtm()
+# 2007-02-02 changed current table row indication using 'tr.onclick'
+# 2007-02-02 html restyling for scaling
+# 2007-02-02 new 'Body' and 'Input' HTML classes for scaling, class defs changed
+# 2007-02-01 key:// hyperlink fixed in cmdb-cgibus.cgi condition: 
+# 2007-01-18 new target=new from some frameset actions # target=NEW
+# 2007-01-18 new target=TOP1 from BOTTOM frame
+# 2007-01-18 changed tfvVersions() using shiftkeys()
+# 2007-01-18 changed tfvReferences() using shiftkeys()
+# 2007-01-18 new splicekeys(), shiftkeys()
+# 2007-01-18 new htmlFVUT(), htmlFVUH()
+# 2007-01-17 cgiQuery()/cgiLst() changed - '-qdatainc'/'-datainc' added
+# ... see 'history' file
+# 2003-09-16 started
 # 2007-01-08 trURLtxt(): new BracketName [[url]] and [[url|label]] notations
 # 2007-01-08 trURLtxt(), trURLhtm(): new 'key://' special URL protocol
 # 2007-01-08 recHist() file attachments arrangement corrected using mtime

@@ -1121,6 +1121,29 @@ $w->set(
 			,-lbl=>'Subject', -cmt=>'Subject following Record and Object'
 			,-lbl_ru=>'Описание', -cmt_ru=>'Запись. Место. Объект. Ресурс. Описание. Используется для представлений'
 			}
+		,{-fld=>'vsubjectx'
+			,-flg=>'-', -hidel=>1
+			,-expr=>"CONCAT_WS('. ', hdesk.record, hdesk.location, hdesk.object, hdesk.application, hdesk.subject)"
+			,-lbl=>'Subject', -cmt=>'Subject following Record and Object'
+			,-lbl_ru=>'Описание', -cmt_ru=>'Запись. Место. Объект. Ресурс. Описание. Используется для представлений'
+			,-lsthtml=>sub{	my $v =$_[3]->{-rec}->{'comment'};
+					my $a;
+					if (!$v) {}
+					elsif ($_[0]->ishtml($v)) {
+						$v =undef;
+						$a =1
+					}
+					else {
+						$a =length($v) >1024;
+						$v =substr($v, 0, 1024) if $a;
+						$v =$_[0]->htmlFVUT('hdesk',$_[3]->{-rec},$v)
+					}
+					$a =$a && $_[0]->urlCmd('',-cmd=>'recRead',-form=>'hdesk',-key=>$_[3]->{-rec}->{'id'});
+					$_[0]->htmlEscape($_)
+					.($v ? '<br /><small>' .$v . '</small>' : '')
+					.($a ? ' <a href="' .$a .'">...</a>' : '')
+					}
+			}
 		,{-fld=>'vauser'
 			,-flg=>'-', -hidel=>1
 			,-expr=>"CONCAT_WS(' / ', hdesk.auser, hdesk.arole)"
@@ -1135,7 +1158,17 @@ $w->set(
 			,-lblhtml=>''
 			,-inp=>{-htmlopt=>1,-hrefs=>1,-arows=>5,-cols=>70,-maxlength=>4*1024}
 			}
-		,$w->tfsAll()
+		#,$w->tfsAll()
+		, $w->tfdRFD(), "\f"
+		, $w->tfvVersions()
+		, $w->tfvReferences(undef
+			, sub{	defined($_[0]->{-pout}->{severity})
+				&& ($_[0]->{-pout}->{severity} ne '4')
+				&& defined($_[0]->{-pout}->{record})
+				&& ($_[0]->{-pout}->{record} eq 'request')
+				? (-datainc=>[qw(comment)],-display=>[qw(votime status vsubjectx vauser)])
+				: ()
+				})
 		]
 		,$w->ttoRVC()
 		,-dbd		=>'dbi'
@@ -1161,7 +1194,7 @@ $w->set(
 			}
 			foreach my $n (qw(severity object application location process subject comment)) {
 				$_[2]->{$n} =$_[3]->{$n} 
-					if !$_[2]->{$n} && $_[3]->{$n};
+					if !$_[2]->{$n} && defined($_[3]->{$n}) && ($_[3]->{$n} ne '');
 			}
 			foreach my $n (qw(puser auser)) {
 				$_[2]->{$n} =$_[2]->{'uuser'} ||$_[0]->user
@@ -1175,7 +1208,7 @@ $w->set(
 			$_[2]->{'record'} ='request'
 				if !$_[2]->{'record'};
 			$_[2]->{'severity'} ='4'
-				if !$_[2]->{'severity'};
+				if !defined($_[2]->{'severity'});
 			$_[2]->{'status'} ='do'
 				if !$_[2]->{'status'};
 			}
@@ -1215,6 +1248,11 @@ $w->set(
 				if $_[2]->{etime}
 				&& $_[2]->{stime}
 				&& ($_[2]->{stime} gt $_[2]->{etime});
+			$_[2]->{etime} = $_[2]->{utime}
+				if $_[2]->{etime}
+				&& $_[2]->{utime}
+				&& ($_[2]->{$_[0]->tn('-rvcState')} =~/^(?:ok|no)$/)
+				&& ($_[2]->{utime} lt $_[2]->{etime});
 			$_[2]->{mailto} =$_[0]->w32umail($_[2]->{mailto})
 				if $_[2]->{mailto};
 			if ($_[2]->{'process'} 
