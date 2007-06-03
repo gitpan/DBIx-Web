@@ -68,7 +68,7 @@ CREATE DATABASE IF NOT EXISTS cgibus;
 {$db=undef; $db =DBI->connect("DBI:mysql:$cgbd",$cgbu,$cgbp); <STDIN>}
 #
 #
-# CMDBM PDM
+# CMDB PDM
  #========================
  # '-' - reserved fields
 #
@@ -79,11 +79,13 @@ CREATE DATABASE IF NOT EXISTS cgibus;
 #
 create table cmdbm (
 	id	varchar(60) primary key,
+	idold	varchar(60),	# migration ptr
 	idnv	varchar(60),	# new version (value) pointer
 	cuser	varchar(60),	# creator user
 	ctime	datetime,	# created time
 	uuser	varchar(60),	# updator user
 	utime	datetime,	# updated time
+	vtime	datetime,	# versioned time
 
 	authors	varchar(60),	# actor role
 	readers	varchar(60),	# reader role
@@ -92,6 +94,7 @@ create table cmdbm (
 	record  	varchar(20),	# record type
 	name		varchar(80),	# record name
 	definition	varchar(255),
+	stmt		varchar(80),
 
 	system		varchar(80),	# 
 	service		varchar(80),	# 
@@ -155,34 +158,34 @@ CREATE TABLE hdesk (
 	idpr	varchar(60)	default NULL,
 	idrm	varchar(60)	default NULL,
 	idrr	varchar(60)	default NULL,
-	idpt	varchar(60)	default NULL,
-	idlr	varchar(60)	default NULL,
-	lslote	varchar(60)	default NULL,
 	cuser	varchar(60)	default NULL,
 	ctime	datetime	default NULL,
 	uuser	varchar(60)	default NULL,
 	utime	datetime	default NULL,
+	vtime	datetime	default NULL,
 	puser	varchar(60)	default NULL,
 	prole	varchar(60)	default NULL,
 	auser	varchar(60)	default NULL,
 	arole	varchar(60)	default NULL,
-	aopt	varchar(10)	default NULL,
+	mrole	varchar(60)	default NULL,
 	rrole	varchar(60)	default NULL,
 	mailto	varchar(255)	default NULL,
 	mailtime	datetime	default NULL,
 	status	varchar(10)	default NULL,
 	severity	decimal(1,0)	default NULL,
-	progress	decimal(10,0)	default NULL,
 	etime	datetime	default NULL,
 	stime	datetime	default NULL,
 	period	varchar(20)	default NULL,
 	record	varchar(10)	default NULL,
+	rectype	varchar(10)	default NULL,
+	recprc	varchar(10)	default NULL,
 	object	varchar(60)	default NULL,
 	application	varchar(80)	default NULL,
 	location	varchar(80)	default NULL,
+	cause	varchar(60)	default NULL,
 	process	varchar(80)	default NULL,
 	cost	decimal(10,2)	default NULL,
-	doctype	varchar(60)	default NULL,
+	analysis varchar(255)	default NULL,
 	subject	varchar(255)	default NULL,
 	comment	text,
 	PRIMARY KEY  (id),
@@ -199,10 +202,7 @@ CREATE TABLE hdesk (
 	KEY location	(location,etime,utime),
 	KEY process	(process,etime,utime)
 );
-#
-#
-#
-{"2006-12-22 'cmdbm' add fields"
+{"'cmdbm' add stmt"
  ###########################
 }
 # 
@@ -210,5 +210,56 @@ ALTER TABLE cmdbm ADD COLUMN idold varchar(60) AFTER id;
 ALTER TABLE cmdbm ADD COLUMN stmt varchar(80) AFTER definition;
 ALTER TABLE cmdbm ADD COLUMN vtime datetime AFTER utime;
 #
+#
+#
+{"'hdesk' 2007-01-24 add 'analysis'" 
+ ###########################
+}
+#
+ALTER TABLE hdesk ADD COLUMN analysis varchar(255) AFTER doctype;
+#
+#
+#
+{"'hdesk' 2007-04-09 drop unused cols, add 'vtime','mrole','recprc'..."
+ ###########################
+}
+#
+ALTER TABLE hdesk DROP idpt, DROP idlr, DROP lslote, DROP progress, DROP aopt, DROP doctype;
+ALTER TABLE hdesk ADD COLUMN vtime datetime default NULL AFTER utime;
+ALTER TABLE hdesk ADD COLUMN mrole varchar(60) default NULL AFTER arole;
+ALTER TABLE hdesk ADD COLUMN recprc varchar(10) default NULL AFTER record;
+ALTER TABLE hdesk ADD COLUMN rectype varchar(10) default NULL AFTER record;
+ALTER TABLE hdesk ADD COLUMN cause varchar(60) default NULL AFTER location;
+#
+{"'notes' table" 2007-05-04
+ ###########################
+}
+# 
+CREATE TABLE notes (
+        id       varchar(60) primary key,
+        idnv     varchar(60),  #   new version (value) pointer
+        idpr     varchar(60),  #   previous record pointer
+        idrm     varchar(60),  #   reply master pointer
+        cuser    varchar(60),  #   creator user
+        ctime    datetime,     #   created time
+        uuser    varchar(60),  #   updator user
+        utime    datetime,     #   updated time
+        prole    varchar(60),  #   principal role
+        rrole    varchar(60),  #   reader role
+	mailto	 varchar(255), #   email receipients
+        status   varchar(10),  #   record status
+        record   varchar(10),  # - record type
+        object   varchar(60),  # - object name
+        doctype  varchar(60),  # - document type
+        subject  varchar(255), #   subject, title
+        comment  text          #   comment, text
+)
+;
+CREATE INDEX idrm     ON notes (idrm,    utime desc,  ctime desc);
+CREATE INDEX cuser    ON notes (cuser,   utime desc,  ctime desc);
+CREATE INDEX uuser    ON notes (uuser,   utime desc,  ctime desc);
+CREATE INDEX prole    ON notes (prole,   utime desc,  ctime desc);
+CREATE INDEX rrole    ON notes (rrole,   utime desc,  ctime desc);
+CREATE INDEX subject  ON notes (subject, utime desc,  ctime desc);
 #
 #

@@ -1,3 +1,63 @@
+# 2007-06-03 cmdb-e: start page view
+# 2007-05-22 new htfrDiff(), changed htmlField()
+# 2007-05-17 htmlML() corrected for frameset switching
+# 2007-05-17 '_qurole' ddlb fix in cgiParse(), cgiForm(), cgiDDLB()
+# 2007-05-07 cmdb: service graph view, notes table
+# 2007-05-07 cgiRun() fixed assigning -form for -cgcCall
+# 2007-05-07 htmlML() implemented _frmName revert when submit
+# 2007-05-07 '-menuchs' item may be scalar, changed htmlML(), htmlMenu(), tvdIndex()
+# 2007-05-04 psEval() fixed
+# 2007-05-02 htmlHidden(), htmlMenu() fixed to use object name & meta form -pcmd
+# 2007-04-28 cmdb-s: oTk users
+# 2007-04-27 cmdb: a_hdesk_stbar() extended with totals by 'severity'
+# 2007-04-27 new '-ugflt1'
+# 2007-04-27 cmdb: added groupings of objects, applications, processes...
+# 2007-04-26 cmdb: new 'cause' field
+# 2007-04-26 fixed htmlRFD(): '%' translation in <a href="...$/..%252B..."
+# 2007-04-26 cmdb: new 'rollback' status
+# 2007-04-25 cgiList() '-lsthtml' not escaped for XML too
+# 2007-04-25 cmdb: unavailability color
+# 2007-04-24 cmdb: instruction finder for 'subject'
+# 2007-04-24 cmdb: color for 'severity' in form
+# 2007-04-24 cmdb: new 'rectype'
+# 2007-04-24 cgiForm() replaced "elsif ($f eq '') {$lr =0 unless $hide && ($hide ==2);...
+# 2007-04-22 '-loop'/'-ddlbloop' may be sub{}
+# 2007-04-22 fixed timestr(), timeadd() for dst
+# 2007-04-20 cmdb: urgency/impact -> severity
+# 2007-04-16 cmdb-s users filter
+# 2007-04-15 fixed 'all versions' filter option deleting state key
+# 2007-04-13 cmdb 'tvfReferences'/'vsubjectx' long under any rec but for 'works'/'tasks' only
+# 2007-04-12 corr recUtr({old}{new}) repaired
+# 2007-04-12 corr recForm: -editable
+# 2007-04-12 cmdb 'recprc' used
+# 2007-04-11 changed recIns(), recUpd - added record read triggers
+# 2007-04-10 cmdb 'record' new -loop, -recFlim0R
+# 2007-04-10 cmdb  new -a_cmdbh_lmrole, -a_cmdbh_vmrole
+# 2007-04-09 cmdb new fields 'mrole', 'recprc'
+# 2007-04-09 mdeRoles() changed reflecting single and multiple role fields
+# 2007-04-09 new -racManager (alike -racPrincipals), 'manager', 'managers', 'muser', 'mrole'
+# 2007-04-09 recActLim() corrected
+# 2007-04-09 cmtpSend() corrected using only addresses for 'to' and 'mail' as RFC
+# 2007-04-08 cgiForm() hidden fields generated on -flg =~/[aeu]/
+# 2007-04-08 cmdb sync: 'vauser', 'vsubject', 'vsubjectx', -query & tfvReferences(), -recFlim0R
+# 2007-04-08 documented -help, -recFlim0R, recActor(), recActLim(), udispq()
+# 2007-04-05 cmdb.cgi: changed 'vauser', 'vsubject', hdesk & tfvReferences() query display lists
+# 2007-04-05 new udispq()
+# 2007-03-30 cgiForm() creates hidden fields for readonly values when recActLim().
+# 2007-03-29 uncommented recActor() #return(1) if $_[0]->uadmin();
+# 2007-03-28 recDel() changed: rmiTrigger($s, $a, undef -> $d
+# 2007-03-28 cgiForm() changed to accept recActLim()
+# 2007-03-28 introducing recActLim()
+# 2007-03-27 ugmember() and '-editable' changed to boolean from username
+# 2007-03-27 '-recFlim0R' - new trigger after '-recForm0R' to specify operation
+# 2007-03-27 recRead_() - new - used in recNew, recForm, recIns, recRead
+# 2007-03-27 recDel() - added '-recForm0R' call
+# 2007-03-26 introducing recActor()
+#		,-recFlim0R	=>sub{	# twin recForm/recRead, rvw recRead use
+#			$_[0]->logRec('***',$_[1]->{-cmd},$_[0]->recActor($_[1],$_[3],'-owner'))
+#			}
+# 2007-03-21 introducing 'frmHelp', cgiHelp(), -help
+# 2007-03-09 publishing 0.67 version
 # 2007-02-28 itroducing -qjoin/-join2
 # 2007-02-28 cmdb.cgi - fix final datetime greater now
 # 2007-02-28 cmdb.cgi - fix priority inheritance

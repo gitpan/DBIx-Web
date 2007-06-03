@@ -8,7 +8,6 @@
 # - htmlMenu scroll
 # - !!! ??? review
 # - code review
-# - cmdb application implementation
 # - root hierarchical record functionality: -ridRoot
 # - record references finder via 'wikn://', 'key://', bracket notation
 # - mail-in interface - records and message browser source
@@ -18,6 +17,8 @@
 # - 'recRead' alike calls may return an objects, knows metadata
 #
 # Problems - Think:
+# - strDiff() breaks hyperlinks
+# - key:// hyperlinks valid only when -cgibus or table//key syntax
 # - table operation trigger instead of -cgiRun0A: should be included within each trigger and duplicated within actions and user interface
 #	# -unflt/uglist, -ugflt/uglist/ugroups, -usernt/user/uglist, -userln/user/uglist, -udisp/udisp, -ugadd/ugroups/uglist
 #	# ui: -unflt, -udisp
@@ -26,15 +27,19 @@
 # - store for users preferences, homepages, notes, etc.
 #
 # ToDo:
-# - cmdb - improve 'tvfReferences'/'vsubjectx' long display 
-#	- may be long for works and short for requests
-# - cgiHelp() function
-# - cmdb/cgi - restrict 'work' editing / deleting, add 'task' more restricted
+# - innice htmlML(): _frmName.value=_form.value ? _form.value : '';
+# - cmdb-e: service graph view
+# - cmdb: process - define hierarchy in cmdb?
+# - calendar views: type and start/end time; start sub{}, entry sub{}, periodical rec.
+# - display of future records, periodical records.
+# - cmdb: graphics (of workload (of personal))
+# - cmdb: idrm??? not recursive -recFlim0R should be
+# - cmdb-s: update vtime, recprc
 # - dbmSeek() -key=>{[{}]} syntax of cgiForm(recQBF)/cgiQKey
 # - test examples: behaviour, versioning, checkouts, attachments, triggers
 #
 # Done:
-# 2007-03-09 publishin 0.67 version
+# 2007-06-03 publishing 0.68 version
 #
 
 
@@ -47,7 +52,7 @@ use Fcntl qw(:DEFAULT :flock :seek :mode);
 
 use vars qw($VERSION @ISA @EXPORT @EXPORT_OK %EXPORT_TAGS $AUTOLOAD $SELF $CACHE $LNG $IMG);
 
-	$VERSION= '0.67';
+	$VERSION= '0.68';
 	$SELF   =undef;				# current object pointer
 	$CACHE	={};				# cache for pointers to subobjects
 	*isa    = \&UNIVERSAL::isa; isa('','');	# isa function
@@ -78,6 +83,22 @@ $LNG ={
 	,'-frame=set'	=>['Frameset',	'Frameset form']
 	,-affected	=>['affected',	'rows affected']
 	,-fetched	=>['fetched',	'rows fetched']
+
+	,-key		=>['Key',	'Key of the record']
+	,-wkey		=>['Lock key',	'Key to lock update of the record']
+	,-wikn		=>['Name',	'May contain name of the record']
+	,-ridRef	=>['References','References to another records']
+	,-rvcActPtr	=>['Versioning','When record is been saving, its old version record is to be created pointing to it']
+	,-rvcChgState	=>['Changing',	'Record is under change without versioning, files may be attached']
+	,-rvcCkoState	=>['Check out',	'Record is checked out, without versioning, files may be attached']
+	,-rvcDelState	=>['Deleted',	'Record is deleted logically']
+	,-racWriter	=>['Writers',	'Writers of the record']
+	,-racReader	=>['Readers',	'Readers of the reord']
+	,-racActor	=>['Actors',	'Actors of the record']
+	,-racManager	=>['Managers',	'Managers of the record']
+	,-racPrincipal	=>['Principals','Principals of the record']
+	,-racUser	=>['Users',	'Users of the record']
+
 	,'Error'	=>['Error',	'Error']
 	,'rfaUplEmpty'	=>['empty',	'Empty filehandle']
 	,'recUpdAclStp'	=>['',		'Record updation prohibited to you']
@@ -93,8 +114,10 @@ $LNG ={
 	,'frmCall'	=>['Go',	'Goto/execute choise']
 	,'frmCallOpn'	=>['Open']
 	,'frmCallNew'	=>['Create for','Create new record to insert into']
+	,'frmHelp'	=>['Help',	'Help screen']
 	,'frmName'	=>['Form',	'Form choice']
 	,'frmLso'	=>['Selection',	'Records selection, may overlap other query conditions spacified']
+	,'frmLsc'	=>['Ordering',	'Records ordering, may overlap other query conditions spacified']
 	,'frmName1'	=>['Create',	'Create new record with form choosen to insert into database']
 	,'recNew'	=>['Create',	'Create new record to insert into database']
 	,'recRead'	=>['Read',	'Read record from the database; escape edit mode discarding changes']
@@ -110,6 +133,7 @@ $LNG ={
 	,'recQBF'	=>['Query',	'Specify records to be listed']
 	,'recQBFReset'	=>['Reset',	'Reset query conditions to default']
 
+	,'-query'	=>['Query',	'Data query specification']
 	,'-qkeyord'	=>['SEEK',	'Key seek relation']
 	,'-qjoin'	=>['JOIN',	'FROM database query clause addition to use for WHERE']
 	,'-qwhere'	=>['WHERE',	'WHERE database query clause']
@@ -164,20 +188,25 @@ $LNG ={
 		,'done'		=>['done']
 		,'deleted'	=>['deleted']
 		,'edit'		=>['edit']
+		,'chk-out'	=>['chk-out']
 		,'all'		=>['all']
 	,'auser'	=>['Actor',	'Actor of the record, user name']
 	,'actor'	=>['Actor',	'Actor of the record, user name']
-	,'arole'	=>['Actors',	'Role of actor of the record or additional actor']
-	,'actors'	=>['Actors',	'Actors of record, users and groups, comma delimited']
-	,'puser'	=>['Principal',	'Principal of record, user name']
-	,'principal'	=>['Principal',	'Principal of record, user name']
-	,'prole'	=>['Principals','Role of principal of the record or additional principal']
-	,'principals'	=>['Principals','Principals of record, users and groups, comma delimited']
-	,'owner'	=>['Owner',	'Owner of record, user name']
-	,'orole'	=>['Owners',	'Role of owner of the record or additional owner']
-	,'owners'	=>['Owners',	'Owners of record, users and groups, comma delimited']
-	,'user'		=>['User',	'User of record, user name']
-	,'users'	=>['Users',	'Users of record, users and groups, comma delimited']
+	,'arole'	=>['Actors',	'Role of the actor of the record or additional actor user']
+	,'actors'	=>['Actors',	'Actors of the record, users and groups, comma delimited']
+	,'puser'	=>['Principal',	'Principal of the record, user name']
+	,'principal'	=>['Principal',	'Principal of the record, user name']
+	,'prole'	=>['Principals','Role of the principal of the record or additional principal user']
+	,'principals'	=>['Principals','Principals of the record, users and groups, comma delimited']
+	,'manager'	=>['Manager',	'Manager of the record, user name']
+	,'muser'	=>['Manager',	'Manager of the record, user name']
+	,'mrole'	=>['Managers',	'Role of the manager of the record, group or user']
+	,'managers'	=>['Managers',	'Managers of the record, users and groups, comma delimited']
+	,'owner'	=>['Owner',	'Owner of the record, user name']
+	,'orole'	=>['Owners',	'Role of the owner of the record or additional owner']
+	,'owners'	=>['Owners',	'Owners of the record, users and groups, comma delimited']
+	,'user'		=>['User',	'User of the record, user name']
+	,'users'	=>['Users',	'Users of the record, users and groups, comma delimited']
 	,'author'	=>['Author',	'Author of the record, user name']
 	,'authors'	=>['Authors',	'Authors of the record, comma delimited']
 	,'rrole'	=>['Readers',	'Readers of the record, group or role']
@@ -200,6 +229,21 @@ $LNG ={
 	,'-frame=set'	=>['Кадрирование','Форма в виде набора фреймов']
 	,-affected	=>['затронуто',	'строк затронуто']
 	,-fetched	=>['выбрано',	'строк выбрано']
+	,-key		=>['Ключ',	'Ключ записи']
+	,-wkey		=>['Ключ блк.',	'Ключ блокировки обновления записи']
+	,-wikn		=>['Имя',	'Может содержать имя записи']
+	,-ridRef	=>['Ссылки',	'Ссылки на другие записи']
+	,-rvcActPtr	=>['Версионирование','При сохранении записи, создается запись ее прежней версии, указывающая на актуальную свежую запись']
+	,-rvcChgState	=>['Изменение',	'Изменение записи без версионирования, возможно присоединение файлов']
+	,-rvcCkoState	=>['Извлечено',	'Запись извлечена для изменения, без версионирования, возможно присоединение файлов']
+	,-rvcDelState	=>['Удалено',	'Запись удалена логически']
+	,-racWriter	=>['Писатели',	'Могут изменять запись']
+	,-racReader	=>['Читатели',	'Могут читать запись']
+	,-racActor	=>['Исполнители','Исполнители записи']
+	,-racManager	=>['Менеджеры',	'Менеджеры записи']
+	,-racPrincipal	=>['Инициаторы','Инициаторы записи']
+	,-racUser	=>['Пользователи','Пользователи записи']
+
 	,'Error'	=>['Ошибка',	'Ошибка']
 	,'rfaUplEmpty'	=>['пусто',	'Пустой манипулятор файла']
 	,'recUpdAclStp'	=>['',		'Изменение записи не разрешено полномочиями доступа пользователя']
@@ -215,8 +259,10 @@ $LNG ={
 	,'frmCall'	=>['Вып',	'Выполнить переход, действие, поиск']
 	,'frmCallOpn'	=>['Открыть']
 	,'frmCallNew'	=>['Создать в',	'Создать новую запись, чтобы затем вставить ее в']
+	,'frmHelp'	=>['Справка',	'Справочная страница']
 	,'frmName'	=>['Форма',	'Выбор формы']
 	,'frmLso'	=>['Выборка',	'Отбор записей, может перекрывать другие заданные условия запроса']
+	,'frmLsc'	=>['Упорядочение','Упорядочение записей, может перекрывать другие заданные условия запроса']
 	,'frmName1'	=>['Создать',	'Создать новую запись выбранной формы, чтобы затем вставить ее в базу данных']
 	,'recNew'	=>['Создать',	'Создать новую запись, чтобы затем вставить ее в базу данных']
 	,'recRead'	=>['Читать',	'(Пере)читать запись из базы данных; перейти от редактирования записи к просмотру с потерей результатов редактирования']
@@ -232,6 +278,7 @@ $LNG ={
 	,'recQBF'	=>['Запрос',	'Задание условия выборки (поиска) записей']
 	,'recQBFReset'	=>['Сброс',	'Сброс условия выборки данных в умолчания']
 
+	,'-query'	=>['Запрос',	'Спецификация выборки записей']
 	,'-qkeyord'	=>['SEEK',	'Направление поиска по ключу']
 	,'-qjoin'	=>['JOIN',	'Дополнение к конструкции запроса FROM, для WHERE']
 	,'-qwhere'	=>['WHERE',	'Конструкция запроса WHERE']
@@ -286,6 +333,7 @@ $LNG ={
 		,'done'		=>['завершено']
 		,'deleted'	=>['удалено']
 		,'edit'		=>['редакт-е']
+		,'chk-out'	=>['chk-out']
 		,'all'		=>['все']
 	,'auser'	=>['Исп-ль',	'Исполнитель записи, пользователь']
 	,'actor'	=>['Исп-ль',	'Исполнитель записи, пользователь']
@@ -295,6 +343,10 @@ $LNG ={
 	,'principal'	=>['Иниц-р',	'Инициатор записи, пользователь']
 	,'prole'	=>['Иниц-ры',	'Роль или группа инициатора записи, либо добавочный инициатор']
 	,'principals'	=>['Иниц-ры',	'Инициаторы записи, пользователи и группы, через запятую']
+	,'manager'	=>['Менеджер',	'Управляющий записью, пользователь']
+	,'muser'	=>['Менеджер',	'Управляющий записью, пользователь']
+	,'mrole'	=>['Менеджеры',	'Роль управляющего записью, группа или пользователь']
+	,'managers'	=>['Менеджеры',	'Управляющие записью, пользователи и группы, через запятую']
 	,'owner'	=>['Владелец',	'Владелец записи, пользователь']
 	,'orole'	=>['Владельцы',	'Роль или группа владельца записи, либо добавочный владелец']
 	,'owners'	=>['Владельцы',	'Владельцы записи, пользователи и группы, через запятую']
@@ -345,6 +397,7 @@ $IMG={
 	,'back'		=>'back.gif'
 	,'login'	=>'small/key.gif'
 	,'frmCall'	=>'hand.up.gif'
+	,'frmHelp'	=>'unknown.gif'
 	,'recNew'	=>'generic.gif'
 	,'recRead'	=>'up.gif'
 	,'recEdit'	=>'quill.gif'
@@ -536,6 +589,7 @@ sub initialize {
  # ,-recForm0A	=>sub{}		# 'recForm' trigger before	UI action
  # ,-recForm0C	=>sub{}		# 'recForm' trigger before	command
  # ,-recForm0R	=>sub{}		# 'recForm' trigger before	row
+ # ,-recFlim0R	=>sub{}		# 'recForm' limiter before	row
  # ,-recForm1C	=>sub{}		# 'recForm' trigger after	command
  # ,-recForm1A	=>sub{}		# 'recForm' trigger after	UI action
  # ,-recEdt0A	=>sub()		# 'recEdt'  trigger before	UI action
@@ -594,7 +648,7 @@ sub initialize {
 			# 'idpt'	# point to record
 			# 'idlr'	# location record pointer
 	,-rvcState	=>'status'	# state of record
-	,-rvcAllState	=>['ok','no','do','progress','chk-out','edit','deleted']
+	,-rvcAllState	=>['ok','no','do','progress','delay','chk-out','edit','deleted']
 	,-rvcFinState	=>['status'=>'ok','no','deleted']
 	,-rvcChgState	=>['status'=>'edit','chk-out']
 	,-rvcCkoState	=>['status'=>'chk-out']
@@ -1242,7 +1296,7 @@ sub strDiff {	# Strings difference
  $s2 =$s->strHTML($s2) if ($o =~/h/) && $s->ishtml($s2);
  return($s2) if ($s1 eq '') || ($s2 eq '');
  my $br =sub{	my ($h, $t)=($_[0], '');
-		while ($h =~/([^\n]{80})/) {
+		while ($h =~/([^\n]{100})/) {
 			$t .=$`; $h =$';
 			my $v =$1;
 			if ($v =~/[ \t]$/) {
@@ -1373,6 +1427,19 @@ sub strDiff {	# Strings difference
 }
 
 
+sub htfrDiff {	# html reformat for difference
+ $_[1] =~/<br\s*\/>\n*[-+=]:/
+ ? "<table>"
+	.join("\n"
+	, map {	$_ =~/^([-+=]):\s*/
+		? "<tr><td align=\"middle\" valign=\"top\">$1</td><td align=\"middle\" valign=\"top\">:</td><td align=\"left\" valign=\"top\">$'</td></tr>"
+		: "<tr><td colspan=3 align=\"left\" valign=\"top\">$_</td></tr>"
+		} split /\s*<br\s*\/>\n/, $_[1])
+	."</table>"
+ : $_[1]
+}
+
+
 sub datastr {	# Data structure from String
 		# (for data structure strings only!)
 		# self, string, ?unescape
@@ -1477,17 +1544,17 @@ sub timestr {	# Time from String
     $th{$m}=$d;
  }
 #eval('use POSIX');
- POSIX::mktime($th{'s'}||0,$th{'M'}||0,$th{'h'}||0,$th{'d'}||0,($th{'m'}||1)-1,$th{'y'}||0)
+ POSIX::mktime($th{'s'}||0,$th{'M'}||0,$th{'h'}||0,$th{'d'}||0,($th{'m'}||1)-1,$th{'y'}||0,0,0,(localtime(time))[8])
 }
 
 
 sub timeadd {	# Adjust time to years, months, days,...
- my $s =shift;
- my @t =localtime(shift);
+ my $s =$_[0];
+ my @t =localtime($_[1]);
  my $i =5;
- foreach my $a (@_) {$t[$i] += ($a||0); $i--}
+ foreach my $a (@_[2..$#_]) {$t[$i] += ($a||0); $i--}
 #eval('use POSIX');
- POSIX::mktime(@t[0..5])
+ POSIX::mktime(@t[0..5],0,0,$t[8])
 }
 
 
@@ -2080,7 +2147,7 @@ sub smtpSend {	# SMTP mail msg send
  $a{-from}	=$s->smtpAdrd($a{-from});
  $a{-to}	=&{$a{-to}}($s,\%a)	if ref($a{-to}) eq 'CODE';
  $a{-to}	=[grep {$_} split /\s*[,;]\s*/, ($a{-to} =~/^\s*(.*)\s*$/ ? $1 : $a{-to})]
-					if $a{-to} && ($a{-to} =~/[,;]/);
+					if $a{-to} && !ref($a{-to}) && ($a{-to} =~/[,;]/);
  $a{-to}	=ref($a{-to}) 
 			? [map {$s->smtpAdrd($_)} @{$a{-to}}]
 			: $s->smtpAdrd($a{-to}) 
@@ -2089,7 +2156,7 @@ sub smtpSend {	# SMTP mail msg send
  $a{-recipient}	=$a{-recipient} ||$a{-to};
  $a{-recipient}	=&{$a{-recipient}}($s,\%a) if ref($a{-recipient}) eq 'CODE';
  $a{-recipient}	=[grep {$_} split /\s*[,;]\s*/, ($a{-recipient} =~/^\s*(.*)\s*$/ ? $1 : $a{-recipient})]
-					if $a{-recipient} && ($a{-recipient} =~/[,;]/);
+					if $a{-recipient} && ref($a{-recipient}) && ($a{-recipient} =~/[,;]/);
  return($s)	if !$a{-recipient};
  $a{-recipient}	=ref($a{-recipient}) 
 			? [map {$s->smtpAdr($_)} @{$a{-recipient}}]
@@ -2155,9 +2222,11 @@ sub smtpSend {	# SMTP mail msg send
  return($s) if !$s->{-smtphost};
  $s->logRec('smtpSend',$a{-recipient});
  local $^W=undef;
- $s->smtp->mail($a{-sender})
+ $s->smtp->mail($a{-sender} =~/<\s*([^<>]+)\s*>/ ? $1 : $a{-sender})
 	||return(&{$_[0]->{-die}}("SMTP sender \'" .$a{-sender} ."'"));
- $s->smtp->to(ref($a{-recipient}) ? @{$a{-recipient}} : $a{-recipient})
+ $s->smtp->to(ref($a{-recipient})
+		? (map { $_ && /<\s*([^<>]+)\s*>/ ? $1 : $_ } @{$a{-recipient}})
+		: $a{-recipient})
 	||return(&{$_[0]->{-die}}("SMTP recipient \'" 
 		.(ref($a{-recipient}) ? join(', ',$a{-recipient}) : $a{-recipient}) ."'"));
  $s->smtp->data($a{-data})
@@ -2518,7 +2587,7 @@ sub unames {	# current user names
 }
 
 
-sub ugroups {	# current user groups
+sub ugroups {	# user groups
 		# (self, ?user) -> [user's groups]
  return($_[0]->{-c}->{-ugroups})        if !$_[1] && $_[0]->{-c}->{-ugroups};
  if ($_[0]->{-ugroups}) {
@@ -2556,7 +2625,7 @@ sub ugroups {	# current user groups
  }
  if ($ug) {
 	$rl ='file';
-	$un =($rs =~/^([^:]+):/ ? $1 : $rs);
+	$un =($rs =~/^([^:]+):/ ? $1 : $rs) if $rs;	# !!! not used
  }
  else {
 	$rl ='default';
@@ -2591,6 +2660,10 @@ sub ugroups {	# current user groups
 			if defined($e)
 			&& !grep /^\Q$e\E$/i, @$ug;
 	}
+ }
+ if ($s->{-ugflt1}) {
+	local $_ =$un;
+	&{$s->{-ugflt1}}($s, $un, $ul, $ug);
  }
  $s->logRec('ugroups', $un, $rl, $ug) if $rl;
  $s->{-c}->{-ugroups} =$ug if !$_[1];
@@ -2629,8 +2702,8 @@ sub ugrexp {	# current user and group names regexp source
 sub ugmember {	# user group membership
  my $e =$_[0]->{-c}->{-ugrexp} ||ugrexp($_[0]);
  foreach my $i (@_[1..$#_]) {
-	if (ref($i))	{foreach my $j (@$i) {defined($j) && &$e($j) && return($_[0]->{-c}->{-user})}}
-	else		{defined($i) && &$e($i) && return($_[0]->{-c}->{-user})}
+	if (ref($i))	{foreach my $j (@$i) {defined($j) && &$e($j) && return(1)}}
+	else		{defined($i) && &$e($i) && return(1)}
  }
  undef
 }
@@ -2874,6 +2947,16 @@ sub udisp {	# display user name
    }
 }
 
+
+sub udispq {	# display user name quick
+   !defined($_[1]) || $_[1] eq ''
+ ? ''
+ : $_[0]->{-AuthUserFile}
+ ? $_[1]
+ : $_[0]->{-c}->{-udisp}
+ ? $_[0]->{-c}->{-udisp}->{lc($_[1])} ||$_[1]
+ : udisp(@_)
+}
 
 
 sub ugfile {	# Users/groups caching, 'AuthGroupFile' file write/refresh
@@ -3784,9 +3867,10 @@ sub mdeRAC {	# Table record access control condition
 	? ($_[0]->{-form}->{$_[1]}->{-table} ? $_[0]->{-table}->{$_[0]->{-form}->{$_[1]}->{-table}} : $_[0]->{-form}->{$_[1]})
 	:  $_[0]->{-table}->{$_[1]}
 	) ||{};
-	( $m->{-racPrincipal}	||$_[0]->{-racPrincipal}
+	( $m->{-racActor}	||$_[0]->{-racActor} 
+	||$m->{-racManager}	||$_[0]->{-racManager}
+	||$m->{-racPrincipal}	||$_[0]->{-racPrincipal}
 	||$m->{-racUser}	||$_[0]->{-racUser}
-	||$m->{-racActor}	||$_[0]->{-racActor} 
 	||$m->{-racWriter}	||$_[0]->{-racWriter} 
 	||$m->{-rvcUpdBy}	||$_[0]->{-rvcUpdBy}
 	) && $m
@@ -3818,9 +3902,19 @@ sub mdeRole {	# Table user role fields list
 		|| ($m->{-rvcUpdBy}	&& [$m->{-rvcUpdBy}])
 		|| ($_[0]->{-rvcUpdBy}	&& [$_[0]->{-rvcUpdBy}])
 		|| mdeRole($_[0], $m, 'authors')
+ :      $_[2] eq 'manager'
+ ?	$m->{-racManager} &&[$m->{-racManager}->[0]] 
+		|| $_[0]->{-racManager} &&[$_[0]->{-racManager}->[0]] 
+		||mdeRole($_[0], $m, $_[3] ||'managers')
+ :	$_[2] eq 'managers'
+ ?	$m->{-racManager} ||$_[0]->{-racManager}
+		|| ($_[3] ? mdeRole($_[0], $m, $_[3]) : undef)
+		|| ($m->{-rvcInsBy}	&& [$m->{-rvcInsBy}])
+		|| ($_[0]->{-rvcInsBy}	&& [$_[0]->{-rvcInsBy}])
+		|| mdeRole($_[0], $m, 'author')
  :      $_[2] eq 'principal'
  ?	$m->{-racPrincipal} &&[$m->{-racPrincipal}->[0]] 
-		|| $_[0]->{-racPrincipal} &&[$_[0]->{-racPrincipal}->[0]] 
+		|| $_[0]->{-racPrincipal} &&[$_[0]->{-racPrincipal}->[0]]
 		|| mdeRole($_[0], $m, $_[3] ||'principals')
  :	$_[2] eq 'principals'
  ?	$m->{-racPrincipal} ||$_[0]->{-racPrincipal}
@@ -3829,7 +3923,7 @@ sub mdeRole {	# Table user role fields list
 		|| ($_[0]->{-rvcInsBy}	&& [$_[0]->{-rvcInsBy}])
 		|| mdeRole($_[0], $m, 'author')
  :      $_[2] eq 'user'
- ?	$m->{-racUser} &&[$m->{-racUser}->[0]] 
+ ?	$m->{-racUser} &&[$m->{-racUser}->[0]]
 		|| $_[0]->{-racUser} &&[$_[0]->{-racUser}->[0]] 
 		|| mdeRole($_[0], $m, $_[3] ||'users')
  :	$_[2] eq 'users'
@@ -3842,18 +3936,24 @@ sub mdeRole {	# Table user role fields list
 
 sub mdeRoles {	# Table user roles list
 		# self, table/form ||0, ? pass value
- return(qw(all author authors actor actors principal principals user users)) 
+ return(qw(all author authors actor actors manager managers principal principals user users))
 	if !$_[1];
  my $m =!$_[1] ? $_[1] : (mdeRAC(@_) ||{});
+ my $v;
  my @l =('all'
 	#,!$m ||$m->{-rvcInsBy}	||$_[0]->{-rvcInsBy}	? ('creator')	: ()
 	#,!$m ||$m->{-rvcUpdBy}	||$_[0]->{-rvcUpdBy}	? ('updater')	: ()
 	,!$m ||$m->{-rvcInsBy}	||$_[0]->{-rvcInsBy}	||
 	 !$m ||$m->{-rvcUpdBy}	||$_[0]->{-rvcUpdBy}	? ('author')	: ()
 	,!$m ||$m->{-racWriter}	||$_[0]->{-racWriter}	? ('authors')	: ()
-	,!$m ||$m->{-racActor}	||$_[0]->{-racActor}	? ('actor','actors')	: ()
-	,!$m ||$m->{-racPrincipal}	||$_[0]->{-racPrincipal} ? ('principal','principals') : ()
-	,!$m ||$m->{-racUser}	||$_[0]->{-racUser}	? ('user','users') : ()
+	,(!($v =!$m ||$m->{-racActor}||$_[0]->{-racActor})
+		? () : $#$v >0 ? (qw(actor actors)) : qw(actor))
+	,(!($v =!$m ||$m->{-racManager}||$_[0]->{-racManager})
+		? () : $#$v >0 ? (qw(manager managers)) : qw(manager))
+	,(!($v =!$m ||$m->{-racPrincipal}||$_[0]->{-racPrincipal})
+		? () : $#$v >0 ? (qw(principal principals)) : qw(principal))
+	,(!($v =!$m ||$m->{-racUser}||$_[0]->{-racUser})
+		? () : $#$v >0 ? (qw(user users)) : qw(user))
 	);
  push @l, $_[2] if $_[2] && !grep {$_ eq $_[2]} @l;
  @l
@@ -3893,9 +3993,9 @@ sub mddUrole {	# Display UROLE
 		|| $_
 		} @$l)
 	: ()
-	, $n =~/^(?:principal|user)$/i
+	, $n =~/^(?:manager|principal|user)$/i
 	? '! ' .$s->mddUrole($m, 'actor')
-	: $n =~/^(?:principals|users)$/i
+	: $n =~/^(?:managers|principals|users)$/i
 	? '! ' .$s->mddUrole($m, 'actors')
 	: ()
 	) || $n
@@ -4365,6 +4465,168 @@ sub rfaUpload {	# Upload named attachment into record's files directory
 }
 
 
+sub recActor {	# User's role ('admin','owner','-...', field); cached using -editable
+		# (table|command, record, ?db record , role | field | 0,...) -> boolean
+ return(1)	if $_[0]->uadmin();
+ return(recActor($_[0],$_[1],$_[3]||$_[2],@_[4..$#_]))
+		if ref($_[3]) ||(!$_[3] && ($#_ >3));
+ return(undef)	if !$_[3]
+		|| !ref($_[2]);
+ return($_[2]->{-editable})
+		if exists($_[2]->{-editable}) 
+		&& (!$_[2]->{-editable} || !$_[3]);
+ return(scalar(grep {recActor($_[0],$_[1],$_[2],$_)} @_[3..$#_]))
+		if $#_ >3;
+ return($_[2]->{-editable}->{$_[3]})
+		if ref($_[2]->{-editable})
+		&& exists($_[2]->{-editable}->{$_[3]});
+ my ($s,$f,$r,$n) =@_;
+ if (!ref($f)) {}
+ elsif ($f->{-cmdt})	{$f =$f->{-cmdt}}
+ elsif ($f->{-table})	{$f =$f->{-table}}
+ if (!exists($r->{-editable})) {
+	my $mt=ref($f) ? $f : !$f ? undef : $s->mdeTable($f);
+	return(undef)	if !$mt;
+	my $w =mdeWriters($s, $mt);
+	$r->{-editable} =!$w ||$s->ugmember(map {$r->{$_}} @$w);
+	return(undef)	if !$r->{-editable};
+ }
+ return($_[2]->{-editable})	if !$n;
+ $r->{-editable} ={} if !ref($r->{-editable});
+ if ($n =~/^(-racOwner)$/) {	# 'owner' role
+	my $n =$1;
+	my $mt =ref($f) ? $f : !$f ? undef : $s->mdeTable($f);
+	$r->{-editable}->{$n} =1;
+	foreach my $k (qw(-rvcInsBy -rvcUpdBy)) {
+		my $nf=($mt && $mt->{$k}) || ($s->{$k}) || ($s->{-tn}->{$k});
+		next	if !$nf || !exists($r->{$nf})
+			|| (lc($r->{$nf}) eq lc($s->user()));
+		$r->{-editable}->{$n} =undef;
+		last
+	}
+ }
+ elsif (substr($n,0,1) eq '-') {	# -racReader, -racWriter; -racActor, -racManager, -racPrincipal, -racUser
+	my $mt =ref($f) ? $f : !$f ? undef : $s->mdeTable($f);
+	$r->{-editable}->{$n} =$s->ugmember(
+			map {$r->{$_} ? $r->{$_} : ()
+				} @{($mt && $mt->{$n}) || $s->{$n} ||[]})
+ }
+ else {					# field name
+	$r->{-editable}->{$n} =!defined($r->{$n}) || ($r->{$n} eq '') 
+				? undef 
+				: $s->ugmember($r->{$n})
+ }
+#$s->logRec('recActor',$n) if $r->{-editable}->{$n};
+ $r->{-editable}->{$n}
+}
+
+
+sub recActLim {	# Bound fields
+ my ($s, $c, $rn, $rb, $fo, @fn) =@_;	# (cmd, new data, db data, opt, fld names | -recDel)
+ my $rr =ref($rn) ? $rn : $rb;		# 1-'v'iew, 2-e'x'clude
+ return(undef)	if !ref($rr);		# []-restrict values; '-recRead'
+ $s->logRec('recActLim',$c->{-cmd},$fo, @fn);
+ if ($fo eq '-recRead') {
+	delete $rr->{-editable};
+	return(&{$s->{-die}}($s->lng(0,$c->{-cmd}) .": " .$s->lng(1,'recUpdAclStp')) && undef)
+		if $c->{-cmd}
+		&& ($c->{-cmd} !~/^(?:recRead)$/);
+	return(1)
+ }
+ $s->recActor($c, $rr, 0) if !$rr->{-editable};
+ return(undef)	if !$rr->{-editable} && !$rr->{-new};
+ return(!$c->{-cmdt}
+	? return(&{$s->{-die}}($s->lng(0,'recActLim') ." no {-cmdt}") && undef)
+	: $s->recActLim($c, $rn, $rb, $1
+	, (map{  my $n =(ref($_) ne 'HASH') ||!$_->{-fld}
+				||(exists($_->{-edit}) && (!$_->{-edit} || ref($_->{-edit})))
+				||($_->{-flg} && ($_->{-flg}!~/[aeu]/))
+			? '' : $_->{-fld};
+		  !$n
+		? ()
+		: !(grep {$n eq $_} @_[5..$#_])
+		? ($n)
+		: ()
+		} @{$c->{-cmdt}->{-field}})))
+	if $fo =~/^(\w)!/;
+ $rr->{-editable} ={} if !ref($rr->{-editable});
+ $rr->{-editable}->{-fr} ={} if !$rr->{-editable}->{-fr};
+ $fo = $fo eq 'v' ? 1 : $fo eq 'x' ? 2 : 1
+	if $fo && !ref($fo) && $fo =~/\w/;
+ my $fh =$rr->{-editable}->{-fr};	# fields restrictions hash
+ my $ds =undef;				# delete restriction
+ if ($c->{-cmd} && ($c->{-cmd} =~/^(?:recRead|recForm)$/)
+ && !$c->{-edit} ) {
+	$fh->{-recDel} =$ds =1	if grep /^-recDel$/, @fn;
+ }
+ elsif ($c->{-cmd} && ($c->{-cmd} =~/^(?:recNew|recRead|recForm|recDel)$/)) {
+	foreach my $fn (@fn) {
+		$fh->{$fn} =$fo;
+		$ds =1	if $fn eq '-recDel';
+	}
+ }
+ else {
+	foreach my $fn (@fn) {
+		$fh->{$fn} =$fo;
+		$ds =1	if $fn eq '-recDel';
+		if	(!$fo
+		||	(substr($fn,0,1) eq '-')
+				) {
+		}
+		elsif (ref($fo)) {	# restricted values
+			if (ref($rn) && (ref($fo) eq 'ARRAY')) {
+				return(&{$s->{-die}}($s->lng(0,'recUpd') 
+					." ('$fn', "
+					.join(', ', map {defined($_) ? "'$_'" : 'undef'
+							} $rn->{$fn}, @$fo)
+					."): " .$s->lng(1,'recUpdAclStp')) && undef)
+					if !defined($rn->{$fn})
+					|| !(grep {$rn->{$fn} eq $_} @$fo);
+			}
+		}
+		if (ref($rn) && ref($rb)) {
+			if	($fo ==1) {	# view only
+				return(&{$s->{-die}}($s->lng(0,'recUpd') 
+					." ('$fn', "
+					.join(', ', map {defined($_) ? "'$_'" : 'undef'
+							} $rn->{$fn}, $rb->{$fn})
+					."): " .$s->lng(1,'recUpdAclStp')) && undef)
+					if (defined($rn->{$fn}) ? $rn->{$fn} : '')
+					ne (defined($rb->{$fn}) ? $rb->{$fn} : '');
+			}
+			elsif	($fo ==2) {	# exclude
+				delete $rn->{$fn}
+			}
+		}
+		elsif (!$rb) {
+			if	($fo ==1) {	# view only
+			}
+			elsif	($fo ==2) {	# exclude
+				delete $rn->{$fn}
+			}
+		}
+	}
+ }
+ if ($ds) {
+	$ds =$c->{-cmdt} && $c->{-cmdt}->{-rvcDelState} ||$s->{-rvcDelState};
+	$fh->{$ds->[0]} =[grep {  $_ ne $ds->[1]
+				} ref($fh->{$ds->[0]})
+				? @{$fh->{$ds->[0]}}
+				: @{$c->{-cmdt}->{-mdefld}->{$ds->[0]}->{-inp}->{-values}}
+				]
+		if $ds
+		&& (!$fh->{$ds->[0]} || (ref($fh->{$ds->[0]}) eq 'ARRAY'))
+		&& $c->{-cmdt}->{-mdefld} && $c->{-cmdt}->{-mdefld}->{$ds->[0]}
+		&& $c->{-cmdt}->{-mdefld}->{$ds->[0]}->{-inp}
+		&& (ref($c->{-cmdt}->{-mdefld}->{$ds->[0]}->{-inp}->{-values}) eq 'ARRAY');
+	return(&{$s->{-die}}($s->lng(0,'recDel') .": " .$s->lng(1,'recDelAclStp')) && undef)
+		if ($c->{-cmd} && ($c->{-cmd} eq 'recDel'))
+		|| ($ds && $rn && $rn->{$ds->[0]} && ($rn->{$ds->[0]} eq $ds->[1]));
+ }
+ 1
+}
+
+
 sub recNew {    # Create new record to be inserted into database
 		# -table=>name, field=>value || -data=>{values}
 		# -key=>prototype record key, -proto=>{values}
@@ -4387,11 +4649,11 @@ sub recNew {    # Create new record to be inserted into database
 	delete $r->{$w};
  }
  $r->{-new} =$s->strtime();
- $r->{-editable} =$s->user() if $s->{-rac} && ($m->{-racWriter}||$s->{-racWriter});
+ $r->{-editable} =1 if $s->{-rac} && ($m->{-racWriter}||$s->{-racWriter});
  rmiTrigger($s, $a, $r, undef, qw(-recForm0C));
- my $p =$a->{-proto} || ((grep {$_} values %{$a->{-key}}) ? $s->recRead(%$a, -data=>undef, -test=>1) : {});
+ my $p =$a->{-proto} || ((grep {$_} values %{$a->{-key}}) ? $s->recRead_($m, {%$a, -data=>undef, -test=>1}) : {});
  rmiTrigger($s, $a, $r, $p, qw(-recNew0C));
- rmiTrigger($s, $a, $r, undef,	qw(-recForm0R -recEdt0R -recNew0R -recNew1C -recForm1C));
+ rmiTrigger($s, $a, $r, undef,	qw(-recForm0R -recFlim0R -recEdt0R -recNew0R -recNew1C -recForm1C));
  $r
 }
 
@@ -4408,12 +4670,16 @@ sub recForm {   # Recalculate record - new or existing
 	$a->{-key}  =rmlKey($s, $a, $d);
  my	$m =mdeTable($s,$a->{-table});
  rmiTrigger($s, $a, $d, undef, qw(-recForm0C));
- my	$r =(!$d->{-new} && (grep {$_} values %{$a->{-key}}) && $s->recRead(%$a,-data=>undef,-test=>1));
+ my	$r =(!$d->{-new} && (grep {$_} values %{$a->{-key}}) && $s->recRead_($m, {%$a,-data=>undef,-test=>1}))
+		||undef;
 	map {$d->{$_} =$r->{$_} if !exists($d->{$_})} keys %$r	if $r;
  foreach my $w (qw(-rvcInsBy -rvcUpdBy)) {foreach my $c ($m, $s) {
 	next if !$c->{$w}; $d->{$c->{$w}} =$s->user if !$d->{$c->{$w}}; last
  }}
- rmiTrigger($s, $a, $d, $r, qw(-recForm0R -recEdt0R -recForm1C));
+ $d->{-editable} =1 
+	if ($r && $r->{-editable})
+	|| ($d->{-new} && $s->{-rac} && ($m->{-racWriter}||$s->{-racWriter}));
+ rmiTrigger($s, $a, $d, $r, qw(-recForm0R -recFlim0R -recEdt0R -recForm1C));
  $d
 }
 
@@ -4443,7 +4709,7 @@ sub recIns {    # Insert record into database
 
  rmiTrigger($s, $a, $d, undef, qw(-recForm0C -recIns0C));
  my	$r =undef;
- my	$p =(grep {$_} values %{$a->{-key}}) && $s->recRead(%$a, -data=>undef, -test=>1);
+ my	$p =(grep {$_} values %{$a->{-key}}) && $s->recRead_($m,{%$a, -data=>undef, -test=>1});
  if ($p) {		# form record with prototype
     my $t =recData($s, $p);
     delete $t->{$v};
@@ -4459,7 +4725,7 @@ sub recIns {    # Insert record into database
 		my $t ={%$e};	# readonly hash
 		rfdStamp($s, $a, $t) if $b;
 		@{$t}{recFields($s, $d)} =recValues($s, $d);
-		rmiTrigger($s, $a, $t, undef, qw(-recForm0R -recEdt0R -recChg0R -recIns0R -recInsID -recChg0W));
+		rmiTrigger($s, $a, $t, undef, qw(-recForm0R -recFlim0R -recEdt0R -recChg0R -recIns0R -recInsID -recChg0W));
 		rfdCp	  ($s, $t->{-file}, $a, $t) if !$a->{-file} && $t && $t->{-file};
 		rfdCp	  ($s, $p->{-file}, $a, $t) if !$a->{-file} && $p && $p->{-file};
 		rfdCp	  ($s, $a->{-file}, $a, $t) if  $a->{-file};
@@ -4475,15 +4741,20 @@ sub recIns {    # Insert record into database
 	$r =$r ||$d;
  }
  else {			# insert single record
-	rmiTrigger($s, $a, $d, undef, qw(-recForm0R -recEdt0R -recChg0R -recIns0R -recInsID -recChg0W));
+	rmiTrigger($s, $a, $d, undef, qw(-recForm0R -recFlim0R -recEdt0R -recChg0R -recIns0R -recInsID -recChg0W));
 	rfdCp	  ($s, $p, $a, $d)		if !$a->{-file} && $p && $p->{-file};
 	rfdCp	  ($s, $a->{-file}, $a, $d)	if  $a->{-file};
 	rmiIndex  ($s, $a, $d, undef)		if $m->{-index} ||$s->{-index};
 	$r =$s->dbiIns($a, $d);
 	rfdStamp  ($s, $a, $r, $tu);
-	$r->{-editable} =$s->user if $r && $s->{-rac} && ($m->{-racWriter}||$s->{-racWriter});
+	$r->{-editable} =1 if $r && $s->{-rac} && ($m->{-racWriter}||$s->{-racWriter});
 	$s->{-affected} =1;
-	rmiTrigger($s, $a, $r, undef, qw(-recIns1R -recIns1C -recForm1C)) if $r;
+	do {	local $a->{-cmd}  ='recRead';
+		rmiTrigger($s, $a, $r, $r, qw(-recForm0R -recFlim0R -recRead0R -recIns1R -recRead1R))
+		}
+		if $r;
+	rmiTrigger($s, $a, $r, undef, qw(-recIns1C -recRead1C -recForm1C))
+		if $r;
  }
  return($r)
 }
@@ -4623,7 +4894,7 @@ sub recUpd {    # Update record(s) in database
  }
  $d->{$t1} =$s->strtime($tu) if $t1;
  rmiTrigger($s, $a, $d, undef, qw(-recForm0C -recUpd0C));
- if ($w ||$o ||$v ||$i ||grep {$s->{$_} || $m->{$_}} qw(-recForm0R -recEdt0R -recChg0R -recUpd0R -recChg0W -recUpd1R)) {
+ if ($w ||$o ||$v ||$i ||grep {$s->{$_} || $m->{$_}} qw(-recForm0R -recFlim0R -recEdt0R -recChg0R -recUpd0R -recChg0W -recUpd1R)) {
 	my $c =$s->recSel(rmlClause($s, $a), -data=>undef);
 	my $j =0;
 	while ($r =$c->fetchrow_hashref()) {
@@ -4667,7 +4938,7 @@ sub recUpd {    # Update record(s) in database
 			&& (($d->{$o->[0]}||'') eq $o->[1])) {
 			$n ={%$r}; @{$n}{recFields($s, $d)} =recValues($s, $d);
 			$n->{$v} =$r->{'id'};
-			rmiTrigger($s, $a, $n, $n, qw(-recForm0R -recEdt0R -recChg0R -recUpd0R -recInsID -recChg0W));
+			rmiTrigger($s, $a, $n, $n, qw(-recForm0R -recFlim0R -recEdt0R -recChg0R -recUpd0R -recInsID -recChg0W));
 			rfdCp	  ($s, $r->{-file}, $a, $n)	if $r->{-file};
 			rfdStamp  ($s, $a, $n, $tu)		if $r->{-file};
 			rmiIndex  ($s, $a, $n, undef)		if $m->{-index} ||$s->{-index};
@@ -4681,7 +4952,7 @@ sub recUpd {    # Update record(s) in database
 					} @{$u}[1..$#{@$u}]))) {
 			$n ={%$r}; @{$n}{recFields($s, $d)} =recValues($s, $d);
 			$p ={%$r, $v=>$r->{'id'}, -table=>$a->{-table}};
-			rmiTrigger($s, $a, $n, $r, qw(-recForm0R -recEdt0R -recChg0R -recUpd0R  -recChg0W));
+			rmiTrigger($s, $a, $n, $r, qw(-recForm0R -recFlim0R -recEdt0R -recChg0R -recUpd0R  -recChg0W));
 			rmiTrigger($s, $a, $p, undef, qw(-recInsID));
 			do {	rfdCp	($s, $r->{-file}, $a, $p);
 				rfdStamp($s, $a, $p, rfdTime($s, $a, $n)||'+');
@@ -4711,7 +4982,7 @@ sub recUpd {    # Update record(s) in database
 		}
 		else {					# update only
 			$n ={%$r}; @{$n}{recFields($s, $d)} =recValues($s, $d);
-			rmiTrigger($s, $a, $n, $r, qw(-recForm0R -recEdt0R -recChg0R -recUpd0R -recChg0W));
+			rmiTrigger($s, $a, $n, $r, qw(-recForm0R -recFlim0R -recEdt0R -recChg0R -recUpd0R -recChg0W));
 			do {	rfdRm  ($s, $a->{-table}, $n);
 				rfdCp  ($s, $a->{-file},  $a->{-table}, $n);
 				}
@@ -4746,9 +5017,12 @@ sub recUpd {    # Update record(s) in database
  if ($r && ($s->{-affected}||0) ==1) {
 	rfdStamp($s, $a, $r) 
 			if $b;
-	$r->{-editable} =$w ? $s->ugmember(map {$r->{$_}} @$w) : $s->user
+	$r->{-editable} =$w ? $s->ugmember(map {$r->{$_}} @$w) : 1
 			if $s->{-rac};
-	rmiTrigger($s, $a, $r, undef, qw(-recUpd1C -recForm1C));
+	{	local $a->{-cmd}  ='recRead';
+		rmiTrigger($s, $a, $r, $r, qw(-recForm0R -recFlim0R -recRead0R -recRead1R))
+	};
+	rmiTrigger($s, $a, $r, undef, qw(-recUpd1C -recRead1C -recForm1C));
  }
  elsif ($r) {
 	rmiTrigger($s, $a, $r, undef, qw(-recUpd1C))
@@ -4770,15 +5044,15 @@ sub recUtr {    # Translate values in database
 	if ($n && ($n !~/^-/)) {
 		$a ={-table=>ref($n) ? $n->{-table} : $n
 			, -key=>{}, -data=>{}, -sel=>0};
-		if (!$_[4] && ref($_[2])) {	# {new}, {old}
+		if (!$_[4] && ref($_[2]) && ref($_[3])) {	# {new}, {old}
 			$a->{-data}=$_[2];
-			$a->{-key} =$_[3]
+			$a->{-key} =$_[3];
 		}
-		if (!$_[2] && ref($_[4])) {	# !, {new}, {old}
+		elsif (!$_[2] && ref($_[3]) && ref($_[4])) {	# !, {new}, {old}
 			$a->{-data}=$_[3];
 			$a->{-key} =$_[4]
 		}
-		elsif (ref($_[2]) eq 'HASH') {	# {field/src}
+		elsif (ref($_[2]) eq 'HASH') {			# {field/src}
 			foreach my $k (keys %{$_[2]}) {
 				if (ref($_[2]->{$k})) {	# {field=>[new, old]}
 					$a->{-data}->{$k} =$_[2]->{$k}->[0];
@@ -5078,9 +5352,9 @@ sub dbmSeek {	# Select records from dbm file using -key and -where
  if ($wr) {
 	my $wl	=$wr;
 	my $wn	=$a->{-uname} ? $s->ugnames($a->{-uname}) : $s->ugnames();
-	my $wx	=$a->{-urole} =~/^(?:principal|user)$/i
+	my $wx	=$a->{-urole} =~/^(?:manager|principal|user)$/i
 		? mdeRole($s, $m, 'actor') 
-		: $a->{-urole} =~/^(?:principals|users)$/i
+		: $a->{-urole} =~/^(?:managers|principals|users)$/i
 		? mdeRole($s, $m, 'actors') 
 		: [];
 	$wr	=sub {	foreach my $n (@$wn) {
@@ -5356,7 +5630,7 @@ sub recDel {    # Delete record(s) in database
 			if $x && defined($r->{$x->[0]}) 
 			&& ($r->{$x->[0]} eq $x->[1]);
 		rfdStamp  ($s, $a, $r)		if $b;
-		rmiTrigger($s, $a, $d, $r, qw(-recDel0R));
+		rmiTrigger($s, $a, undef, $r, qw(-recForm0R -recFlim0R -recDel0R));
 		rfdRm	  ($s, $r)		if !$x && $r->{-file};
 		rmiIndex  ($s, $a, undef, $r)	if !$x && $i;
 	}
@@ -5488,7 +5762,16 @@ sub recRead {   # Read one record from database
  my	$m =mdeTable($s,$a->{-table});
  my	$r =undef;
  rmiTrigger($s, $a, $d, undef, qw(-recForm0C -recRead0C));
- $r =$s->dbiSel($a)->fetchrow_hashref();
+ $r =$s->recRead_($m, $a);
+ rmiTrigger($s, $a, $r, $r, qw(-recForm0R -recFlim0R -recRead0R -recRead1R -recRead1C -recForm1C))
+	if $r;
+ $r
+}
+
+
+sub recRead_ {	# recRead internal use, without triggers
+ my ($s, $m, $a) =@_;
+ my $r =$s->dbiSel($a)->fetchrow_hashref();
  if ($r) {
 	$s->{-affected} =1;
 	$s->{-fetched}  =1;
@@ -5509,13 +5792,11 @@ sub recRead {   # Read one record from database
 	&&($m->{-racWriter} ||$s->{-racWriter} ||$m->{-racReader} ||$s->{-racReader})
 	&& !$s->ugmember(map {$r->{$_}}	 @{$m->{-racWriter} ||$s->{-racWriter}||[]}
 					,@{$m->{-racReader} ||$s->{-racReader}||[]});
-	$r->{-editable} =$s->user()
+	$r->{-editable} =1
 		if $s->uadmwtr()
 		|| $s->ugmember(map {$r->{$_}} @{$m->{-racWriter} || $s->{-racWriter}||[]})
  }
  rfdStamp($s, $a, $r) if $m->{-rfa} ||$s->{-rfa};
- rmiTrigger($s, $a, $r, $r, qw(-recForm0R -recRead0R -recRead1R -recRead1C -recForm1C))
-	if $r;
  $r
 }
 
@@ -5861,14 +6142,14 @@ sub dbiSel {    # Select records from database
 				, $cf))
 			,(!$a->{-urole}
 			 ? ()
-			 : $a->{-urole} =~/^(?:principal|user)$/i
+			 : $a->{-urole} =~/^(?:manager|principal|user)$/i
 			 ? dbiACLike($s, 0, $f, 'NOT'
 				, mdeRole($s, $f, 'actor')
 				,($a->{-uname}
 				? $s->ugnames($a->{-uname})
 				: $s->ugnames())
 				, $cf)
-			 : $a->{-urole} =~/^(?:principals|users)$/i
+			 : $a->{-urole} =~/^(?:managers|principals|users)$/i
 			 ? dbiACLike($s, 0, $f, 'NOT'
 				, mdeRole($s, $f, 'actors')
 				,($a->{-uname}
@@ -6195,6 +6476,7 @@ sub cgiRun {	# Execute CGI query
 	foreach my $e (map {$om->{$_}} ('-cgcURL', '-redirect')) {
 		next if !defined($e);
 		last if !$e;
+		last if $oa eq 'frmHelp';
 		print $s->cgi->redirect(-uri=>$e, -nph=>(($ENV{SERVER_SOFTWARE}||'') =~/IIS/) ||($ENV{MOD_PERL} && !$ENV{PERL_SEND_HEADER}));
 		$s->end();
 		return($r);
@@ -6205,7 +6487,10 @@ sub cgiRun {	# Execute CGI query
 			,$og =~/^rec(.+)/ ? $1 : $og, 'Call') {
 		next if !defined($e);
 		last if !$e;
+		last if $oa eq 'frmHelp';
 		$s->cgibus(1);
+		$s->{-pcmd}->{-form} =$on	if !ref($e);
+		$e =$` .$e	if !ref($e) && !-f $e && ($0=~/[^\\\/]+$/);
 		$_ =$s;
 		$r =	ref($e) 
 			? &$e($s, $on, $om, $s->{-pcmd}, $s->{-pdta})
@@ -6257,6 +6542,7 @@ sub cgiRun {	# Execute CGI query
 		,$og =~/^rec(.+)/ ? $1 : $og, 'Call') {
 	next if !defined($e);
 	last if !$e;
+	last if $oa eq 'frmHelp';
 	$_ =$s;
 	$r =	  ref($e)
 		? &$e($s, $on, $om, $s->{-pcmd}, $s->{-pout})
@@ -6275,6 +6561,7 @@ sub cgiRun {	# Execute CGI query
 	);
  $s->cgiForm($on, $om, $s->{-pcmd}, $s->{-pout}) if $s->cgiHook('recFormRWQ');
  $s->cgiList($on, $om, $s->{-pcmd}, $s->{-pout}) if $s->cgiHook('recList');
+ $s->cgiHelp($on, $om, $s->{-pcmd}, $s->{-pout}) if $s->cgiHook('frmHelp');
  $s->recCommit();
  $s->cgiFooter();
  $s->output($s->htmlEnd());
@@ -6295,19 +6582,20 @@ sub cgiParse {	# Parse CGI call parameters
 	next if !defined($d->{$k} || $d->{$k} eq '');
 	if($k =~/^_(quname)__S$/) {		# cgiDDLB choise
 		$s->{-pcmd}->{"-$1"} =$d->{'_' .$1 .'__L'};
+		$s->{-pdta}->{$k} =$d->{$k};
 	}
-	if($k =~/^(.+)__S$/) {			# cgiDDLB choise
+	elsif($k =~/^(.+)__S$/) {		# cgiDDLB choise
 		$s->{-pdta}->{$1} =$d->{$1 .'__L'};
 		$s->{-pdta}->{$k} =$d->{$k};
 	}
-	if($k =~/^(.+)__R$/) {			# cgiDDLB reset
+	elsif($k =~/^(.+)__R$/) {		# cgiDDLB reset
 		$s->{-pdta}->{$1} =undef;
 		$s->{-pdta}->{$1 .'__S'} =$d->{$k};
 	}
 	elsif($k =~/^_(new|file)$/) {		# record attribute
 		$s->{-pdta}->{"-$k"} =$d->{$k}
 	}
-	elsif ($k =~/^_(cmd|cmg|frmCall|frmName\d*|frmLso|frmLsc|recNew|recRead|recPrint|recXML|recHist|recEdit|recIns|recUpd|recDel|recForm|recList|recQBF|submit.*|app.*|form|key|wikn|proto|urm|qjoin|qkey|qwhere|qurole|quname|qftext|qversion|qorder|qkeyord|qlist|qlimit|qdisplay|qftwhere|qftord|qftlimit|edit|backc|login|print|xml|hist|refresh|style|frame)(?:\.[xXyY]){0,1}$/i) {
+	elsif ($k =~/^_(cmd|cmg|frmCall|frmName\d*|frmLso|frmLsc|frmHelp|recNew|recRead|recPrint|recXML|recHist|recEdit|recIns|recUpd|recDel|recForm|recList|recQBF|submit.*|app.*|form|key|wikn|proto|urm|qjoin|qkey|qwhere|qurole|quname|qftext|qversion|qorder|qkeyord|qlist|qlimit|qdisplay|qftwhere|qftord|qftlimit|edit|backc|login|print|xml|hist|refresh|style|frame)(?:\.[xXyY]){0,1}$/i) {
 		my ($c, $v) =($1, $d->{$k});	# command
 		$v =$1	if ($k !~/^_(key|proto|qkey|qftext)/i)
 			&& ($v =~/^\s*(.+?)\s*$/);
@@ -6316,7 +6604,7 @@ sub cgiParse {	# Parse CGI call parameters
 			$g->delete($k);
 			$v=1;
 		}
-		if ($c =~/^(?:rec|frmCall|submit)/i) {
+		if ($c =~/^(?:rec|frmCall|frmHelp|submit)/i) {
 			$s->{-pcmd}->{-cmd} =$c
 		}
 		else {
@@ -6406,6 +6694,10 @@ sub cgiParse {	# Parse CGI call parameters
 	$c->{-hist} =1;
 	$c->{-cmd} ='recRead';
 	# $c->{-backc}=0;
+ }
+ elsif	($c->{-cmd} eq 'frmHelp') {
+	$c->{-edit} =undef;
+	$c->{-backc}=0;
  }
  elsif	($c->{-cmd} !~/^(recIns|recUpd|recForm)/) {
 	$c->{-edit} =undef
@@ -6551,43 +6843,43 @@ sub psParse {	# PerlScript Parse Source
      $i ='<' .$1 .$'
  }
  if ($b && $i =~m{(<body[^>]*>)}i) {
-     my ($i0,$i1) =($` .$1 ,$');
-     $i =$i0 .('<base href="'. $s->htmlEscape($b) .'/" />') .$i1
+	my ($i0,$i1) =($` .$1 ,$');
+	$i =$i0 .('<base href="'. $s->htmlEscape($b) .'/" />') .$i1
  }
  if ($opt =~/e/i && $i =~m{<body[^>]*>}i) {	# '-e'mbeddable html
-    $i =$';
-    $i =$` if $i =~m{</body>}i
+	$i =$';
+	$i =$` if $i =~m{</body>}i
  }
  while ($i) {
-    if (not $i =~m{<(\%@|\%|SCRIPT) *(Language *= *|)* *(PerlScript|Perl|)* *(RUNAT *= *Server|)*[ >]*}i) {
-       $ol =$i; $i ='';
-       $ts ='';
-    }
-    elsif (($2 && !$3) || (!$3 && $tl eq '1')) {
-       $ol =$` .$&;
-       $i  =$';
-       $tl =1;
-       $tc =$ts ='';
-    }
-    elsif ($1) {
-       $ol =$`; $i =$';
-       $ts =uc($1||''); $tl =($2 && $3)||''; $ta=$4||'';
-       if ($i =~m{ *(\%>|</SCRIPT>)}i) {$tc =$`; $i =$'}
-       else                            {$tc =''}
-    }
-    else {
-       $ol =$i; $i ='';
-    }
-    $ol =~s/(["\$\@%\\])/\\$1/g;
-    $ol =~s/[\n]/\\n");\n\$_[0]->output("/g;
-    $o .= "\$_[0]->output(\"$ol\\n\");\n";
-    next if !$ts || !$tc || $ts eq '%@';
-    $tc =~s/\&lt;?/</g;
-    $tc =~s/\&gt;?/>/g;
-    $tc =~s/\&amp;?/\&/g;
-    $tc =~s/\&quot;?/"/g;
-    if    ($ts eq '%')      { $o .= "\$_[0]->output($tc);\n" }
-    elsif ($ts eq 'SCRIPT') { $o .= $tc .";\n"}
+	if (not $i =~/<(\%@|\%|script)\s*(language\s*=\s*|)*\s*(PerlScript|Perl|)*\s*(runat\s*=\s*Server|)*[\s>]*/i) {
+		$ol =$i; $i ='';
+		$ts ='';
+	}
+	elsif (($2 && !$3) || (!$3 && $tl eq '1')) {
+		$ol =$` .$&;
+		$i  =$';
+		$tl =1;
+		$tc =$ts ='';
+	}
+	elsif ($1) {
+		$ol =$`; $i =$';
+		$ts =uc($1||''); $tl =($2 && $3)||''; $ta=$4||'';
+		if ($i =~/\s*(\%>|<\/script\s*>)/i)	{$tc =$`; $i =$'}
+		else					{$tc =''}
+	}
+	else {
+		$ol =$i; $i ='';
+	}
+	$ol =~s/(["\$\@%\\])/\\$1/g;
+	$ol =~s/[\n]/\\n");\n\$_[0]->output("/g;
+	$o .= "\$_[0]->output(\"$ol\\n\");\n";
+	next if !$ts || !$tc || $ts eq '%@';
+	$tc =~s/\&lt;?/</g;
+	$tc =~s/\&gt;?/>/g;
+	$tc =~s/\&amp;?/\&/g;
+	$tc =~s/\&quot;?/"/g;
+	if    ($ts eq '%')	{ $o .= "\$_[0]->output($tc);\n" }
+	elsif ($ts eq 'SCRIPT')	{ $o .= $tc .";\n"}
  }
  $o;
 }
@@ -6603,7 +6895,7 @@ sub psEval {	# Evaluate perl script file
 	$f =$s->{-path} .'/psp/' .$f;
 	$u =$s->{-url}  if !$u;
  }
- $s->hfNew($f)->read($c, -s $f)->close();
+ my $h =$s->hfNew($f); $h->read($c, -s $f); $h->close();
  $s->output($s->{-c}->{-httpheader} =$s->cgi->header(
 		  -charset => $s->charset(), -expires => 'now'
 		, ref($s->{-httpheader})
@@ -6612,6 +6904,8 @@ sub psEval {	# Evaluate perl script file
           if $o !~/e/;  # '-e'mbeddable html
  local $SELF =$s;
  $c =eval('sub{' .$s->psParse($o, $c, $u, @_) .'}');
+ return(&{$s->{-die} }("psParse($o, $f)->$@") && undef) if !$c;
+ local $_ =$s;
  eval{&$c($s, $o, $f, @_)};
  return(&{$s->{-die} }("psEval($o, $f)->$@") && undef) if $@;
  $s
@@ -6684,7 +6978,7 @@ sub cgiAction {	# cgiRun Action Executor encapsulated
 	$s->rmiTrigger($oc, $s->{-pout}, undef, qw(-recForm1A))
 		if $oa =~/^rec(?:New|Form|Ins|Upd|Read)/;
  }
- elsif	($oa =~/^(recForm)/) {
+ elsif	($oa =~/^(recForm|frmHelp)/) {
 	# nothing needed
  }
  else	{
@@ -6707,7 +7001,7 @@ sub htmlStart {	# HTTP/HTML/Form headers
 	? 'Form' .($on ? ' ' .$on : '')
 	: $s->cgiHook('recFormQ')
 	? 'Form' .($on ? ' ' .$on : '') .' QBF' .($on ? ' ' .$on .'__QBF' : '')
-	: $s->cgiHook('recHelp')
+	: $s->cgiHook('frmHelp')
 	? 'Form Help' .($on ? ' ' .$on .'__Help' : '')
 	: 'Form' .($on ? ' ' .$on : '') .' List' .($on ? ' ' .$on .'__List' : '');
  my $r	=join(""
@@ -6758,6 +7052,9 @@ sub htmlStart {	# HTTP/HTML/Form headers
 				.".htmlMQHsel {text-decoration: none; font-weight: bolder; border-style: inset;}"
 			,-title	=> (do{	my $v =eval{$om && $s->lnglbl($om)};
 					$v ? $v .' - ' : ''})
+				.($s->{-pcmd}->{-cmd} eq 'frmHelp'
+					? $s->lng(0,'frmHelp') .' - '
+					: '')
 				.($s->{-title} ||$s->cgi->server_name())
 			,-class	=> "Body $cs"
 			,$s->{-pcmd}->{-frame}
@@ -6836,6 +7133,8 @@ sub htmlOnLoadW {# OnLoad event JavaScript write
 sub htmlHidden {# Common hidden fields
  my ($s, $on, $om) =@_;
  return('') if $s->{-pcmd}->{-xml} ||$s->{-pcmd}->{-print};
+ $on =$s->{-pcmd}->{-form} ||$s->{-pcmd}->{-table} ||''
+	if !$on;
  join("\n"
 	,'<input type="hidden" name="_form" value="' .$s->htmlEscape($on) .'" />'
 	,'<input type="hidden" name="_cmd"  value="" />'
@@ -6863,10 +7162,13 @@ sub htmlHidden {# Common hidden fields
 sub htmlMenu {	# Screen menu bar
  my ($s,$on,$om) =@_;
  return('') if $s->{-pcmd}->{-xml} ||$s->{-pcmd}->{-print};
+ $on =$s->{-pcmd}->{-form} ||$s->{-pcmd}->{-table} ||''
+	if !$on;
+ $om =$on && $s->{-form}->{$on}||$s->mdeTable($on) if !$om;
  my $ot=$om && $om->{-table} && $s->mdeTable($om->{-table}) || $om;
  my $c =$s->{-pcmd};
- my $a =$c->{-cmd};
- my $g =$c->{-cmg};
+ my $a =$c->{-cmd} ||'';
+ my $g =$c->{-cmg} ||'';
  my $e =$c->{-edit};
  my $d =$s->{-pdta};
  my $n =$d->{-new} ||($c->{-cmg} eq 'recNew');
@@ -6914,8 +7216,12 @@ sub htmlMenu {	# Screen menu bar
 	push @r, htmlMB($s, 'recQBF');
 	if ($s->uguest) {}
 	elsif ($om->{-recNew} || $om->{-recForm}
-	|| (grep {(ref($_) eq 'ARRAY') && ($_->[0] =~/^\Q$on\E\+/)
-		} @{$s->{-menuchs1} ||$s->{-menuchs} ||[]}) ) {
+	|| ($on && (grep {(	!ref($_)
+				? $_
+				: ref($_) eq 'HASH'
+				? $_->{-val}
+				: $_->[0]) =~/^\Q$on\E\+/
+		} @{$s->{-menuchs1} ||$s->{-menuchs} ||[]})) ) {
 		push @r, htmlMB($s, 'recNew')
 	}
 	elsif (	$om->{-table}
@@ -6923,7 +7229,11 @@ sub htmlMenu {	# Screen menu bar
 	&&	$s->{-table}->{$om->{-table}}
 	&&	!$s->{-table}->{$om->{-table}}->{-ixcnd}
 	&&	do{my $on =$om->{-table};
-		grep {(ref($_) eq 'ARRAY') && ($_->[0] =~/^\Q$on\E\+/)
+		grep {(	!ref($_)
+				? $_
+				: ref($_) eq 'HASH'
+				? $_->{-val}
+				: $_->[0]) =~/^\Q$on\E\+/
 		} @{$s->{-menuchs1} ||$s->{-menuchs} ||[]}} ){
 		push @r, htmlMB($s, 'recNew')
 	}
@@ -6937,7 +7247,8 @@ sub htmlMenu {	# Screen menu bar
  elsif	($g eq 'recDel') {		# Deleted record menu items
  }
  elsif	($s->cgiHook('recOp')) {	# Record menu items
-	my $ea =(!$s->{-rac} ||$s->{-pout}->{-editable}) &&!$s->uguest;
+	my $ea =(!$s->{-rac} ||$s->{-pout}->{-editable}) &&!$s->uguest
+			&& ((ref($s->{-pout}->{-editable}) && $s->{-pout}->{-editable}->{-fr}) ||1);
 	my @rk =('','_form'=>$_[0]->{-pcmd}->{-form}, '_key'=>strdata($_[0], $_[0]->{-pcmd}->{-key}));
 	my $ll =$s->lnghash();
 	local	$ll->{'recIns'} = $e && $n
@@ -6960,22 +7271,25 @@ sub htmlMenu {	# Screen menu bar
 	push @r, htmlMB($s, 'recForm',	'')	if $e;
 	push @r, htmlMB($s, 'recUpd',	'')	if $e && !$n;
 	push @r, htmlMB($s, 'recIns',	'')	if $e;
-	push @r, htmlMB($s, 'recDel',	'')	if !$n && $ea;
+	push @r, htmlMB($s, 'recDel',	'')	if !$n && $ea
+						&& (!ref($ea) ||!$ea->{-recDel});
 	push @r, htmlMB($s, 'recNew'	# ,undef)
 				,['','_cmd'=>'recNew','_form'=>$_[0]->{-pcmd}->{-form}
 				, '_proto'=>strdata($_[0], $_[0]->{-pcmd}->{-key})])
 						if !$n && !$s->uguest;
  }
- if (1) {				# Help button
+ if ($a ne 'frmHelp') {			# Help button
+	push @r, htmlMB($s, 'frmHelp');
  }
 
  my $mi	='[\'<i>'	.htmlEscape($s,lng($s, 0, $c->{-cmd}))
 	.'\'@\''	.htmlEscape($s,lng($s, 0, $c->{-cmg}))
 	.'\',  '	.htmlEscape($s, $s->user()) .'</i>]';
  my $mh =htmlEscape($s
-		, $s->lngcmt($om, $ot)
-		|| (($s->{-title} ||$s->cgi->server_name() ||'') .' - ' .($c->{-form} ||'')));
-
+		,($a eq 'frmHelp' 
+			? $s->lng(0, 'frmHelp') .': ' .$s->lnglbl($om, $ot)
+			: $s->lngcmt($om, $ot))
+		 || (($s->{-title} ||$s->cgi->server_name() ||'') .' - ' .($c->{-form} ||'')));
  my $mc =$g ne 'recList'
 	? ''
 	: join("; "
@@ -7079,7 +7393,7 @@ sub htmlMB {	# CGI menu bar button
  }
  elsif ($_[1] eq 'logo') {
 	$_[0]->{-logo}
-	? $td0 ."><nobr>\n" 
+	? $td0 ."><nobr>\n"
 	  .(	  ref($_[0]->{-logo}) eq 'CODE' 
 		? &{$_[0]->{-logo}}(@_) 
 		: $_[0]->{-logo}) ."\n</nobr></td>"
@@ -7143,7 +7457,7 @@ sub htmlMB {	# CGI menu bar button
 		? undef
 		: urlCat($_[0], !$_[2] ? ('', '_form'=>$_[0]->{-pcmd}->{-form},'_cmd'=>$_[1]) : ref($_[2]) ? @{$_[2]} : $_[2]);
 	my $jc =' onclick="{'
-		.($hl && ($_[1] =~/^(?:recRead|recPrint|recXML|recHist|recEdit|recNew)$/)
+		.($hl && ($_[1] =~/^(?:recRead|recPrint|recXML|recHist|recEdit|recNew|frmHelp)$/)
 		? "if((self.name=='BOTTOM') || (self.name=='TOP') ||document.getElementsByName('_frame').length){window.document.open('"
                         .(($_[1] =~/^(?:recNew)$/ && ($hl =~/_proto=/))
 			? (do {my $v=$hl; $v =~s/([?&;])_proto=/${1}_key=/; $v})
@@ -7196,27 +7510,38 @@ sub htmlML {	# CGI menu bar list
  .( $_[1] eq 'frmLso'
   ? 'if (_frmLso.value==&quot;recQBF&quot;) {window.document.DBIx_Web._cmd.value=_frmLso.value; _frmLso.value=&quot;' .$_[0]->htmlEscape($i) .'&quot;; window.document.DBIx_Web.submit(); return(true);} else {window.document.DBIx_Web._cmd.value=&quot;frmCall&quot;; window.document.DBIx_Web.submit(); return(false);}}">'
   : 1 && ($_[1] eq 'frmName1')
-  ? ("var v=_frmName1.value; _frmName1.value=''; window.document.open('" .$_[0]->cgi->url() ."?_cmd=frmCall;_frmName1=' +encodeURIComponent(v)"
+  ? ("var v=_frmName1.value; _frmName1.value=''; document.body.style.cursor=_frmName1.style.cursor='wait'; window.document.open('" .$_[0]->cgi->url() ."?_cmd=frmCall;_frmName1=' +encodeURIComponent(v)"
 	.",self.name.match(/^(?:TOP|BOTTOM)\$/) || document.getElementsByName('_frame').length ? '_blank' : '_self'"
-	.", '', false); return(true);}\">")
+	.", '', false); document.body.style.cursor=_frmName1.style.cursor='auto'; return(true);}\">")
   : 1 && ($_[1] eq 'frmName')
   ? ('window.document.DBIx_Web._cmd.value=&quot;frmCall&quot;; '
 	.($_[0]->{-menuchs1} && ($_[1] eq 'frmName') 
 		? '_frmName1.value=&quot;&quot;; ' 
 		: '')
-	."if(self.name=='TOP' && _frmName.value=='-frame=set'){window.document.DBIx_Web.target='_parent'; _frmName.value=_form.value ? _form.value : ''; if (document.getElementsByName('_frame').length) {_frame.value=''}};"
-	."if((self.name.match(/^(?:TOP|BOTTOM)\$/) || document.getElementsByName('_frame').length) && _frmName.value.match(/\\+\$/)){var v=_frmName.value; _frmName.value=_form.value ? _form.value : ''; window.document.open('" .$_[0]->cgi->url() ."?_cmd=frmCall;_frmName=' +encodeURIComponent(v), '_blank', '', false); return(true)};"
+	."if((_frmName.value=='-frame=set') && (self.name.match(/^(?:TOP|BOTTOM)\$/) || document.getElementsByName('_frame').length)){window.document.DBIx_Web.target='_parent'; _frmName.value=_form.value ? _form.value : ''; if (document.getElementsByName('_frame').length) {_frame.value=''}}"
+	."else if(_frmName.value.match(/\\+\$/) && (self.name.match(/^(?:TOP|BOTTOM)\$/) || document.getElementsByName('_frame').length)){var v=_frmName.value; _frmName.value=_form.value ? _form.value : ''; window.document.open('" .$_[0]->cgi->url() ."?_cmd=frmCall;_frmName=' +encodeURIComponent(v), '_blank', '', false); return(true)}"
+	."else {var v=_frmName.value; document.body.style.cursor=_frmName.style.cursor='wait'; _frmName.value=_form.value ? _form.value : ''; window.document.open('" .$_[0]->cgi->url() ."?_cmd=frmCall;_frmName=' +encodeURIComponent(v), '_self', '', false); document.body.style.cursor=_frmName.style.cursor='auto'; return(true)};"
 	.'window.document.DBIx_Web.submit(); return(false);}">')
   : 'return(true)}')
  ."\n\t"
  .join("\n\t"
 	, map { my ($n, $l) =!ref($_) 
-			? ($_, ucfirst($_[0]->lng(0, $_)))
+			? ($_ , $_[1] !~/^frmName/
+				? ucfirst($_[0]->lng(0, $_))
+				: !$_
+				? '--- ' .$_[0]->lng(0, 'frmCallNew') .' ---'
+				: (do {	my($n, $x) =/([+&.]*)$/ ? ($`, $1) : ($_,'');
+					my $o =$_[0]->{-form}->{$n} ||$_[0]->{-table}->{$n};
+					$o =$_[0]->lngslot($o,'-lbl') if $o;
+					$o =&$o($_[0]) if ref($o);
+					($o || ucfirst($_[0]->lng(0, $n)))
+					.($x && (substr($x,0,1) eq '+') ? " $x$x" : '')
+					}))
 			: ref($_) eq 'ARRAY'
 			? ($_->[0]
 				, (ref($_->[1]) ? $_[0]->lnglbl($_->[1]) : $_->[1])
 				|| ucfirst($_[0]->lng(0, $_->[0])))
-			: ($_->{-val}, $_[0]->lnglbl($_) ||ucfirst($_[0]->lng(0, $_->{-val})));
+			: ($_->{-val}||$_->{-lbl}, $_[0]->lnglbl($_) ||ucfirst($_[0]->lng(0, $_->{-val})));
 		'<option ' 
 			.($i && ($n eq $i) 
 			? do{$i =''; 'selected'}
@@ -7295,7 +7620,12 @@ sub htmlMChs {	# Adjust CGI forms list
 	if (@{$_[0]->{-menuchs}} <6)	{push @{$_[0]->{-menuchs}}, @a}
 	else				{$_[0]->{-menuchs1} =[@a]}
  }}
- if ($_[0]->{-menuchs1} && $_[0]->{-menuchs1}->[0]->[0]) {
+ if ($_[0]->{-menuchs1}
+ && (!ref($_[0]->{-menuchs1}->[0])
+	? $_[0]->{-menuchs1}->[0]
+	: ref($_[0]->{-menuchs1}->[0]) eq 'HASH'
+	? $_[0]->{-menuchs1}->[0]->{-val}
+	: $_[0]->{-menuchs1}->[0]->[0])) {
 	unshift @{$_[0]->{-menuchs1}}, ['', '--- ' .lng($_[0], 0, 'frmCallNew') .' ---']
  }
  $_[0]->{-menuchs}
@@ -7360,6 +7690,7 @@ sub cgiForm {	# Print CGI screen form
  my $qm=($c->{-cmg}||'') eq 'recQBF';
  my $em=$c->{-edit} || $qm;
  my $fm=($em || $qm ? 'e' : '') .($qm ? 'q' : '') .($c && $c->{-print} ? 'p' : '');
+ my $fr=ref($d) && ref($d->{-editable}) && $d->{-editable}->{-fr};
 
  my $mt=$m->{-table} ? $s->mdeTable($m->{-table}) : $m;
  local $c->{-cmdt} =$mt || $m;	# table metadata
@@ -7482,7 +7813,8 @@ sub cgiForm {	# Print CGI screen form
 			: (!$f->{-fld} || !exists($d->{$f->{-fld}}));
 	}
 	elsif	($f eq '')	{			# next col
-		$lr =0 unless $hide && ($hide ==2);
+		$lr =$hide && ($hide ==2) ? 1 : 0;
+		$hide =0;
 		next
 	}
 	elsif	($f =~/^(\n*)(\t*)$/)	{
@@ -7521,6 +7853,8 @@ sub cgiForm {	# Print CGI screen form
 	local  $_=$d->{$f->{-fld}};
 	$hide =    $qm && ($f->{-flg}||'') =~/[aq]/	# 'a'll, 'q'uery
 		 ? 0
+		 : $fr && $fr->{$f->{-fld}} && !ref($fr->{$f->{-fld}}) && ($fr->{$f->{-fld}} >1)
+		 ? 1
 		 : ((ref($f->{-hide})  eq 'CODE' ? &{$f->{-hide}} ($s,$f,$fm,$d) && 1 : $f->{-hide}  && 1)
 		 || (ref($f->{-hidel}) eq 'CODE' ? &{$f->{-hidel}}($s,$f,$fm,$d) && 2 : $f->{-hidel} && 2)
 		 || (defined($f->{-flg}) 
@@ -7534,6 +7868,8 @@ sub cgiForm {	# Print CGI screen form
 			 && 1));
 	$edit =  !$em
 		? $qm
+		: $fr && $fr->{$f->{-fld}} && !ref($fr->{$f->{-fld}})
+		? 0
 		: ref($f->{-edit})  eq 'CODE'
 		? $qm || &{$f->{-edit}}($s,$f,$fm,$d)
 		: exists($f->{-edit})
@@ -7707,16 +8043,26 @@ sub cgiForm {	# Print CGI screen form
 	}
 
 	$_=$d->{$f->{-fld}};
-	my $wgp =$hide
+	my $wgp = $hide
 		? ''
 		: $edit
-		? htmlField($s, $f->{-fld}, $cmt, $f->{-inp}, $d->{$f->{-fld}})
+		? htmlField($s, $f->{-fld}, $cmt
+			, $fr && ref($f->{-inp}) && ref($fr->{$f->{-fld}})
+			? (ref($fr->{$f->{-fld}}) eq 'HASH'
+				? $fr->{$f->{-fld}}
+				: {%{$f->{-inp}}, -values=>$fr->{$f->{-fld}}})
+			: $f->{-inp}
+			, $d->{$f->{-fld}})
 		: $f->{-inp} && ($f->{-inp}->{-labels} || $f->{-inp}->{-hrefs} || $f->{-inp}->{-htmlopt})
 		? htmlField($s, '', $cmt, $f->{-inp}, $d->{$f->{-fld}})
 		: $fuc || $s->mdeFldRW($mt, $f->{-fld})
 		? $s->htmlEscape($s->udisp($d->{$f->{-fld}}))
 		: htmlField($s, '', $cmt, $f->{-inp}, $d->{$f->{-fld}});
-
+	$wgp ='<input type="hidden" name="' .$s->htmlEscape($f->{-fld}) .'" value="' .$s->htmlEscape($_) .'" />'
+		.$wgp
+		if $em && !$qm && !$edit && !$hide && defined($_) && ($_ ne '')
+		# && $fr # !!! commented 2007-04-08 to remove
+		&& (!defined($f->{-flg}) ||($f->{-flg} =~/[aeu]/)); # as cgiDBData()
 	if (!$hide && defined($f->{-inphtml})) {
 		my $wgh	=$f->{-inphtml};
 		$wgh	=&$wgh($s,$f,$fm,$d) if ref($wgh) eq 'CODE';
@@ -7746,9 +8092,9 @@ sub cgiForm {	# Print CGI screen form
 	if	(!$lt) {
 		if ($hide && ($hide ==2)) {
 		}
-		elsif ($f->{-ddlb} && $em && !$hide) {
-			my $wg1;
-			($wgp, $wg1) =($1, $2) if $wgp =~/^(.*)(<\/t[dh]>)$/i;
+		elsif ($f->{-ddlb} && $em && $edit && !$hide) {
+			my $wg1='';
+			($wgp, $wg1) =($`, $1) if $wgp =~/(<\/t[dh]>)$/i;
 			$s->output((!$lr ? '' : "\n</tr>\n<tr>\n"), $lbl, $wgp);
 			$s->cgiDDLB($f, $em, $qm, $d);
 			$s->output($wg1, "\n");
@@ -7800,7 +8146,9 @@ sub cgiForm {	# Print CGI screen form
 	my $qo ={qw (all all eq == ge >= gt > le <= lt <)};
 	   $qo ={map {("-a$_", 'asc ' .$qo->{$_}, "-d$_", 'dsc ' .$qo->{$_})} keys %$qo};
 	my $qk =1; # -qkeyord switch
-	$s->{-pcmd}->{-qkey} =$s->cgiQKey($n,$m,$s->{-pdta});
+	$s->{-pcmd}->{-qkey} =$s->cgiQKey($n,$m
+		,{map {	$_ =~/^_q/ ? () : ($_ => $s->{-pdta}->{$_})
+			} keys %{$s->{-pdta}}});
 	$s->output(&$th($s, '-qkeyord'), $td
 		, htmlField($s, '_qkeyord', lng($s,1,'-qkeyord')
 			, {-labels=>$qo}
@@ -7842,7 +8190,7 @@ sub cgiForm {	# Print CGI screen form
 	if ($s->mdeRAC($m)) {
 		$s->output(&$th($s, '-qurole'), $td
 		, htmlField($s, '_qurole', lng($s,1,'-qurole')
-			, {-values=>[$s->mdeRoles(0)]}, $c->{-qurole})
+			, {-values=>[$s->mdeRoles($mt)]}, $c->{-qurole})
 		, htmlField($s, '_quname', lng($s,1,'-quname'), undef, $c->{-quname})
 			);
 		$_ =$c->{-quname};
@@ -7954,7 +8302,6 @@ sub htmlField {	# Generate field widget HTML
 		$wgp =$s->trURLhtm($v,sub{$_[1]},sub{$_[1]})
 	}
 	elsif	($m->{-hrefs})	{				# Text & Hyperlinks
-		# $wgp .='<code>' if $v =~/ {2,}/;
 		$wgp =$s->trURLtxt($v
 		, sub {	my $v =$_[1];
 			$v =htmlEscape($_[0], $_[1]);
@@ -7964,7 +8311,10 @@ sub htmlField {	# Generate field widget HTML
 			$v
 			}
 		, \&trURLhref);
-		$wgp .='</code>' if $wgp =~/^<code>/;
+		$wgp =	$s->htfrDiff($wgp)
+			if $s->{-pcmd} 
+			&& $s->{-pcmd}->{-hist};
+		# $wgp ='<code>' .$wgp .'</code>' if $v =~/ {2,}/;
 	}
 	elsif	(grep {exists($m->{$_})} qw(-arows -rows -cols)) {# Resizeable text
 		$v =htmlEscape($s,$v); 
@@ -8077,13 +8427,16 @@ sub htmlField {	# Generate field widget HTML
 		unshift @$tv, '' if $s->{-pcmd}->{-cmg} eq 'recQBF';
 		$wgp	=$s->cgi->popup_menu(
 			 ($cs ? (-class=>$cs) : ())
-			,$m->{-ddlbloop}||$m->{-loop}
+			,($m->{-ddlbloop} ? !ref($m->{-ddlbloop}) || &{$m->{-ddlbloop}}($s) : 0)
+			||($m->{-loop} ? !ref($m->{-loop}) || &{$m->{-loop}}($s) : 0)
 				? (-onchange => '{window.document.DBIx_Web._cmd.value="recForm"; window.document.DBIx_Web.submit(); return(false)}')
 				: ()
 			,(map {	!defined($m->{$_}) || ($_=~/^(?:-ddlbloop|loop)$/)
 				? ()
 				: ref($m->{$_}) eq 'CODE'
-				? ($_ => &{$m->{$_}}($s,$m,local($_)=$v))
+				? (do {	my $n =$_; local $_ =$v;
+					($n => &{$m->{$n}}($s,$m,$_))
+					})
 				: ($_ => $m->{$_})} keys %$m)
 			,-name=>$n, -title=>$t
 			, $tv ? (-values=>$tv) : ()
@@ -8283,6 +8636,7 @@ sub htmlRFD {	# RFD widget html
  my  $fnf='_file_f';
  my  $fnl='_file_l';
  my  $fno='_file_o';
+ my  $g =$s->cgi();
  my  $r ='';
  if ($edt && $s->cgi->param($fnu)) {	# Upload
 	$s->rfaUpload($c, $d, $fnu);
@@ -8328,15 +8682,17 @@ sub htmlRFD {	# RFD widget html
 		# .' oncopy="{window.clipboardData.setData(\'Text\',\'' .$s->htmlEscape($fs) .'\'); return(false)}" '
 		# window.event.srcElement
 		# document.selection.empty(); 
-		.' title="' .$s->htmlEscape($s->lng(1,'rfafolder') .' ') .'" '
-		.'><a href="' .$s->htmlEscape($urf) .'" target="_blank" >'
-		.$s->htmlEscape($fs) ."</a></span> ]</font><br />\n";
+		.' title="' .$s->htmlEscape($s->lng(1,'rfafolder') .' ') .'">'
+		.$g->a({-href=>$urf, -target=>'_blank'}
+				, $s->htmlEscape($fs))
+		."</span> ]</font><br />\n";
 	}
 	else {
 		$r .="\n&nbsp;&nbsp;&nbsp;\n"
 	}
 	$r .=join('; ', 
-		map {	$s->cgi->a({-href=>"$url/$_", -target=>'_blank'}
+		map {	my $f =$_; $f=~s/([%])/uc sprintf("%%%02x",ord($1))/ge;
+			$s->cgi->a({-href=>"$url/$f", -target=>'_blank'}
 			, $s->cgi->checkbox(-name=>$fnl
 				,($cs ? (-class=>$cs) : ())
 				, -value=>$_
@@ -8347,12 +8703,12 @@ sub htmlRFD {	# RFD widget html
  else	{				# View widget
 	$r .=' '
 	.join('; ', 
-		map {	my $f =$s->htmlEscape($_);
+		map {	my $f =$_; $f=~s/([%])/uc sprintf("%%%02x",ord($1))/ge;
 			$_ eq '.htaccess'
 			? ()
-			: ("<a href=\"$url/$f\" target=\"_blank\" >"
-			. $s->htmlRFDimg($_,$pth,$url)
-			. "$f</a>")
+			: ($g->a({-href=>"$url/$f",-target=>'_blank'}
+				, $s->htmlRFDimg($_,$pth,$url)
+				. $s->htmlEscape($_)))
 		} $s->pthGlobns($pth .'/*'))	# } $s->rfdGlobn($c, $d))
  }
  $r
@@ -8430,7 +8786,12 @@ sub cgiDDLB {	# CGI Drop-down list box
  my $csc=($cs ? 'class="' .htmlEscape($s, $cs) .'"' : '');
 
  if	($s->{-pdta}->{$ne}) {		# real assignment in 'cgiParse'
-	$s->{-pout}->{$tg} =$s->{-pdta}->{$nl};
+	if ($tg =~/^_(quname)/) {
+		$s->{-pcmd}->{$tg} =$s->{-pdta}->{$nl};
+	}
+	else {
+		$s->{-pout}->{$tg} =$s->{-pdta}->{$nl};
+	}
  }
  if	($s->{-pdta}->{$ne}  ||$s->{-pcmd}->{$ne} ||$s->{-pdta}->{$nc}) {
 	$s->output($s->htmlOnLoad("{window.document.DBIx_Web.${nf}.focus()}"));
@@ -8761,7 +9122,7 @@ sub cgiQuery {	# Query records
 	}
 	elsif (ref($oa) eq 'ARRAY') {
 		push @{$m->{-frmLso}}
-			,(substr(ref($oa->[0]) eq 'HASH' ? $oa->[0]->{-val} : $oa->[0]->[0], 0, 1) 
+			,(substr(ref($oa->[0]) eq 'HASH' ? $oa->[0]->{-val}||$oa->[0]->{-lbl} : $oa->[0]->[0], 0, 1) 
 				ne '-'
 			? (['-add'	=>'-------------'])
 			: ())
@@ -8832,7 +9193,7 @@ sub cgiQuery {	# Query records
 				? @{&$ml($s, $n, $m, $c, exists($c->{-frmLso}) ? $c->{-frmLso} ||'' : ())}
 				: ()) {
 				next	if !ref($e)
-					|| ($lso ne (ref($e) eq 'HASH' ? $e->{-val} : $e->[0]));
+					|| ($lso ne (ref($e) eq 'HASH' ? $e->{-val} ||$e->{-lbl} : $e->[0]));
 				my $x =ref($e) eq 'HASH' ? $e->{-cmd} : $e->[2];
 				next	if !$x;
 				$rv =$x;
@@ -8857,7 +9218,7 @@ sub cgiQuery {	# Query records
 		delete $c->{-qurole};
 		delete $c->{-quname};
 	}
-	elsif ($s->grep1(sub{$lso eq $_}, $s->mdeRoles())) {
+	elsif ($s->grep1(sub{$lso eq $_}, $s->mdeRoles(0))) {
 		$c->{-qurole}=$lso
 	}
 	elsif ($lso eq '-todo') {
@@ -8920,6 +9281,12 @@ sub cgiQuery {	# Query records
 	}
 	elsif ($ov && ($lso eq $ov)) {
 		$c->{-qversion} ='+';
+		if ($c->{-qkey}) {
+			foreach my $k (qw(-rvcFinState -rvcChgState -rvcCkoState -rvcDelState)) {
+				my $v =$t->{$k} ||$s->{$k} ||$s->tn($k);
+				delete $c->{-qkey}->{$v->[0]} if $v;
+			}
+		}
 	}
 	elsif ($lso eq '-add') {
 		foreach my $e (ref($oa) eq 'ARRAY' ? @$oa : ()) {
@@ -8991,6 +9358,11 @@ sub cgiQuery {	# Query records
 					=values %{$x->{-keyadd}};
 			delete $a{-keyadd}
 		}
+		foreach my $k (qw(-qhref -qhrcol)) {
+			next if !$a{$k};
+			$c->{$k} =$a{$k};
+			delete $a{$k}
+		}
 		last;
 	}
  }
@@ -9016,7 +9388,7 @@ sub cgiSel {	# Select records from database
 sub cgiQueryFv {	# Query field values
 			# (self, form ||{cmd} ||false, field ||[fields], ?{query})
  my ($s, $w, $f, $q) =@_;
- return($s->cgiQuery($w
+ return($s->cgiQuery(ref($w) ? $w->{-table} : $w
 	,{	 -table=>ref($w) ? $w->{-table} : $w
 		,-query=>{-data=>ref($f) ? $f : [$f]
 			, -display=>ref($f) ? $f : [$f]
@@ -9557,6 +9929,10 @@ sub cgiList {	# List queried records
 			}
 		: $f->{-inp} && !$xml && (ref($s->lngslot($f->{-inp}, '-labels')) eq 'HASH')
 		? do{	my($i, $c) =($j, $s->lngslot($f->{-inp}, '-labels'));
+			$c = {map {$c->{$_} && ($c->{$_} =~/^[_\s]+/)
+					? ($_ => $')
+					: ($_ => $c->{$_})
+					} keys %$c} if $c;
 			sub{	local $_=ref($_[4]) ? $_[4]->[$i] : $_[4];
 				htmlEscape(undef, defined($c->{$_}) && defined($c->{$_}) ? $c->{$_} : $_)}
 			}
@@ -9714,7 +10090,11 @@ sub cgiList {	# List queried records
 		? $s->output(''
 		, xmlsTag($s, 'tr', 'href'=>$s->cgi->url() .'/' .$h, '0')
 		, "\n"
-		, (map {xmlsTag($s, $_->[0]
+		, (map {	ref($_->[1])
+				? ('<', $_->[0], '>'
+				, &{$_->[1]}($s, $cargo, undef, $i, $r)
+				, '</', $_->[0], ">\n")
+				: xmlsTag($s, $_->[0]
 				, ''=>	  ref($_->[1])
 					? &{$_->[1]}($s, $cargo, undef, $i, $r)
 					: ref($r)
@@ -9777,6 +10157,305 @@ sub cgiLst {	# Simplified 'cgiList' to embed into 'cgiForm'
  }
  $s->cgiList($o, $f, undef, $q ||{}
 		,$s->cgiQuery($f, undef, $q))
+}
+
+
+sub cgiHelp {	# Print CGI Help screen form
+		# self, form name, form meta, command, data
+ my ($s, $n, $m, $c, $d) =@_;
+    $m =$s->{-form}->{$n}||eval{$s->mdeTable($n)} if !$m;
+    $c =$s->{-pcmd} if !$c;
+    $d =$s->{-pout} if !$d;
+ my $mt=ref($m) && $m->{-table} ? eval{$s->mdeTable($m->{-table})} : $m;
+ my $cs  =join(' '
+		,$s->{-c}->{-htmlclass} ? $s->htmlEscape($s->{-c}->{-htmlclass}) : ()
+		,$s->{-uiclass} ? $s->{-uiclass} : ());
+ my $cs1 =$cs ? 'class="' .$cs .'"' : '';
+ my $cs2 =$cs ? 'class="' .$cs .'"' : '';
+ my $th1 ="<th align=\"left\" valign=\"top\" style=\"text-decoration: underline\" nowrap=true $cs1>";
+ my $td1 ="<td align=\"left\" valign=\"top\" $cs2>";
+ my $th2 ="<th align=\"left\" valign=\"top\" $cs2>";
+ my $td2 ="<td align=\"left\" valign=\"top\" $cs2>";
+ my $th3 =$th2;
+ my $td3 =$td2;
+ my ($th, @td);
+
+ my $hl  =$LNG->{$s->{-lng}} || $LNG->{''};
+ my $cl  =sub{	my $t =$_[0];
+		my ($c, $v);
+		$c =$t;
+		$v =$c && $hl->{$c} && $hl->{$c}->[0];
+		return($v) if $v;
+		$c =substr($t,0,1) eq '-' ? substr($t,1) : $t;
+		$v =$c && $hl->{$c} && $hl->{$c}->[0];
+		return($v) if $v;
+		$t #ucfirst($c)
+		};
+ my $cv  =sub{	my $v =$_[0];
+		  !defined($v)
+		? 'undef'
+		: $v eq ''
+		? $s->dsdQuot($v)
+		: ref($v) eq 'CODE'
+		? 'CODE()'
+		: ref($v)
+		? $s->dsdQuot($v)
+		: $v};
+ my $cf;
+    $cf  =sub {	# (meta, name)
+		return(join(', ', map {&$cf($_[0],$_,$#_ >1 ? @_[2..$#_] : ())
+					} @{$_[1]})
+			) if ref($_[1]) eq 'ARRAY';
+		my $f =($_[0]->{-mdefld} && $_[0]->{-mdefld}->{$_[1]})
+			|| ($mt->{-mdefld} && $mt->{-mdefld}->{$_[1]});
+		$_[2] && $f
+		? $s->htmlEscape($s->lngcmt($f) ||$s->lng(1,$_[1]))
+		: $_[2]
+		? ''
+		: $f 
+		? '<span title="' 
+		 .$s->htmlEscape($s->lngcmt($f) ||$s->lng(1,$_[1]))
+		 .'">'
+		 .$s->htmlEscape($s->strquot($s->lnglbl($f) ||$s->lng(0,$_[1])))
+		 .'</span>'
+		: (wantarray() ? () : $s->htmlEscape($s->strquot($_[1])))
+		};
+ my $hff={	 'a'	=>"all"
+		,'k'	=>"key"
+		,'w'	=>"wkey"
+		,'e'	=>"edit"
+		,'u'	=>"update"
+		,'m'	=>"mandatory"
+		,'h'	=>"hyperlik"
+		,'q'	=>"query"
+		,'l'	=>"list"
+		,'f'	=>"fetch"
+		,'n'	=>"numeric"
+		,'9'	=>"numeric"
+		,'"'	=>"string"
+		};
+ my $cff=sub {	return('') if !$_[0];
+		join(', '
+			, map {	$hff->{$_} ? $hff->{$_} : $_
+				} split / */, $_[0])
+		};
+ my $ce =sub {	my $v =$s->htmlEscape(@_);
+		$v =~s/[\r\n]+/<br \/>/g;
+		$v
+		};
+
+ $s->output("\n<table $cs2>\n");
+ $s->output("<tr>"
+		,$th1, "<br />"
+		,''
+		,'</th>'
+		,$td1, "<br />"
+		,$s->htmlEscape($s->lngslot($s,'-help'))
+		,"</td></tr>\n"
+		) if $s->lngslot($s,'-help');
+
+ foreach my $oc ('f','t') {
+	my $om;
+	my $on;
+	if ($oc eq 'f') {
+		$on =$n;
+		$om =$s->{-form}->{$n};
+	}
+	elsif ($oc eq 't') {
+		$om =$s->{-form}->{$n};
+		$om =!$om ? eval{$s->mdeTable($on =$n)} : $om->{-table} ? eval{$s->mdeTable($on =$om->{-table})} : eval{$s->mdeTable($on =$n)};
+	}
+	next if !$om;
+	$s->output("<tr>"
+		,$th1, "<br />"
+		,$s->htmlEscape($s->lnglbl($om)||'')
+		,'</th>'
+		,$td1, "<br />"
+		,&$ce($s->lngcmt($om)||'')
+		,"</td></tr>\n"
+		);
+	$s->output("<tr>"
+		,$th2
+		,'</th>'
+		,$td2
+		,&$ce($s->lngslot($om,'-help')||'')
+		,"</td></tr>\n"
+		) if $s->lngslot($om,'-help');
+	$th =join(' ', $on ? $on : ());
+	$th =join('; '
+		, $th ? $th : ()
+		, map { !exists($om->{$_}) && !exists($s->{$_})
+			? ()
+			: $s->htmlEscape($_
+				.'=> ' 
+				.&$cv(exists($om->{$_}) 
+					? $om->{$_} 
+					: $s->{$_}))
+			} ($om->{-table} && !ref($om->{-table}) ? qw(-table) : ())
+			, qw(-expr -null)
+			, (grep {/^-(?:cgc|cgv|subst|redirect)/
+			} sort keys %$om));
+	$s->output("<tr>",$th2,'</th>',$td2, '<code>',$th,"</code></td></tr>\n")
+		if $th;
+
+	($th, @td) =($s->htmlEscape(&$cl('-key')));
+	foreach my $k (   qw(-key)
+			, $oc eq 't' ? qw(-wikn) : ()
+			, qw(-wkey)
+			, $oc eq 't' ? qw(-ridRef) : ()) {
+		next	if !exists($om->{$k}) && !exists($s->{$k});
+		my $td =&$cf($om, $om->{$k} ||$s->{$k});
+		$td .=($hl->{$k} && $hl->{$k}->[1]
+			 ? ' - ' .$s->htmlEscape($hl->{$k}->[1])
+			 : '')	if $td;
+		push @td, $td	if $td;
+	}
+	$s->output("<tr>",$td1,$th,'</td>',$td2,join("</td></tr>\n<tr>$td1</td>$td2", @td),"</td></tr>\n")
+		if @td;
+
+	($th, @td) =($s->htmlEscape(&$cl('-rvcActPtr')));
+	foreach my $k (	$oc eq 't' && ($om->{-rvcActPtr} ||$s->{-rvcActPtr})
+			? qw(-rvcChgState -rvcCkoState -rvcDelState)
+			: ()) {
+		next	if !exists($om->{$k}) && !exists($s->{$k});
+		my $td =$om->{$k}->[0] && &$cf($om,$om->{$k}->[0]);
+		next	if !$td;
+		my $f =($om->{-mdefld} && $om->{-mdefld}->{$om->{$k}->[0]})
+			|| ($mt->{-mdefld} && $mt->{-mdefld}->{$om->{$k}->[0]});
+		my $l =$s->lngslot($f->{-inp},'-labels') ||$f->{-inp}->{-labels}
+			if $f && $f->{-inp};
+		   $l =undef
+			if ref($l) ne 'HASH';
+		$f = ref($f->{-inp}->{-values}) eq 'ARRAY'
+			? {map {($_=>$l && $l->{$_} ||$s->lng(0,$_) ||$_)
+				} @{$f->{-inp}->{-values}}}
+			: $l
+			if $f && $f->{-inp};
+		my $v =join(', '
+		, map{	  !$f
+			? $s->strquot($s->lng(0,$_)||$_)
+			: $f->{$_}
+			? $s->strquot($f->{$_})
+			: ()
+			} @{$om->{$k}}[1..$#{$om->{$k}}]);
+		$td =$v ? $td .' = ' .$v : '';
+		next	if !$td;
+		$td .=($hl->{$k} && $hl->{$k}->[1]
+			 ? ' - ' .$s->htmlEscape($hl->{$k}->[1])
+			 : '');
+		push @td, $td	if $td;
+	}
+	{	my $k ='-rvcActPtr';
+		my $v =&$cf($om, $om->{$k} ||$s->{$k});
+		$v .=$hl->{$k} && $hl->{$k}->[1]
+			? ' - ' .$s->htmlEscape($hl->{$k}->[1])
+			: ''	if $v;
+		unshift @td, $v	if $v && @td;
+	}
+	$s->output("<tr>",$td1,$th,'</td>',$td2,join("</td></tr>\n<tr>$td1</td>$td2", @td),"</td></tr>\n")
+		if @td;
+
+	($th, @td) =($s->htmlEscape(&$cl('-racUser')));
+	foreach my $k ( $oc eq 't'
+			?($s->{-rac} ? qw(-racWriter -racReader) : ()
+			, qw(-racActor -racManager -racPrincipal -racUser))
+			: ()) {
+		next	if !exists($om->{$k}) && !exists($s->{$k});
+		my $td =&$cf($om, $om->{$k} ||$s->{$k});
+		$td .=($hl->{$k} && $hl->{$k}->[1]
+			 ? ' - ' .$s->htmlEscape($hl->{$k}->[1])
+			 : '')	if $td;
+		push @td, $td	if $td;
+	}
+	$s->output("<tr>",$td1,$th,'</td>',$td2,join("</td></tr>\n<tr>$td1</td>$td2", @td),"</td></tr>\n")
+		if @td;
+
+	($th, @td) =($s->htmlEscape(&$cl('-query')));	# no -frmLso -frmLsoAdd
+	foreach my $k (qw(-query)
+			) {
+		next	if !exists($om->{$k}) && !exists($s->{$k});
+		my $td ='<code>'
+			.$s->htmlEscape(&$cv(exists($om->{$k}) ? $om->{$k} : $s->{$k}))
+			.'</code>';
+		push @td, $td	if $td;
+		my @td1 =map {$_ eq 'all'
+				? ()
+				: $s->htmlEscape($s->strquot($s->lng(0,$_))
+					# .($s->lng(1,$_) ? ' - ' .$s->lng(1,$_) : '')
+					)
+				} $s->mdeRoles($mt)
+				if $td;
+		push @td, &$cl('-frmLso')
+			. ': ' .join(', ', @td1)
+			if @td && @td1
+	}
+	$s->output("<tr>",$td1,$th,'</td>',$td2,join("</td></tr>\n<tr>$td1</td>$td2", @td),"</td></tr>\n")
+		if @td;
+
+	($th, @td) =($s->htmlEscape(&$cl('-frmLsc')));
+	foreach my $k (qw(-frmLsc)
+			) {
+		next	if !exists($om->{$k}) && !exists($s->{$k});
+		my $td =join('<br />'
+			, map {	my ($e, $el, $ec) =$_;
+				if (ref($e) eq 'HASH') {
+					$el =$s->htmlEscape($s->lngslot($e,'-lbl'))
+						|| $e->{-val}
+						&& &$cf($om,$e->{-val});
+					$ec =$s->htmlEscape($s->lngslot($e,'-cmt'))
+						|| $e->{-val}
+						&& &$cf($om,$e->{-val},1);
+				}
+				elsif (ref($e) eq 'ARRAY') {
+					$el =$s->htmlEscape($e->[1]) ||&$cf($om,$e->[0]);
+					$ec =&$cf($om,$e->[0],1);
+				}
+				  $el && $ec ? $el .' - ' .$ec
+				: $el ? $el
+				: ()
+				} @{$om->{$k}});
+		push @td, $td	if $td;
+	}
+	$s->output("<tr>",$td1,$th,'</td>',$td2,join("</td></tr>\n<tr>$td1</td>$td2", @td),"</td></tr>\n")
+		if @td;
+
+	if ($om->{-field} && (ref($om->{-field}) eq 'ARRAY')) {
+		foreach my $f (@{$om->{-field}}) {
+			next if ref($f) ne 'HASH';
+			$s->output("<tr>"
+				,$th2
+				,$s->htmlEscape($s->lnglbl($f) ||($f->{-fld} && $s->lng(0,$f->{-fld})) ||'')
+				,'</th>'
+				,$td2
+				,&$ce($s->lngcmt($f) ||($f->{-fld} && $s->lng(1,$f->{-fld})) ||'')
+				,"</td></tr>\n"
+				);
+			$s->output("<tr>"
+				,$th2
+				,'</th>'
+				,$td2
+				,&$ce($s->lngslot($f,'-help')||'')
+				,"</td></tr>\n"
+				) if $s->lngslot($f,'-help');
+			$th =join(' '
+				, $f->{-fld} ? $s->htmlEscape(&$cv($f->{-fld})) : ()
+				, $f->{-flg} ? $s->htmlEscape("(" .&$cff($f->{-flg}) .")") : ()
+				);
+			$th =join('; '
+				, $th ? $th : ()
+				, map { !exists($f->{$_})
+					? ()
+					: $s->htmlEscape($_ .'=> ' .&$cv($f->{$_}))
+					} qw(-expr -null -edit -hide -hidel -inp -ddlb -ddlbmult -ddlbtgt)
+				);
+			$s->output("<tr>",$th2,'</th>',$td2,'<code>',$th,"</code></td></tr>\n")
+				if $th;
+		}
+	}
+	
+ }
+ $s->output("\n</table>\n");
+ $s
 }
 
 
@@ -10336,6 +11015,7 @@ sub tvdIndex {	# Template View Definition for Index page
 			,($s->{-menuchs1}? @{$s->{-menuchs1}}: ())
 			) {
 		my ($n, $l) = ref($e) ? @$e : ($e, $e);
+		$l ='--- ' .$_[0]->lng(0, 'frmCallNew') .' ---' if !$n && !$l;
 		next if $n eq '-frame';
 		my ($o, $a) = $n =~/^(.+?)([+&.]+)$/ ? ($1, $2) : ($n, $n);
 		my $l0 =$s->lnglbl($s->{-form}->{$o} ||$s->{-table}->{$o} ||{}, $o)||'';
@@ -10352,11 +11032,13 @@ sub tvdIndex {	# Template View Definition for Index page
 					: $a =~/[&.]/
 					? $s->lng(0,'frmCallOpn') ." '$l0'"
 					: $s->lng(0,'frmCallOpn') ." '$l0'"
-				, $a =~/[+]/
+				, $a =~/[+]/		# form
 				? (-OnClick=>"window.document.open('$ur1', self.name.match(/^(?:TOP|BOTTOM)\$/) || document.getElementsByName('_frame').length ? '_blank' : '_self','',false); return(false)"
+					# or "this.target = self.name.match(/^(?:TOP|BOTTOM)\$/) || document.getElementsByName('_frame').length ? '_blank' : '_self'; return(true)";
 					)
-				: (-target=>'_self'
+				: (-target=>'_self'	# list
 				  ,-OnClick=>"window.document.open('$ur2', self.name=='TOP' ? '_self': self.name=='BOTTOM' ? 'TOP' : '_self','',false); return(false)"
+					# or "this.target = self.name=='TOP' ? '_self' : self.name=='BOTTOM' ? 'TOP' : '_self'; return(true)";
 					)
 				}
 				,(!$s->{-icons}
