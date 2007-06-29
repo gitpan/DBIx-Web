@@ -2230,8 +2230,11 @@ C<recUpd> fills this field with C<-rvcUpdWhen> of actual record when recording i
 	=> 1 || 0 || 2 || 3
 
 (C<Database Options>)
-Serialisation level of database operation: 
-0 - none, 1 - updates, 2 - reads and updates, 3 - everything (exclusive).
+Serialisation level of database operation within C<start>/C<end>: 
+0 - none,
+1 - shared,
+2 - shared read and exclusive update operation,
+3 - exclusive (full serialisation).
 
 
 =item -setup
@@ -4049,6 +4052,24 @@ another options may be implemented within script itself.
 =head1 VERSION
 
 =over
+
+
+=head2 2007-06-29 - Development Version 0.69
+
+
+=head2 2007-06-26
+
+Considered Active Perl/PerlIS 5.8 with L<CGI|CGI> 3.20:
+'use CGI qw(-no_xhtml -newstyle_urls -nph)';
+'$CGI::Q =$s->{C<-cgi>}';
+new C<url> method fixing L<CGI::url|CGI>.
+
+Corrected C<-serial> operation.
+
+Optimised C<w32umail>.
+
+Corrected C<ugfile>.
+
 
 =head2 2007-06-03 - Development Version 0.68
 

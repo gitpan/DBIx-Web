@@ -1,3 +1,29 @@
+# 2006-06-28 commented 'use PerlEx::DBI'
+# 2007-06-27 recActLim() corrected, cleaning '-editable' by '-racWriter'
+# 2007-06-27 recActLim() corrected, removed restrict read of deleted record
+# 2007-06-26 w32umail() optimised using '-smtpdomain'
+# 2007-06-26 for perl58: 'Algorithm::Diff' added to Active Perl
+# 2007-06-26 ugfile()/ugf_xxx() corrected:
+#	(Warn 'print() on unopened filehandle FL')
+#	from:	my ($s, $tm, $df); local (*FG, *FL); ($s, *FG, *FL, $tm, $df) =@_; print FL...
+#	to:	my ($s, $FG, $FL, $tm, $df) =@_; print $FL...
+# 2007-06-25 for perl58/CGI: $CGI::Q =$_[0]->{-cgi} - default CGI object
+# 2007-06-25 for perl58: using CGI 3.29
+# 2007-06-25 CGI 3.20 - 3.29 bug traced:
+#	sub _style { ... push(@result,style({'type'=>$type},"$cdata_start\n$_\n$cdata_end")) foreach @c;
+#	autoloads new CGI - damages existed CGI / ?PerlIS / ?PerlEx
+#	may be something like:
+#	push(@result,style($self,{'type'=>$type},"$cdata_start\n$_\n$cdata_end")) foreach @c;
+# 2007-06-25 for perl58: cgiFooter trace using CGI->{'dbix_web'}
+# 2007-06-25 for perl58: "400 Bad request (malformed multipart POST)" traced within 'sub read_multipart'
+# 2007-06-25 new {-c}->{-startitit} for initialize()/start() transition
+# 2007-06-25 for perl58: deleted 'site/lib/CGI.pm' & 'site/lib/CGI/...' parts
+# 2007-06-22 for perl58: use CGI qw(-nph); start_html(-style=>{-code=>...};
+# 2007-06-22 for perl58: sub url{...}
+# 2007-06-20 destructor
+# 2007-06-13 corrected -serial: start(), varLoad(), varLock(), update operation
+# 2007-06-10 for perl58: use CGI qw(-no_xhtml);... start_html(-encoding=>charset)
+# 2007-06-03 publishing 0.68 version
 # 2007-06-03 cmdb-e: start page view
 # 2007-05-22 new htfrDiff(), changed htmlField()
 # 2007-05-17 htmlML() corrected for frameset switching

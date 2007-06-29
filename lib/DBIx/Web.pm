@@ -27,7 +27,12 @@
 # - store for users preferences, homepages, notes, etc.
 #
 # ToDo:
+# - commented 'use PerlEx::DBI'
+# - osCmd cacls may buzz sometimes somewhy
+# - error display: cgiRun(), htmlRFD(): message parsing
+# - may buzz when -serial=>2
 # - innice htmlML(): _frmName.value=_form.value ? _form.value : '';
+# - w32umail() slow
 # - cmdb-e: service graph view
 # - cmdb: process - define hierarchy in cmdb?
 # - calendar views: type and start/end time; start sub{}, entry sub{}, periodical rec.
@@ -39,8 +44,7 @@
 # - test examples: behaviour, versioning, checkouts, attachments, triggers
 #
 # Done:
-# 2007-06-03 publishing 0.68 version
-#
+# 2007-06-29 publishing 0.69 version
 
 
 package DBIx::Web;
@@ -52,7 +56,7 @@ use Fcntl qw(:DEFAULT :flock :seek :mode);
 
 use vars qw($VERSION @ISA @EXPORT @EXPORT_OK %EXPORT_TAGS $AUTOLOAD $SELF $CACHE $LNG $IMG);
 
-	$VERSION= '0.68';
+	$VERSION= '0.69';
 	$SELF   =undef;				# current object pointer
 	$CACHE	={};				# cache for pointers to subobjects
 	*isa    = \&UNIVERSAL::isa; isa('','');	# isa function
@@ -458,6 +462,7 @@ sub initialize {
    ,-logm	=>100		# Log list max size
 
    ,-c => {			# Cache for computed values
+	# ,-startinit	=>undef # Started by initialize
         # ,-pth_tmp	=>undef	# Temporary files path, see pthForm('tmp')
         # ,-pth_var	=>undef	# Variable  files path, see pthForm('var')
         # ,-pth_log	=>undef	# Log       files path, see pthForm('log')
@@ -757,6 +762,7 @@ sub initialize {
  $ENV{TMP} =$ENV{TEMP} =$ENV{TMP}||$ENV{tmp}||$ENV{TEMP}||$ENV{temp}
 			||$ENV{TMPDIR}		# see CGI.pm source
 			||$s->pthForm('tmp');
+ $s->{-c}->{-startinit} =1;
  $s
 }
 
@@ -790,6 +796,7 @@ sub set {
 	}
 	elsif ($opt{-die}) {
 		my $m =($s->{-die} =~/^([^\s]+)\s*/ ? $1 : $s->{-die}) .'::';
+		$s->cgi() if $s->{-die} =~/^CGI/;
 		$s->{-warn} =eval('use ' .$s->{-die} .';\\&' .$m .($s->{-debug} ?'cluck'   :'carp' ));
 		$s->{-die}  =eval('use ' .$s->{-die} .';\\&' .$m .($s->{-debug} ?'confess' :'croak'));
 	}
@@ -957,12 +964,15 @@ sub warn {
 sub start {	# start session
  my $s =shift;
  my %o =@_;
- $CACHE->{$s}	={};
- $s->{-c}	={};
- $s->{-var}->{'_handle'}->destroy if $s->{-var} && $s->{-var}->{'_handle'};
+ if (!$s->{-c}->{-startinit}) {
+	$CACHE->{$s}	={};
+	$s->{-c}	={};
+ }
+ delete $s->{-c}->{-startinit};
  $s->{-fetched} =0;
  $s->{-limited} =0;
  $s->{-affected}=0;
+ $s->{-var}->{'_handle'}->destroy if $s->{-var} && $s->{-var}->{'_handle'};
  $s->w32IISdpsn()	if (($ENV{SERVER_SOFTWARE}||'') =~/IIS/)
 			&& ((defined($s->{-w32IISdpsn})
 				? $s->{-w32IISdpsn} ||0
@@ -970,7 +980,7 @@ sub start {	# start session
 			&& !$s->cgi->param('_qftwhere');
  unless ((($ENV{SERVER_SOFTWARE}||'') =~/IIS/)
 	&& $s->cgi->param('_qftwhere')) {
-	 $s->varLoad($s->{-serial} >2 ? LOCK_EX : $s->{-serial} >1 ? LOCK_SH : 0);
+	 $s->varLoad(!$s->{-serial} ? 0 : $s->{-serial} >2 ? LOCK_EX : $s->{-serial} >1 ? LOCK_SH : $s->{-serial} >0 ? LOCK_SH : 0);
 	 $s->logOpen if $s->{-log} && !ref($s->{-log});
 	 $s->{-log}->lock(0) if ref($s->{-log});
  }
@@ -983,18 +993,45 @@ sub end {	# end session
  my $s =shift;
  &{$s->{-end0}}($s) if $s->{-end0};
  $s->recCommit() if $s->{-dbi};
+ eval{$s->{-cgi}->DESTROY()} if $s->{-cgi}; # delete $INC{'CGI.pm'};
  delete $s->{-cgi};
+ $CGI::Q =undef;
  foreach my $k (sort keys %{$s->{-endh}}) {eval{&{$s->{-endh}->{$k}}($s)}};
  $s->{-endh} ={};
  $s->smtp(undef) if $s->{-smtp};
- $s->{-var}->{'_handle'}->destroy if $s->{-var} && $s->{-var}->{'_handle'};
- $s->{-log}->lock(0) if ref($s->{-log});
- $s->{-log}->destroy if ref($s->{-log});
+ if ($s->{-var} && $s->{-var}->{'_handle'}) {
+	$s->{-var}->{'_handle'}->destroy;
+	delete $s->{-var}->{'_handle'};
+ }
+ if (ref($s->{-log})) {
+	$s->{-log}->destroy;
+	$s->{-log} =undef;
+ }
  eval{$s->{-c}->{-ldap}->unbind} if $s->{-c}->{-ldap};
- $s->{-log}	=undef;
  $s->{-c}	={};
  $CACHE->{$s}	={};
  &{$s->{-end1}}($s) if $s->{-end1};
+ $s
+}
+
+
+sub DESTROY {
+ my $s =shift;
+ eval{$s->{-cgi}->DESTROY()} if $s->{-cgi};
+ delete $s->{-cgi};
+ $CGI::Q =undef;
+ $s->smtp(undef) if $s->{-smtp};
+ if ($s->{-var} && $s->{-var}->{'_handle'}) {
+	eval{$s->{-var}->{'_handle'}->destroy};
+	delete $s->{-var}->{'_handle'};
+ }
+ if (ref($s->{-log})) {
+	eval{$s->{-log}->destroy};
+	$s->{-log} =undef;
+ }
+ eval{$s->{-c}->{-ldap}->unbind} if $s->{-c}->{-ldap};
+ $s->{-c}	={};
+ $CACHE->{$s}	={};
  $s
 }
 
@@ -1801,16 +1838,63 @@ sub utf8dec {	# Decode from UTF8, see also cptran()
 
 sub cgi {       # CGI object
  return($_[0]->{-cgi}) if $_[0]->{-cgi};
- eval("use CGI; 1") || &{$_[0]->{-die}}("use CGI -> $@");
+ eval("use CGI (); 1") || &{$_[0]->{-die}}("use CGI -> $@");
  no warnings;
- $_[0]->{-cgi} =eval('CGI->new')
+ $_[0]->{-cgi} =eval('local $^W =0; CGI->new')
 	|| &{$_[0]->{-die}}("CGI::new() -> $@");
+ $CGI::Q =$_[0]->{-cgi}; # default CGI object
+ if ($_[0]->{-cgi}->{'.cgi_error'}) {
+	$_[0]->{-c}->{'.cgi_error'} =$_[0]->{-cgi}->{'.cgi_error'};
+	$_[0]->logRec('error','CGI::new() -> ' .$_[0]->{-cgi}->{'.cgi_error'})
+ }
+ $CGI::XHTML =0;
+ $CGI::USE_PARAM_SEMICOLONS =$HS eq ';' ? 1 : 0;
+ if ((($ENV{SERVER_SOFTWARE}||'') =~/IIS/i)
+ ||  ($ENV{MOD_PERL} && !$ENV{PERL_SEND_HEADER})) {
+	$CGI::NPH =1
+ }
+ if ($ENV{PERLXS}) {
+ }
+ if (($ENV{GATEWAY_INTERFACE}||'') =~/PerlEx/) {
+ }
+ $_[0]->{-cgi}
+}
+
+
+sub url {	# CGI script URL
+ if ($#_ >0) {
+	local $^W =0;
+	my $v =($_[0]->{-cgi}||$_[0]->cgi)->url(@_[1..$#_]);
+	if ($v) {}
+	elsif (!($ENV{PERLXS} ||(($ENV{GATEWAY_INTERFACE}||'') =~/PerlEx/))) {}
+	elsif (($#_ >2) ||(($#_ ==2) && !$_[2])) {}
+	elsif ($_[1] eq '-relative') {
+		$v =$ENV{SCRIPT_NAME};
+		$v =$1 if $v =~/[\\\/]([^\\\/]+)$/;
+	}
+	elsif ($_[1] eq '-absolute') {
+		$v =$ENV{SCRIPT_NAME}
+	}
+	return($v)
+ }
+ return($_[0]->{-c}->{-url})
+	if $_[0]->{-c}->{-url};
+ local $^W =0;
+ $_[0]->{-c}->{-url} =$_[0]->cgi->url();
+ if ($ENV{PERLXS} ||(($ENV{GATEWAY_INTERFACE}||'') =~/PerlEx/)) {
+	$_[0]->{-c}->{-url} .=
+		(($_[0]->{-c}->{-url} =~/\/$/) ||($ENV{SCRIPT_NAME} =~/^\//) ? '' : '/')
+		.$ENV{SCRIPT_NAME}
+		if ($_[0]->{-c}->{-url} !~/\w\/\w/) && $ENV{SCRIPT_NAME};
+ }
+ $_[0]->{-c}->{-url}
 }
 
 
 sub dbi {       # DBI connection object
  return ($_[0]->{-dbi}) if $_[0]->{-dbi};
  $_[0]->{-dbidsn} =ref($_[0]->{-dbiarg}) ? $_[0]->{-dbiarg}->[0] : $_[0]->{-dbiarg};
+ # eval('use PerlEx::DBI') if $ENV{GATEWAY_INTERFACE} =~/PerlEx/;
  $_[0]->{-dbi} =eval("use DBI; 1;")
 	##	&& DBI->connect(ref($_[0]->{-dbiarg}) ? @{$_[0]->{-dbiarg}} : $_[0]->{-dbiarg})
 		&& $_[0]->dbiConnect()
@@ -2198,9 +2282,9 @@ sub smtpSend {	# SMTP mail msg send
 	if ($a{-pout}) {
 		$a{-form} =$a{-form} || $a{-pcmd} && ($a{-pcmd}->{-form} ||$a{-pcmd}->{-table});
 		$a{-data} .=do{	local $s->{-c}->{-httpheader} =1;
-				# local $s->{-htmlstart} ={ref($s->{-htmlstart}) ? %{$s->{-htmlstart}} : (), -xbase=>$s->cgi->url()};
+				# local $s->{-htmlstart} ={ref($s->{-htmlstart}) ? %{$s->{-htmlstart}} : (), -xbase=>$s->url};
 				$s->htmlStart($a{-form})};
-		$a{-data} .='<base href="'. $s->htmlEscape($s->cgi->url()) .'" />' ."\n";
+		$a{-data} .='<base href="'. $s->htmlEscape($s->url) .'" />' ."\n";
 		local $s->{-output} =sub{$a{-data} .=join('',@_[1..$#_])};
 		# local $a{-pout} ={%{$a{-pout}}}; # read-only supposed
 		local $a{-pcmd} ={($a{-pcmd} ? %{$a{-pcmd}} : ())
@@ -2427,24 +2511,39 @@ sub varFile {   # Common variables filename
 sub varLoad {   # Load common variables
  my ($s, $lck) =@_;
  return($s->{-var}) if $s->{-var} && !$lck;
+ $s->{-var}->{'_handle'}->destroy if $s->{-var} && $s->{-var}->{'_handle'};
+ $s->{-var} =undef;
  my $fn =$s->varFile;
  my $hf;
  if (!-f $fn) {
     $s->{-var} ={'id'=>'DBIx-Web-variables'};
     $s->varStore();
  }
+ # $s->logRec('varLoad', $lck ? ($lck) : (LOCK_SH, $lck));
  $hf =$s->hfNew('+<',$fn)->lock($lck||LOCK_SH);
  $s->{-var} =$hf->{-buf} =$hf->load && $s->dsdParse($hf->{-buf});
  $s->{-var}->{'_handle'} =$hf;
- $hf->close() if !$lck;
+ if (!$lck) {
+	# $hf->lock(LOCK_UN |LOCK_NB);
+	# $hf->close();		# auto LOCK_UN, auto reopen
+	$hf->destroy(); delete $s->{-var}->{'_handle'};
+ }
  $s
 }
 
 
 sub varLock  {	# Lock common variables file
- !$_[0]->{-var} ||!$_[0]->{-var}->{'_handle'}
- ? $_[0]->varLoad($_[1] ||LOCK_EX)
- : $_[0]->{-var}->{'_handle'}->lock($_[1] ||LOCK_EX)
+ if (!$_[0]->{-var} ||!$_[0]->{-var}->{'_handle'}) {
+	$_[0]->varLoad($_[1] ||LOCK_EX)
+ }
+ elsif ((($_[1] ||LOCK_EX) eq LOCK_EX)
+ &&	(($_[0]->{-var}->{'_handle'}->{-lock} ||0) ne LOCK_EX)	){
+	$_[0]->varLoad($_[1] ||LOCK_EX)
+ }
+ else {
+	# $_[0]->logRec('varLock',$_[1] ||LOCK_EX);
+	$_[0]->{-var}->{'_handle'}->lock($_[1] ||LOCK_EX)
+ }
 }
 
 
@@ -3057,14 +3156,14 @@ sub ugfile {	# Users/groups caching, 'AuthGroupFile' file write/refresh
  seek(FG,0,0); seek(FL,0,0);
  open(FW, "+>>$fg") && flock(FW,LOCK_EX)
  	&& truncate(FW,0) && seek(FW,0,0)
-	&& do {while(my $rr =readline *FG){print FW $rr}; 1}
+	&& (do {while(my $rr =readline *FG){print FW $rr}; 1})
 	&& flock(FW,LOCK_UN) && close(FW)
 	|| ($s && $s->die($s->lng(0, 'ugfile') .": open('$fg') -> $!"))
 	|| croak("open('<$fg') -> $!");
  flock(FG,LOCK_UN); close(FG); unlink("$fg.tmp");
  open(FW, "+>>$fl") && flock(FW,LOCK_EX) 
  	&& truncate(FW,0) && seek(FW,0,0)
-	&& do {while(my $rr =readline *FL){print FW $rr}; 1}
+	&& (do {while(my $rr =readline *FL){print FW $rr}; 1})
 	&& flock(FW,LOCK_UN) && close(FW)
 	|| ($s && $s->die($s->lng(0, 'ugfile') .": open('$fl') -> $!"))
 	|| croak("open('<$fl') -> $!");
@@ -3077,9 +3176,7 @@ sub ugfile {	# Users/groups caching, 'AuthGroupFile' file write/refresh
 
 
 sub ugf_w32 {	# ugfile() module using Win32 ADSI WinNT://
- my ($s, $tm, $df);
- local (*FG, *FL);
- ($s, *FG, *FL, $tm, $df) =@_;
+ my ($s, $FG, $FL, $tm, $df) =@_;
  eval('use Win32::OLE'); Win32::OLE->Option('Warn'=>0);
  my $od =Win32::OLE->GetObject('WinNT://' .(Win32::NodeName()) .',computer');
  my $hdu=$od	&& $od->{Name}		|| ''; 		# host domain name
@@ -3147,7 +3244,7 @@ sub ugf_w32 {	# ugfile() module using Win32 ADSI WinNT://
 			next if !$oe || !$oe->{Class} || !$oe->{Name} || substr($oe->{Name},-1,1) eq '$' || substr($oe->{Name},-1,1) eq '&';
 			next if $oe->{AccountDisabled};
 			next if $oe->{Name} =~/^(?:SYSTEM|INTERACTIVE|NETWORK|IUSR_|IWAM_|HP ITO |opc_op|patrol|SMS |SMS&_|SMSClient|SMSServer|SMSService|SMSSvc|SMSLogon|SMSInternal|SMS Site|SQLDebugger|sqlov|SharePoint|RTCService)/i;
-			print FL $dp ? "$dp\\" : '', $oe->{Name}
+			print $FL $dp ? "$dp\\" : '', $oe->{Name}
 			,":\t", $oe->{Name} .'@' .$du
 			,":\t", $oe->{ADsPath}
 			,":\t", $oe->{Class}
@@ -3168,7 +3265,7 @@ sub ugf_w32 {	# ugfile() module using Win32 ADSI WinNT://
 				&& ($oe->{groupType} eq '4');	# local
 			next if $oe->{Name} =~/^(?:Domain Controllers|Domain Computers|Pre-Windows 2000|RAS and IAS Servers|MTS Trusted|SMSInternal|NetOp Activity)/i;
 			my $sgm =&$fgm($_[0], $oe);
-			print FL $dp ? "$dp\\" : '', $oe->{Name}
+			print $FL $dp ? "$dp\\" : '', $oe->{Name}
 			,":\t", $oe->{Name}
 				.(($oe->{groupType} ne '4')
  						? '@' .$du : '')
@@ -3178,7 +3275,7 @@ sub ugf_w32 {	# ugfile() module using Win32 ADSI WinNT://
 			,":\t", ''
 			,":\t", $oe->{Description}||''
 			, "\n";
-			print FG !$dp ? ($oe->{Name}, ":\t", $sgm, "\n") : ()
+			print $FG !$dp ? ($oe->{Name}, ":\t", $sgm, "\n") : ()
 			, $du, '\\', $oe->{Name}, ":\t", $sgm, "\n"
 			, $oe->{Name}, '@', $du, ":\t", $sgm, "\n"
 			;
@@ -3190,9 +3287,7 @@ sub ugf_w32 {	# ugfile() module using Win32 ADSI WinNT://
 
 
 sub ugf_w32ldap { # ugfile() module using Win32 ADSI LDAP:// and WinNT://
- my ($s, $tm, $aq);
- local (*FG, *FL);
- ($s, *FG, *FL, $tm, $aq) =@_;
+ my ($s, $FG, $FL, $tm, $aq) =@_;
  my $hn ={};	# dn -> name
  my $hm ={};	# group dn -> members
  eval('use Win32::OLE'); Win32::OLE->Option('Warn'=>0);
@@ -3332,7 +3427,7 @@ sub ugf_w32ldap { # ugfile() module using Win32 ADSI LDAP:// and WinNT://
 					|| !($oe->{groupType} & 0x00000004)
 						? '@' .($pi ||$lh) : '');
 			my $el =&$am($id);
-			print FL $en
+			print $FL $en
 				,":\t", $ef
 				,":\t", $oe->{ADsPath}		||''
 				,":\t", ucfirst($oe->{Class})	||''
@@ -3340,15 +3435,15 @@ sub ugf_w32ldap { # ugfile() module using Win32 ADSI LDAP:// and WinNT://
 				,":\t", $oe->{EmailAddress}	||''
 				,":\t", $oe->{Description}	||''
 				, "\n";
-			print FG $en, ":\t", $el, "\n"
+			print $FG $en, ":\t", $el, "\n"
 				if $el;
-			print FG "$ld\\$en", ":\t", $el, "\n"
+			print $FG "$ld\\$en", ":\t", $el, "\n"
 				,"$en\@$ld", ":\t", $el, "\n"
 				if $el && !$pw && $pl;
-			print FG "$lh\\$en", ":\t", $el, "\n"
+			print $FG "$lh\\$en", ":\t", $el, "\n"
 				,"$en\@$lh", ":\t", $el, "\n"
 				if $el && !$pw && !$pl;
-			print FG $ef, ":\t", $en
+			print $FG $ef, ":\t", $en
 				, !$pw ? ("\t", "$ld\\$en") : ()
 				, $el ? ("\t", $el) : ()
 				, "\n"
@@ -3360,9 +3455,7 @@ sub ugf_w32ldap { # ugfile() module using Win32 ADSI LDAP:// and WinNT://
 
 
 sub ugf_ldap {	# ugfile() module using Net::LDAP
- my ($s, $tm, $ha);
- local (*FG, *FL);
- ($s, *FG, *FL, $tm, $ha) =@_;
+ my ($s, $FG, $FL, $tm, $ha) =@_;
  $s =$ha if !$s;
  my $hn ={};	# dn -> name
  my $hm ={};	# group dn -> members
@@ -3421,7 +3514,7 @@ sub ugf_ldap {	# ugfile() module using Net::LDAP
 		if !$ei;
 	   $ei =~s/[\n\r]/ /g;
 	my $el =$hm->{$dn} ? &$ae($dn) : undef;
-	print FL $en
+	print $FL $en
 		,":\t", $ef ||$em ||$en ||''
 		,":\t", $ep ||''
 		,":\t", $ec ||''
@@ -3429,9 +3522,9 @@ sub ugf_ldap {	# ugfile() module using Net::LDAP
 		,":\t", $em ||''
 		,":\t", $ei ||''
 		, "\n";
-	print FG $en, ":\t", $el, "\n"
+	print $FG $en, ":\t", $el, "\n"
 		if $el;
-	print FG map {utf8dec($s, $_) .":\t"
+	print $FG map {utf8dec($s, $_) .":\t"
 			.$en
 			.($el ? "\t" .$el : '')
 			."\n"
@@ -3573,10 +3666,15 @@ sub w32ugrps {	# Win32 user groups, optional usage, interesting legacy code
 sub w32umail {	# E-mail address(es) of user(s) given
  my($s, $u) =@_[0,1];	# (self, ?user(s), ?ad fields) -> email
 	$u  =$s->user() if !$u;
+ my $d =$s->{-smtpdomain};
  join(', '
-	, map {	my $v =$_;
-		my $o =eval{$s->w32user($v)};
-		if ($o) {
+	, map {	my ($v, $o) =($_);
+		!$v
+		? ()
+		: $v && $d && ($v =~/\@\Q$d\E/i)
+		? $v
+		: ($o =eval{$s->w32user($v)})
+		? (do {
 			foreach my $f ($#_ >1 ? @_[2..$#_] : ('EmailAddress','Description')) {
 			# !!! 'EmailAddress' not supported via WinNT://
 			# MSDN "IADs Property Methods"; "Using objectGUID to Bind to an Object"
@@ -3586,9 +3684,9 @@ sub w32umail {	# E-mail address(es) of user(s) given
 					$v =$1; last
 				}
 			}
-		}
-		# $v =~/\\([^\\]+)/ ? $1 : $v;
-		$v
+			($v)
+		  })
+		: $v
 		} split /\s*[,;]\s*/, $u)
 }
 
@@ -4533,6 +4631,7 @@ sub recActLim {	# Bound fields
 		&& ($c->{-cmd} !~/^(?:recRead)$/);
 	return(1)
  }
+ delete $rr->{-editable}  if ref($rr->{-editable}) && exists($rr->{-editable}->{-racWriter}) && !$rr->{-editable}->{-racWriter};
  $s->recActor($c, $rr, 0) if !$rr->{-editable};
  return(undef)	if !$rr->{-editable} && !$rr->{-new};
  return(!$c->{-cmdt}
@@ -4621,7 +4720,9 @@ sub recActLim {	# Bound fields
 		&& (ref($c->{-cmdt}->{-mdefld}->{$ds->[0]}->{-inp}->{-values}) eq 'ARRAY');
 	return(&{$s->{-die}}($s->lng(0,'recDel') .": " .$s->lng(1,'recDelAclStp')) && undef)
 		if ($c->{-cmd} && ($c->{-cmd} eq 'recDel'))
-		|| ($ds && $rn && $rn->{$ds->[0]} && ($rn->{$ds->[0]} eq $ds->[1]));
+		|| ($c->{-cmd} && ($c->{-cmd} !~/^(?:recRead|recForm)$/)
+			&& $ds && $rn && $rn->{$ds->[0]}
+			&& ($rn->{$ds->[0]} eq $ds->[1]));
  }
  1
 }
@@ -4688,7 +4789,7 @@ sub recIns {    # Insert record into database
 		# -table=>table, field=>value || -data=>{values}
 		# -key=>{sample}, -from=>cursor
  my	$s =$_[0];
-	$s->varLock if $s->{-serial} && $s->{-serial} ==1;
+	$s->varLock if $s->{-serial} && $s->{-serial} ==2;
 	$s->logRec('recIns', @_[1..$#_]);
  my	$a =(@_< 3 && ref($_[1]) ? {%{$_[1]}} : {@_[1..$#_]});
  my	$d =$a->{-data} ? {%{$a->{-data}}} : exists($a->{-data}) ? {} : $a;
@@ -4861,7 +4962,7 @@ sub recUpd {    # Update record(s) in database
 		# -key=>{field=>value}, -where=>'condition', -version=>'+'|'-'
 		# -optrec=>boolean, -sel=>boolean
  my	$s =$_[0];
-	$s->varLock if $s->{-serial} && $s->{-serial} ==1;
+	$s->varLock if $s->{-serial} && $s->{-serial} ==2;
 	$s->logRec('recUpd', @_[1..$#_]);
  my	$a =(@_< 3 && ref($_[1]) ? {%{$_[1]}} : {@_[1..$#_]});
  my	$d =$a->{-data} ? {%{$a->{-data}}} : exists($a->{-data}) ? {} : $a;
@@ -5085,7 +5186,7 @@ sub recUtr {    # Translate values in database
 	else {
 		$a = (@_< 3 && ref($n) ? {%{$n}} : {@_[1..$#_]});
 	}
-	$s->varLock if $s->{-serial} && $s->{-serial} ==1;
+	$s->varLock if $s->{-serial} && $s->{-serial} ==2;
 	$s->logRec('recUtr', @_[1..$#_]);
  my	$d =$a->{-data} ? {%{$a->{-data}}} : exists($a->{-data}) ? {} : $a;
 	$a->{-cmd}  ='recUtr';
@@ -5603,7 +5704,7 @@ sub recDel {    # Delete record(s) in database
 		# -table=>table
 		# -key=>{field=>value}, -where=>'condition', -version=>'+'|'-'
  my	$s =$_[0];
-	$s->varLock if $s->{-serial} && $s->{-serial} ==1;
+	$s->varLock if $s->{-serial} && $s->{-serial} ==2;
 	$s->logRec('recDel', @_[1..$#_]);
  my	$a =(@_< 3 && ref($_[1]) ? {%{$_[1]}} : {@_[1..$#_]});
  my	$d =$a->{-data} ? {%{$a->{-data}}} : exists($a->{-data}) ? {} : $a;
@@ -6423,12 +6524,12 @@ sub cgiRun {	# Execute CGI query
 		,'<frameset rows="50%,*">',"\n"
 		,'<frame name="TOP" src="' 
 			.($s->{-pcmd}->{-form} eq 'default'
-			? $s->htmlEscape($s->cgi->url())
+			? $s->htmlEscape($s->url)
 			: $s->htmlEscape($s->urlOpt(-frame=>'BOTTOM'))
 			)			# !!! Mozilla no OnLoad target
 			.'">',"\n"
 		,'<frame name="BOTTOM" src="' 
-			.$s->urlCat($s->cgi->url())
+			.$s->urlCat($s->url)
 			.'">',"\n"
 		,'</frameset>',"\n"
 		,'</html>',"\n");
@@ -6827,7 +6928,7 @@ sub urlOptl {	# Option URL arg list
 
 
 sub urlOpt {	# Option URL
- $_[0]->urlCat($_[0]->cgi->url, $_[0]->urlOptl(@_[1..$#_]))
+ $_[0]->urlCat($_[0]->url, $_[0]->urlOptl(@_[1..$#_]))
 }
 
 
@@ -7036,7 +7137,8 @@ sub htmlStart {	# HTTP/HTML/Form headers
 					? '<meta http-equiv="refresh" content=' .$s->{-pcmd}->{-refresh} .'>' 
 					: '')
 			,-lang	=> $s->lang(0,'-lang')
-			,-style	=> ''
+			,-encoding => $s->charset()
+			,-style	=> {-code=>''
 				.".Body {font-size: 70%; font-family: Verdana, Helvetica, Arial, sans-serif; }\n"
 				.".Input {font-size: 100%; font-family: Verdana, Helvetica, Arial, sans-serif; }\n"
 				.".Form {margin-top:0px; }\n"
@@ -7050,6 +7152,7 @@ sub htmlStart {	# HTTP/HTML/Form headers
 				.".MenuButton {background-color: buttonface; color: black; text-decoration:none; font-size: 7pt}\n"
 				.".MenuInput {font-size: 8pt}\n"
 				.".htmlMQHsel {text-decoration: none; font-weight: bolder; border-style: inset;}"
+				}
 			,-title	=> (do{	my $v =eval{$om && $s->lnglbl($om)};
 					$v ? $v .' - ' : ''})
 				.($s->{-pcmd}->{-cmd} eq 'frmHelp'
@@ -7074,11 +7177,11 @@ sub htmlStart {	# HTTP/HTML/Form headers
 				 ,$s->{-pcmd}->{$_})
 				: ()
 				} sort keys %{$s->{-pcmd}})
-			, 'xmlns'=>$s->cgi->url
+			, 'xmlns'=>$s->url
 			, '0')
-		: $s->cgi()->start_multipart_form(-method=>($s->{-pcmd}->{-refresh} ? 'get' : 'post')
+		: $s->cgi->start_multipart_form(-method=>($s->{-pcmd}->{-refresh} ? 'get' : 'post')
 			,-class	=> "$cs"
-			,-action=> $s->cgi()->url()
+			,-action=> $s->url
 			,-target=> '_self'
 			,-name=>'DBIx_Web'
 			# !!! 'DBIx_Web.' or 'forms[0].' syntax inflexible
@@ -7095,7 +7198,7 @@ sub htmlEnd {	# End of HTML/HTTP output
 	return("\n</" .$s->xmlTagEscape($s->{-pcmd}->{-form}||'default') .">\n")
  }
  else {
-	return($s->cgi()->endform()
+	return($s->cgi->endform()
 	,"\n"
 	,$s->htmlOnLoadW(
 		!$s->{-c}->{-jswload}
@@ -7107,7 +7210,7 @@ sub htmlEnd {	# End of HTML/HTTP output
 				: '')
 			." : e[0].target)}}"
 		: ())
-	,$s->cgi()->end_html())
+	,$s->cgi->end_html())
  }
 }
 
@@ -7185,7 +7288,7 @@ sub htmlMenu {	# Screen menu bar
 	push @r,htmlMB($s, 'home');
  }
  if	(1) {				# 'back' js button
-	push @r, htmlMB($s, 'back', $s->cgi->url(), ($c->{-backc}||1));
+	push @r, htmlMB($s, 'back', $s->url, ($c->{-backc}||1));
  }
  if	($s->uguest()
 	&& $s->{-login}) {		# Login
@@ -7416,13 +7519,13 @@ sub htmlMB {	# CGI menu bar button
  }
  elsif ($_[1] eq 'home') {
 	my $jc =' onclick="{window.document.open(\'' 
-		.$_[0]->urlCat($_[0]->cgi->url(),$_[0]->{-pcmd}->{-frame} ? ('_frame'=>$_[0]->{-pcmd}->{-frame}) : ())
+		.$_[0]->urlCat($_[0]->url,$_[0]->{-pcmd}->{-frame} ? ('_frame'=>$_[0]->{-pcmd}->{-frame}) : ())
 		."','_self','',false); return(false)}\" ";
 	my $tl =htmlEscape($_[0], lng($_[0], 1, 'home'));
         $td0 
 	.($tdb ? $tdb .$jc : '')
 	.' title="' .$tl .'"'
-	.'><a href="' .($_[0]->cgi->url) .'" '
+	.'><a href="' .($_[0]->url) .'" '
 	.($tdb ? '' : $jc)
 	.' title="' .$tl .'"'
 	.' class="' .$cs .'" target="_self"><img src="' .$_[0]->{-icons} .'/' .$IMG->{'home'} .'" border=0 align="bottom" class="' .$cs .'" '
@@ -7446,7 +7549,7 @@ sub htmlMB {	# CGI menu bar button
 	$td0 
 	.' title="' .$tl .'"'
 	.($pb && $tdb ? $tdb .$jc : '') ."><nobr>\n"
-	.'<a href="' .($_[2]||$_[0]->cgi->url) .'" ' 
+	.'<a href="' .($_[2]||$_[0]->url) .'" ' 
 	.($pb || $tdb ? '' : $jc)
 	.' title="' .$tl .'"'
 	.' class="' .$cs .'" target="_self"><img src="' .$_[0]->{-icons} .'/' .$IMG->{'back'} .'" border=0 align="bottom" height="22" class="' .$cs .'" '
@@ -7510,7 +7613,7 @@ sub htmlML {	# CGI menu bar list
  .( $_[1] eq 'frmLso'
   ? 'if (_frmLso.value==&quot;recQBF&quot;) {window.document.DBIx_Web._cmd.value=_frmLso.value; _frmLso.value=&quot;' .$_[0]->htmlEscape($i) .'&quot;; window.document.DBIx_Web.submit(); return(true);} else {window.document.DBIx_Web._cmd.value=&quot;frmCall&quot;; window.document.DBIx_Web.submit(); return(false);}}">'
   : 1 && ($_[1] eq 'frmName1')
-  ? ("var v=_frmName1.value; _frmName1.value=''; document.body.style.cursor=_frmName1.style.cursor='wait'; window.document.open('" .$_[0]->cgi->url() ."?_cmd=frmCall;_frmName1=' +encodeURIComponent(v)"
+  ? ("var v=_frmName1.value; _frmName1.value=''; document.body.style.cursor=_frmName1.style.cursor='wait'; window.document.open('" .$_[0]->url ."?_cmd=frmCall;_frmName1=' +encodeURIComponent(v)"
 	.",self.name.match(/^(?:TOP|BOTTOM)\$/) || document.getElementsByName('_frame').length ? '_blank' : '_self'"
 	.", '', false); document.body.style.cursor=_frmName1.style.cursor='auto'; return(true);}\">")
   : 1 && ($_[1] eq 'frmName')
@@ -7519,8 +7622,8 @@ sub htmlML {	# CGI menu bar list
 		? '_frmName1.value=&quot;&quot;; ' 
 		: '')
 	."if((_frmName.value=='-frame=set') && (self.name.match(/^(?:TOP|BOTTOM)\$/) || document.getElementsByName('_frame').length)){window.document.DBIx_Web.target='_parent'; _frmName.value=_form.value ? _form.value : ''; if (document.getElementsByName('_frame').length) {_frame.value=''}}"
-	."else if(_frmName.value.match(/\\+\$/) && (self.name.match(/^(?:TOP|BOTTOM)\$/) || document.getElementsByName('_frame').length)){var v=_frmName.value; _frmName.value=_form.value ? _form.value : ''; window.document.open('" .$_[0]->cgi->url() ."?_cmd=frmCall;_frmName=' +encodeURIComponent(v), '_blank', '', false); return(true)}"
-	."else {var v=_frmName.value; document.body.style.cursor=_frmName.style.cursor='wait'; _frmName.value=_form.value ? _form.value : ''; window.document.open('" .$_[0]->cgi->url() ."?_cmd=frmCall;_frmName=' +encodeURIComponent(v), '_self', '', false); document.body.style.cursor=_frmName.style.cursor='auto'; return(true)};"
+	."else if(_frmName.value.match(/\\+\$/) && (self.name.match(/^(?:TOP|BOTTOM)\$/) || document.getElementsByName('_frame').length)){var v=_frmName.value; _frmName.value=_form.value ? _form.value : ''; window.document.open('" .$_[0]->url ."?_cmd=frmCall;_frmName=' +encodeURIComponent(v), '_blank', '', false); return(true)}"
+	."else {var v=_frmName.value; document.body.style.cursor=_frmName.style.cursor='wait'; _frmName.value=_form.value ? _form.value : ''; window.document.open('" .$_[0]->url ."?_cmd=frmCall;_frmName=' +encodeURIComponent(v), '_self', '', false); document.body.style.cursor=_frmName.style.cursor='auto'; return(true)};"
 	.'window.document.DBIx_Web.submit(); return(false);}">')
   : 'return(true)}')
  ."\n\t"
@@ -7768,7 +7871,7 @@ sub cgiForm {	# Print CGI screen form
 			&& $f->{-inp}->{-rfd}
 			&& $s->{-pout}->{-file})	{
 			my $u =$s->rfdPath(-url=>$s->{-pcmd}, $s->{-pout});
-			   $u =$s->cgi->url(-base=>1) .$u if $u !~/\/\/\w+:/;
+			   $u =$s->url(-base=>1) .$u if $u !~/\/\/\w+:/;
 			my $v =join("\n", map { $u .'/' .$_
 				} $s->rfdGlobn($s->{-pcmd}, $s->{-pout}));
 			$s->output($s->xmlsTag('files',''=>$v),"\n");
@@ -7785,8 +7888,8 @@ sub cgiForm {	# Print CGI screen form
 			, sub{	  $_[1] =~/^[\w-]{3,7}:\/{2}/
 				? $_[1]
 				: $_[1] =~/^\//
-				? $s->cgi->url(-base=>1) .$_[1]
-				: $s->cgi->url() .$_[1]
+				? $s->url(-base=>1) .$_[1]
+				: $s->url .$_[1]
 				})
 			,'</',$f->{-fld},">\n");
 		}
@@ -7796,8 +7899,8 @@ sub cgiForm {	# Print CGI screen form
 			, sub{	  $_[1] =~/^[\w-]{3,7}:\/{2}/
 				? $_[1]
 				: $_[1] =~/^\//
-				? $s->cgi->url(-base=>1) .$_[1]
-				: $s->cgi->url() .$_[1]
+				? $s->url(-base=>1) .$_[1]
+				: $s->url .$_[1]
 				});
 			$s->output($s->xmlsTag($f->{-fld}, ''=>$v), "\n")
 		}
@@ -8259,7 +8362,7 @@ sub cgiForm {	# Print CGI screen form
 		, htmlField($s, '_xml', lng($s,1,'-xml'), {-labels=>{''=>'','yes'=>'xml'}})
 		, "</td></tr>\n"
 		) if 0;
-	my $u =htmlEscape($s, $s->urlCat($s->cgi->url(-relative=>1)
+	my $u =htmlEscape($s, $s->urlCat($s->url(-relative=>1)
 			, '_cmd'=>'recList', '_form'=>$c->{-form}
 			, !(grep {defined($c->{$_}) && ($c->{$_} ne '')
 					} qw (-qkey -qwhere -qurole))
@@ -8690,7 +8793,7 @@ sub htmlRFD {	# RFD widget html
 	else {
 		$r .="\n&nbsp;&nbsp;&nbsp;\n"
 	}
-	$r .=join('; ', 
+	my $v= eval{join('; ',
 		map {	my $f =$_; $f=~s/([%])/uc sprintf("%%%02x",ord($1))/ge;
 			$s->cgi->a({-href=>"$url/$f", -target=>'_blank'}
 			, $s->cgi->checkbox(-name=>$fnl
@@ -8698,18 +8801,30 @@ sub htmlRFD {	# RFD widget html
 				, -value=>$_
 				, -label=>$_
 				, -title=>$s->lng(1,'rfadelm')))
-		} $s->pthGlobns($pth .'/*'))	# } $s->rfdGlobn($c, $d))
+		} $s->pthGlobns($pth .'/*'))};
+	$r .=(defined($v)
+		? $v
+		: ('<span class="ErrorMessage"><hr class="ErrorMessage" /><b>'
+			.$s->htmlEscape($s->lng(0, 'Error')) .':</b> '
+			.$s->htmlEscape($@)
+			."</b></span>\n"))
  }
  else	{				# View widget
-	$r .=' '
-	.join('; ', 
+	my $v =eval{join('; ',
 		map {	my $f =$_; $f=~s/([%])/uc sprintf("%%%02x",ord($1))/ge;
 			$_ eq '.htaccess'
 			? ()
 			: ($g->a({-href=>"$url/$f",-target=>'_blank'}
 				, $s->htmlRFDimg($_,$pth,$url)
 				. $s->htmlEscape($_)))
-		} $s->pthGlobns($pth .'/*'))	# } $s->rfdGlobn($c, $d))
+		} $s->pthGlobns($pth .'/*'))};
+	$r .=' '
+		.(defined($v)
+		? $v
+		: ('<span class="ErrorMessage"><hr class="ErrorMessage" /><b>'
+			.$s->htmlEscape($s->lng(0, 'Error')) .':</b> '
+			.$s->htmlEscape($@)
+			."</b></span>\n"))
  }
  $r
 }
@@ -9501,7 +9616,6 @@ sub cgiQInherit { # Inherit cgi query attributes if needed
  }
  foreach my $m ($q, $qmv, ($qmv ne $tm) ? $tm : ()) {
 	next	if !$m;
-	# $_[0]->logRec('***cgiQInherit',$m->{-lbl} || 'query');
 	if (!$q->{-data}) {
 	$q->{-field}=$m->{-field}
 		if !$q->{-field};
@@ -9662,8 +9776,6 @@ sub htmlMQH {	# Menu Query Hyperlink
 			? $s->strdata($vq) ne $s->strdata($vf)
 			: $vq ne $vf;
 	}
-	# $s->logRec('***',$qm,$k,$vf,$vq)
-	#	if $a->{-quname} && ($a->{-quname} =~/it/i);
 	$qw->{$k} =$k eq '-qkey'
 		? $vf && $vq	? {%$vf, %$vq}	: $vq
 		: $k eq '-qwhere'
@@ -10088,7 +10200,7 @@ sub cgiList {	# List queried records
 		my $h =&$href($s, $r);
 		$xml
 		? $s->output(''
-		, xmlsTag($s, 'tr', 'href'=>$s->cgi->url() .'/' .$h, '0')
+		, xmlsTag($s, 'tr', 'href'=>$s->url .'/' .$h, '0')
 		, "\n"
 		, (map {	ref($_->[1])
 				? ('<', $_->[0], '>'
@@ -10464,10 +10576,41 @@ sub cgiFooter {	# Footer of CGI screen
  my $cs  =($s->{-c}->{-htmlclass} ? $s->htmlEscape($s->{-c}->{-htmlclass}) .' ' : '')
 		.'FooterArea';
  return(undef) if $s->{-pcmd}->{-xml} ||$s->{-pcmd}->{-print};
+ if ($s->{-cgi} && $s->{-cgi}->{'.cgi_error'}
+ && (($s->{-c}->{'.cgi_error'} ||'') ne $s->{-cgi}->{'.cgi_error'})) {
+	$_[0]->logRec('error','CGI', $s->{-cgi}->{'.cgi_error'})
+ }
+
+# $s->logRec('***','perl'
+#	,$]
+#	,'@INC',@INC
+#	# , 'Win32::LoginName', Win32::LoginName()
+#	);
+# $s->logRec('***','%ENV'
+#	,map {($_, (defined($ENV{$_}) ? $ENV{$_} : 'undef'))
+#		} qw(SERVER_SOFTWARE SERVER_PROTOCOL GATEWAY_INTERFACE PERLXS SCRIPT_NAME PATH_INFO PATH_TRANSLATED REQUEST_METHOD REQUEST_URI QUERY_STRING REDIRECT_QUERY_STRING CONTENT_TYPE CONTENT_LENGTH));
+# $s->logRec('***','CGI'
+#	,(map {	my $v =eval("\$CGI::$_");
+#		("\$$_", defined($v) ? $v : 'undef')
+#		} qw (VERSION TAINTED MOD_PERL XHTML NOSTICKY NPH PRIVATE_TEMPFILES TABINDEX CLOSE_UPLOAD_FILES POST_MAX HEADERS_ONCE USE_PARAM_SEMICOLONS))
+#	,(map {	my $v =$s->url(!$_ ? () : ($_=>1));
+#		(($_||'%url'), (defined($v) ? $v : 'undef'))
+#		} '', qw(-absolute -relative -base))
+#	# ,'-self_url', ($s->cgi->self_url()||'')
+#	);
+# if ($s->{-cgi} && $s->{-cgi}->{dbix_web}) {
+#	foreach my $v (split /[\n\r]+/, $s->{-cgi}->{dbix_web}) {
+#		$_[0]->logRec('***','CGI','dbix_web',$v)
+#	}
+# }
+# $s->logRec('***','param'
+#	,map {($_, (defined($s->cgi->param($_)) ? $s->cgi->param($_) : 'undef'))
+#		} $s->cgi->param);
+
  $s->output("\n"
 	,'<span class="', $cs, '" onclick="{var e=document.getElementById(\'_FooterArea\'); e.style.display=(e.style.display==\'none\' ? \'inline\' : \'none\')}"'
 		.(($ENV{HTTP_USER_AGENT}||'') =~/MSIE/ 
-			? ' style="cursor: hand;"' 
+			? ' style="cursor: hand;"'
 			: (' title="' .$s->htmlEscape($s->lng(0,'ddlbopen')) .'"'))
 		.'>'
 	,'<hr class="', $cs, '" />'
@@ -11301,7 +11444,7 @@ sub binmode {
 
 sub close {
  return($_[0]) if !$_[0]->{-handle};
- $_[0]->lock(LOCK_UN) if $_[0]->{-lock} ne LOCK_UN;
+ $_[0]->lock(LOCK_UN |LOCK_NB) if $_[0]->{-lock} ne LOCK_UN;
  $_[0]->{-lcks}={};
  CORE::close($_[0]->{-handle}); 
  $_[0]->{-handle} =undef;
@@ -11915,11 +12058,10 @@ sub new {
   if (!ref($e)) { # string to safe evaluate
      my $c =$e;
      my $m =eval('use Safe; Safe->new()');
-     #  $m->permit_only(qw(recSel recRead fetch fetchrow_arrayref fetchrow_hashref :default)); # may be :base_core :browse
-	$m->permit_only(qw(:default :base_core :browse));
-        $m->share('@_', '$DBIx::Web::SELF');
+	eval{local $^W =0; $m->permit_only(qw(:default :base_core :browse))};
+        eval{local $^W =0; $m->share('@_', '$DBIx::Web::SELF')};
      my $o =$DBIx::Web::SELF;
-     $e =sub{	local ($DBIx::Web::SELF, $^W) =($o, undef);
+     $e =sub{	local ($DBIx::Web::SELF, $^W) =($o, 0);
 		$m->reval($c)};
   }
   bless $e, $c;

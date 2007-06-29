@@ -21,7 +21,7 @@ my $w =DBIx::Web->new(
 #,-logo		=>'<img src="/icons/p.gif" border="0" />'
  ,-debug	=>2		# debug level
 #,-log          =>0             # logging
- ,-serial	=>2		# serial operation level
+ ,-serial	=>1		# serial operation level
  ,-dbiarg	=>["DBI:mysql:cgibus","cgibus","********"]
 #,-dbiph	=>1		# dbi placeholders usage
  ,-dbiACLike	=>'eq'		# dbi access control comparation, i.e. 'eq lc', 'rlike'
@@ -150,7 +150,7 @@ $w->set(
 			,-lblhtml=>'' # '<b>$_</b><br />'
 			,-inp=>{-htmlopt=>1, -hrefs=>1, -arows=>5, -cols=>70}
 			}
-		,$w->tfsAll() # ,$w->tfdRFD(),$w->tfvVersions(),$w->tfvReferences()		
+		,$w->tfsAll() # ,$w->tfdRFD(),$w->tfvVersions(),$w->tfvReferences()
 		]
 		,$w->ttoRVC()
 		,-racReader	=>[qw(rrole)]
@@ -592,7 +592,7 @@ $w->cgiRun();
 ##############################
 # Setup Script
 ##############################
-__END__
+#__END__
 #
 # Connect as root to mysql, once creating database and user:
 #{$_->{-dbi} =undef; $_->{-dbiarg} =['DBI:mysql:mysql','root','password']; $_->dbi; <STDIN>}
@@ -601,6 +601,6 @@ __END__
 #{$_->{-dbi} =undef; $_->{-dbiarg} =$_->{-dbiargpv}; $_->dbi; <STDIN>}
 #
 # Reindex database:
-{$s->recReindex(1)}
+#{$s->recReindex(1)}
 #
 #

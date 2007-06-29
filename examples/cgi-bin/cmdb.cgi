@@ -10,7 +10,7 @@ my $w =DBIx::Web->new(
 #,-logo		=>'<img src="/icons/p.gif" border="0" />'
  ,-debug	=>1		# debug level
  ,-log          =>0             # logging
- ,-serial	=>2		# serial operation level
+ ,-serial	=>1		# serial operation level
  ,-dbiarg	=>["DBI:mysql:cgibus","cgibus","********"]
  ,-dbiACLike	=>'rlike'	# dbi access control comparation, i.e. 'eq lc', 'rlike'
  ,-keyqn	=>1		# key query null comparation
