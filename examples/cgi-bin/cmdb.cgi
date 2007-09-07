@@ -1,6 +1,6 @@
 #!perl -w
 BEGIN {
-#push @INC, $1 .'sitel/lib' if !(grep /sitel/i, @INC) && ($INC[0] =~/(.+?[\\\/])lib$/i);
+ push @INC, $1 .'sitel/lib' if !(grep /sitel/i, @INC) && ($INC[0] =~/(.+?[\\\/])lib$/i);
 }
 #$ENV{HTTP_ACCEPT_LANGUAGE} ='';
 
@@ -10,8 +10,8 @@ my $w =DBIx::Web->new(
 #,-logo		=>'<img src="/icons/p.gif" border="0" />'
  ,-debug	=>1		# debug level
  ,-log          =>0             # logging
- ,-serial	=>1		# serial operation level
- ,-dbiarg	=>["DBI:mysql:cgibus","cgibus","********"]
+ ,-serial	=>2		# serial operation level
+ ,-dbiarg	=>["DBI:mysql:cgibus","cgibus","d83nfmJR971Yv3gVI35"]
  ,-dbiACLike	=>'rlike'	# dbi access control comparation, i.e. 'eq lc', 'rlike'
  ,-keyqn	=>1		# key query null comparation
  ,-path		=>'-ServerRoot' # datastore path
@@ -22,7 +22,7 @@ my $w =DBIx::Web->new(
 #,-login	=>/cgi-bin/ntlm/# login URL
 #,-AuthUserFile	=>''		# apache users file
 #,-AuthGroupFile=>''		# apache groups file
-#,-usernt	=>1		# windows NT style for user names (0 - @, 1 - \\)
+ ,-usernt	=>1		# windows NT style for user names (0 - @, 1 - \\)
 #,-userln	=>0		# short local usernames (0 - off, 1 - default)
  ,-ugadd	=>['Everyone','Guests']	# additional user groups
 #,-rac		=>0		# record access control (0 - off, 1 - default)
@@ -58,29 +58,29 @@ $w->{-a_cmdbm_fh} =			# CMDBm field hide conditions
 		 !$k
 		? 0
 		: $k eq 'all'
-		? $f !~/^(?:name|system|service|application|type|os|invno|location|office|model|hardware|cpu|ram|hdd|action|computer|slot|device|port|ipaddr|macaddr|speed|duplex|interface|ugroup|role|user|definition)/
+		? $f !~/^(?:name|system|service|application|type|os|invno|location|office|model|hardware|cpu|ram|hdd|action|computer|slot|device|port|ipaddr|macaddr|speed|duplex|interface|ugroup|role|user|stmt|seclvl|definition)/
 		: $k eq 'description'
-		? $f !~/^(?:name|system|office|definition)/
+		? $f !~/^(?:name|system|office|stmt|definition)/
 		: $k eq 'service'
-		? $f !~/^(?:name|system|application|office|definition)/
+		? $f !~/^(?:name|system|application|office|stmt|seclvl|definition)/
 		: $k eq 'user'
-		? $f !~/^(?:name|system|location|office|ugroup|user|definition)/
+		? $f !~/^(?:name|system|location|office|ugroup|user|stmt|seclvl|definition)/
 		: $k eq 'grouping'
-	 	? $f !~/^(?:ugroup|role|user|definition)/
+	 	? $f !~/^(?:ugroup|role|user|stmt|definition)/
 		: $k eq 'computer'
-		? $f !~/^(?:name|system|type|os|invno|location|office|model|hardware|cpu|ram|hdd|port|ipaddr|ipmask|macaddr|speed|duplex|role|user|definition)/
+		? $f !~/^(?:name|system|type|os|invno|location|office|model|hardware|cpu|ram|hdd|port|ipaddr|ipmask|macaddr|speed|duplex|role|user|stmt|seclvl|definition)/
 		: $k eq 'interface'
-		? $f !~/^(?:name|system|computer|port|ipaddr|ipmask|macaddr|speed|duplex|definition)/
+		? $f !~/^(?:name|system|computer|port|ipaddr|ipmask|macaddr|speed|duplex|stmt|definition)/
 		: $k eq 'device'
-		? $f !~/^(?:name|system|slot|invno|location|office|model|hardware|definition)/
+		? $f !~/^(?:name|system|slot|invno|location|office|model|hardware|stmt|definition)/
 		: $k eq 'netint'
-		? $f !~/^(?:name|system|slot|invno|service|ipaddr|ipmask|macaddr|speed|duplex|interface|definition)$/
+		? $f !~/^(?:name|system|slot|invno|service|ipaddr|ipmask|macaddr|speed|duplex|interface|stmt|definition)$/
 		: $k eq 'connector'
-		? $f !~/^(?:name|system|slot|device|port|definition)/
+		? $f !~/^(?:name|system|slot|device|port|stmt|definition)/
 		: $k eq 'connection'
-		? $f !~/^(?:system|slot|device|port|definition)/
+		? $f !~/^(?:system|slot|device|port|stmt|definition)/
 		: $k eq 'usage'
-		? $f !~/^(?:service|action|computer|interface|role|user|definition)/
+		? $f !~/^(?:service|action|computer|interface|role|user|stmt|definition)/
 		: 0 };
 $w->{-a_cmdbm_fho} =			# CMDBm field optional hide condition
 	sub{	(!$_ && ($_[2] !~/e/)) ||&{$_[0]->{-a_cmdbm_fh}}(@_)};
@@ -713,6 +713,27 @@ $w->set(
 			,-lbl_ru=>'ОпрПольз', -cmt_ru=>'Определение пользователя'
 			,-flg=>'', -hidel=>1
 			}
+		,{-fld=>'seclvl'
+			,-lbl=>'Permit', -cmt=>'Security level/clearance/classification'
+			,-lbl_ru=>'Допуск', -cmt_ru=>'Уровень безопасности/защиты/доступа'
+			,-flg=>'euq'
+			,-hidel=>$w->{-a_cmdbm_fho} 
+			,-inp=>{ -values=>['', qw(public corporate restricted confidentl secret)]
+				,-labels_ru=>{	''	=>''
+						,'public' => 'публичный'
+						,'corporate' => 'корпоративный'
+						,'restricted' => 'ограниченный'
+						,'confidentl' => 'конфиденциальный'
+						,'secret' => 'тайна'
+						}}
+			},
+		#,{-fld=>'stmt'
+		#	,-lbl=>'Stmt *', -cmt=>'[obsolete/legacy/removal] Statement of work'
+		#	,-lbl_ru=>'Основание *', -cmt_ru=>'[устарело/унаследовано/исключение] Основание выполнения работ'
+		#	,-flg=>'euq'
+		#	,-hidel=>1
+		#	,-ddlb =>sub{$_[0]->cgiQueryFv('','stmt')}, -form=>'cmdbm'
+		#	}
 		,{-fld=>'definition'
 			,-lbl=>'Def', -cmt=>'Configuration item short definition'
 			,-lbl_ru=>'Опр-е', -cmt_ru=>'Определение (краткое описание) конфигурационной единицы'

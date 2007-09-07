@@ -461,7 +461,7 @@ C<-subst>,
 C<-recXXX> (C<-recNew>, C<-recForm>, C<-recIns>, C<-recUpd>, C<-recDel>, C<-recRead>, C<-recList>,...);
 C<-recX#A> (C<-recTrim0A>, C<-recEdt0A>, C<-recEdt0R>, C<-recEdt1A>);
 C<-httpheader>, C<-htmlstart>;
-C<-logo>, C<-icons>, C<-menuchs>, C<-menuchs1>, C<-frmLso>, C<-frmLsc>;
+C<-banner>, C<-logo>, C<-icons>, C<-menuchs>, C<-menuchs1>, C<-frmLso>, C<-frmLsc>;
 C<-login>;
 C<-cgvXXX>;
 
@@ -554,6 +554,15 @@ See also C<ugfile>.
 
 (C<Database Options>)
 Autocommit database mode
+
+
+=item -banner
+
+	=> not exists || HTML || sub{}(self) -> HTML
+
+(C<User Interface>)
+Banner to display at the top.
+See also C<-logo>
 
 
 =item -c 
@@ -1484,7 +1493,8 @@ Login URL part, where web server authentication is estimated.
 	=> not exists || HTML
 
 (C<User Interface>)
-Logotype to display in the button bar
+Logotype to display in the button bar.
+See also C<-banner>.
 
 
 =item -lsthtml
@@ -4053,6 +4063,17 @@ another options may be implemented within script itself.
 
 =over
 
+=head2 2007-09-07 - Development Version 0.70
+
+And some minor corrections
+
+
+=head2 2007-08-23
+
+New C<-banner>.
+
+Corrected C<osCmd> behaviour for 'xcopy' command under PerlEx.
+
 
 =head2 2007-06-29 - Development Version 0.69
 
@@ -4618,6 +4639,8 @@ prohibited to use completely, partially or in ideas
 for impairing nature industries
 in Archangel region (wood and timber, geological and mining, space);
 Russian procrastination structures and kgbists.
+
+A help in the revival of Pomor'e will be good.
 
 
 =head1 AUTHOR

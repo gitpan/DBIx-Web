@@ -68,7 +68,7 @@ CREATE DATABASE IF NOT EXISTS cgibus;
 {$db=undef; $db =DBI->connect("DBI:mysql:$cgbd",$cgbu,$cgbp); <STDIN>}
 #
 #
-# CMDB PDM
+# CMDBM PDM
  #========================
  # '-' - reserved fields
 #
@@ -95,6 +95,7 @@ create table cmdbm (
 	name		varchar(80),	# record name
 	definition	varchar(255),
 	stmt		varchar(80),
+	seclvl		varchar(10),
 
 	system		varchar(80),	# 
 	service		varchar(80),	# 
@@ -195,7 +196,6 @@ CREATE TABLE hdesk (
 	KEY idrr	(idrr,etime,utime),
 	KEY record	(record,etime,utime),
 	KEY object	(object,etime,utime),
-	KEY doctype	(doctype,etime,utime),
 	KEY auser	(auser,etime,utime),
 	KEY arole	(arole,etime,utime),
 	KEY application	(application,etime,utime),
@@ -216,26 +216,27 @@ ALTER TABLE cmdbm ADD COLUMN vtime datetime AFTER utime;
  ###########################
 }
 #
-ALTER TABLE hdesk ADD COLUMN analysis varchar(255) AFTER doctype;
+ALTER TABLE hdesk ADD COLUMN analysis varchar(255) AFTER cost;
 #
 #
 #
-{"'hdesk' 2007-04-09 drop unused cols, add 'vtime','mrole','recprc'..."
+{"'hdesk' 2007-04-09 drop unused cols, add 'vtime','mrole','recprc'"
  ###########################
 }
 #
-ALTER TABLE hdesk DROP idpt, DROP idlr, DROP lslote, DROP progress, DROP aopt, DROP doctype;
+ALTER TABLE hdesk DROP idpt, DROP idlr, DROP lslote, DROP progress, DROP aopt;
 ALTER TABLE hdesk ADD COLUMN vtime datetime default NULL AFTER utime;
 ALTER TABLE hdesk ADD COLUMN mrole varchar(60) default NULL AFTER arole;
 ALTER TABLE hdesk ADD COLUMN recprc varchar(10) default NULL AFTER record;
 ALTER TABLE hdesk ADD COLUMN rectype varchar(10) default NULL AFTER record;
+ALTER TABLE hdesk DROP doctype;
 ALTER TABLE hdesk ADD COLUMN cause varchar(60) default NULL AFTER location;
 #
-{"'notes' table" 2007-05-04
+{"'hnotes' table" 2007-05-04
  ###########################
 }
 # 
-CREATE TABLE notes (
+CREATE TABLE hnotes (
         id       varchar(60) primary key,
         idnv     varchar(60),  #   new version (value) pointer
         idpr     varchar(60),  #   previous record pointer
@@ -255,11 +256,18 @@ CREATE TABLE notes (
         comment  text          #   comment, text
 )
 ;
-CREATE INDEX idrm     ON notes (idrm,    utime desc,  ctime desc);
-CREATE INDEX cuser    ON notes (cuser,   utime desc,  ctime desc);
-CREATE INDEX uuser    ON notes (uuser,   utime desc,  ctime desc);
-CREATE INDEX prole    ON notes (prole,   utime desc,  ctime desc);
-CREATE INDEX rrole    ON notes (rrole,   utime desc,  ctime desc);
-CREATE INDEX subject  ON notes (subject, utime desc,  ctime desc);
+CREATE INDEX idrm     ON hnotes (idrm,    utime desc,  ctime desc);
+CREATE INDEX cuser    ON hnotes (cuser,   utime desc,  ctime desc);
+CREATE INDEX uuser    ON hnotes (uuser,   utime desc,  ctime desc);
+CREATE INDEX prole    ON hnotes (prole,   utime desc,  ctime desc);
+CREATE INDEX rrole    ON hnotes (rrole,   utime desc,  ctime desc);
+CREATE INDEX subject  ON hnotes (subject, utime desc,  ctime desc);
+#
+#
+{"2007-08-23 update"
+ ###########################
+}
+#
+ALTER TABLE cmdbm ADD COLUMN seclvl varchar(10) AFTER stmt;
 #
 #

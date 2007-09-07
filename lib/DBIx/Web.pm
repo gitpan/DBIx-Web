@@ -27,7 +27,7 @@
 # - store for users preferences, homepages, notes, etc.
 #
 # ToDo:
-# - commented 'use PerlEx::DBI'
+# - use / comment / debug 'use PerlEx::DBI'
 # - osCmd cacls may buzz sometimes somewhy
 # - error display: cgiRun(), htmlRFD(): message parsing
 # - may buzz when -serial=>2
@@ -44,7 +44,7 @@
 # - test examples: behaviour, versioning, checkouts, attachments, triggers
 #
 # Done:
-# 2007-06-29 publishing 0.69 version
+# 2007-09-07 publishing 0.70 version
 
 
 package DBIx::Web;
@@ -56,7 +56,7 @@ use Fcntl qw(:DEFAULT :flock :seek :mode);
 
 use vars qw($VERSION @ISA @EXPORT @EXPORT_OK %EXPORT_TAGS $AUTOLOAD $SELF $CACHE $LNG $IMG);
 
-	$VERSION= '0.69';
+	$VERSION= '0.70';
 	$SELF   =undef;				# current object pointer
 	$CACHE	={};				# cache for pointers to subobjects
 	*isa    = \&UNIVERSAL::isa; isa('','');	# isa function
@@ -830,12 +830,13 @@ sub set {
 				# 'rfdName()'/'-rfdName'
 			local $_ =$_[1];
 			my $r ='';
+			return($r) if !$_;
 			while ($_ =~/([\\\/])/) {
 				$_ =$';
 				my $v =$` .$1; $v =~s/([^a-zA-Z0-9])/uc sprintf("_%02x",ord($1))/eg;
 				$r .=$v .'/'
 			};
-			$r .=join('/'
+			$r .= join('/'
 				,map {	if (defined($_) && $_ ne '') {
 						my $v =$_; 
 						$v =~s/([^a-zA-Z0-9])/uc sprintf("_%02x",ord($1))/eg;
@@ -1894,7 +1895,7 @@ sub url {	# CGI script URL
 sub dbi {       # DBI connection object
  return ($_[0]->{-dbi}) if $_[0]->{-dbi};
  $_[0]->{-dbidsn} =ref($_[0]->{-dbiarg}) ? $_[0]->{-dbiarg}->[0] : $_[0]->{-dbiarg};
- # eval('use PerlEx::DBI') if $ENV{GATEWAY_INTERFACE} =~/PerlEx/;
+ eval('use PerlEx::DBI') if $ENV{GATEWAY_INTERFACE} =~/PerlEx/;
  $_[0]->{-dbi} =eval("use DBI; 1;")
 	##	&& DBI->connect(ref($_[0]->{-dbiarg}) ? @{$_[0]->{-dbiarg}} : $_[0]->{-dbiarg})
 		&& $_[0]->dbiConnect()
@@ -1931,7 +1932,7 @@ sub dbiConnect {# DBI connecting with optional DBI:Proxy:hostname=127.0.0.1
 			my $p =$c=~/port=([^;]+)/ ? $1 : '';
 			my $x =$^X;	# \\?\D:\Share\B\Perl\bin\PerlIS.dll
 			$x =$'			if $x =~/^\\\\\?\\/;
-			$x =$` .'perl.exe'	if $x =~/PerlIS\.dll$/i;
+			$x =$` .'perl.exe'	if $x =~/(?:PerlIS|PerlEx)\d*\.dll$/i;
 			my $a ="$x -e\"use DBI::ProxyServer; DBI::ProxyServer::main('--localaddr'=>'$h','--localport'=>'$p')\"";
 			# '--mode'=>'single','--logfile'=>'STDERR','--debug'=>1
 			# $_[0]->die($a);
@@ -2052,10 +2053,10 @@ sub osCmd {     # OS Command
   local(*RDRFH, *WTRFH);
   $s->logRec('osCmd', @_);
   if ($^O eq 'MSWin32'		# !!! arguments may need to be quoted
-   || $^X =~/perlis\.dll$/i) {	# ISAPI, DB_File operation problem hacks
+   || $^X =~/(?:perlis|perlex)\d*\.dll$/i) {	# ISAPI, DB_File operation problem hacks
      if (!$sub) {
 	if (($opt !~/h/)
-	&& ($^X =~/perlis\.dll$/i
+	&& ($^X =~/(?:perlis|perlex)\d*\.dll$/i
 		? $_[0] !~/^(?:xcopy)/	# !!! problematic programs
 		: 1)
 		) {
@@ -6525,7 +6526,10 @@ sub cgiRun {	# Execute CGI query
 		,'<frame name="TOP" src="' 
 			.($s->{-pcmd}->{-form} eq 'default'
 			? $s->htmlEscape($s->url)
-			: $s->htmlEscape($s->urlOpt(-frame=>'BOTTOM'))
+			: $s->htmlEscape($s->urlOpt(-frame=>'BOTTOM',
+				uc($ENV{REQUEST_METHOD}||'') ne 'GET'
+				? ()
+				: ('_all'=>1)))
 			)			# !!! Mozilla no OnLoad target
 			.'">',"\n"
 		,'<frame name="BOTTOM" src="' 
@@ -6902,28 +6906,29 @@ sub urlOptl {	# Option URL arg list
  my $s =$_[0];
  my %v =();
  my $l =0;
+ my $m =100;
  for (my $i =1; $i <$#_; $i+=2) {
 	next if !defined($_[$i+1]) ||($_[$i+1] eq '');
 	$v{$_[$i] =~/^-/ ? '_' .substr($_[$i],1) : $_[$i]}
 		=ref($_[$i+1]) ? $s->strdata($_[$i+1]) : $_[$i+1];
  };
+ if ($v{'_all'}) {$m =0; delete $v{'_all'}};
  foreach my $k (keys %v) {$l +=length($k) +length($v{$k}||0)};
  ((map {	my $n =$_;
+		my $v;
 		if (	defined($s->{-pcmd}->{$_})
 			&& ($s->{-pcmd}->{$_} ne '')
 			&& ($n =$_ =~/^-/ ? '_' .substr($_,1) : $_)
 			&& ($n !~/_(?:frmName|cmg|cmh|cmdf|cmdt|backc|ui)/i)
 			&& !exists($v{$n})	) {
-			my $v =ref($s->{-pcmd}->{$_}) 
+			$v =ref($s->{-pcmd}->{$_}) 
 				? $s->strdata($s->{-pcmd}->{$_}) 
 				: $s->{-pcmd}->{$_};
 			$l +=length($n) +length($v);
-			$l <100 ? ($n => $v) : ()
+			$v =undef if $m && ($l >$m);
 		}
-		else {
-			()
-		}
-	} keys %{$s->{-pcmd}}), %v)
+		defined($v) ? ($n => $v) : ()
+	} sort keys %{$s->{-pcmd}}), %v)
 }
 
 
@@ -7425,7 +7430,14 @@ sub htmlMenu {	# Screen menu bar
 	? &{$om->{-frmLso1C}||$ot->{-frmLso1C}}($s,$on,$om,$c,$mc)
 	: $mc;
 
- !$s->{-icons}
+ ($s->{-banner}
+	? (do{	my $v =ref($s->{-banner}) ? &{$s->{-banner}}($s,$on,$om) : $s->{-banner};
+		$v
+		? "\n<div class=\"$cs BannerDiv\">$v</div>"
+		: ''
+		})
+	: '')
+ .(!$s->{-icons}
  ?  "\n<div class=\"$cs MenuDiv\">" .join("\n", @r, $mi, '<br />', $mh, '<br />', $mc ? ($mc, '<br />') : ()) ."</div>\n\n"
  : ("\n<div class=\"$cs MenuDiv\"><table class=\"$cs\" cellpadding=\"0\"><tr>\n"
 	# cellspacing=\"1px\"
@@ -7451,7 +7463,7 @@ sub htmlMenu {	# Screen menu bar
 	.(0	# scrollTop==0
 	? '<script for="window" event="onscroll">{var w=window.document.getElementsByTagName(\'table\')[0]; window.status=document.body.scrollTop; if (!w) {} else if(document.body.scrollTop >(w.height||0)){w.style.position="absolute"; w.style.top=document.body.scrollTop} else {w.style.position="static"} return(true)}</script>' ."\n" 
 	: '')
-	."\n")
+	."\n"))
 }
 
 
@@ -8587,7 +8599,7 @@ sub trURLtxt {	# Translate text with URLs
 		}
 		$u =$u0 =htmlEscape($s,$u) if $u =~/\s/;
 	}
-	if ($s->{-cgibus} && ($u =~/^(?:url|urlr)/)) {
+	if ($s->{-cgibus} && ($u =~/^(?:url|urlr):/)) {
 		$u =~s/_tcb_cmd=-sel/'_cmd=recRead&_form=' .$s->{-pcmd}->{-form}/ge;
 		$u =~s/_tcb_cmd=-lst/'_cmd=recList&_form=' .$s->{-pcmd}->{-table}/ge;
 		$u =~s/_tsw_FTEXT=/_qftext=/;
