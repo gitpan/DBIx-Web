@@ -1,3 +1,25 @@
+# 2007-11-02 err processing correction for PerlEx and improvement for '-ermu'
+#	PerlEx - not works: $SIG{__DIE__}, CGI::Carp::set_message, CGI::Carp::ineval
+#	new ineval()
+#	cgiRun() changed
+#	new '-ermu' internal
+#	goto cgiRunEND
+# 2007-11-02 cgiParse(): collision of form buttons with window.document.DBIx_Web._cmd.value=&quot;...&quot;
+# 2007-10-26 use / comment / debug 'use PerlEx::DBI'
+# 2007-10-22 cgi() improved: CGI::Q ||CGI->new(); error diagnostics
+# 2007-10-22 logRec() improved: $s->{-c}->{-user} used instead of $s->user()
+# 2007-10-03 cmdb: managed record may be rejected when draft
+# 2007-10-03 error/tracing markup to display, new '-ermd' internal
+# 2007-10-03 query length limit increased from 100 - 200 to 800
+# 2007-10-02 htmlMQH()/cgiSel() cnd cat; '[[]]/**/' syntax starting -query
+# 2007-09-29 cmdb: changing record status flow:
+#	old:         draft                   do (progress,rollback,delay,edit) (ok,no) (ok-appr,no-appr) (deleted)
+#	new: new draft appr-do scheduled do (progress,rollback,delay,edit) (appr-ok,appr-no) (ok,no) (deleted)
+#	usr: new
+#	mgr: draft	scheduled do				(ok,no)
+#	act: 	appr-do	(progress,rollback,delay,edit) (appr-ok,appr-no)
+# 2007-09-29 recActLim() corrects unlisted value in restricted field
+# 2007-09-07 starting 0.71 version
 # 2007-09-04 corrected '-rfdName' for '-cgibus'
 # 2007-08-28 corrected cgi-bus url translation
 # 2007-08-22 new -banner

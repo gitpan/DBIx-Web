@@ -1,6 +1,6 @@
 #!perl -w
 BEGIN {
- push @INC, $1 .'sitel/lib' if !(grep /sitel/i, @INC) && ($INC[0] =~/(.+?[\\\/])lib$/i);
+#push @INC, $1 .'sitel/lib' if !(grep /sitel/i, @INC) && ($INC[0] =~/(.+?[\\\/])lib$/i);
 }
 #$ENV{HTTP_ACCEPT_LANGUAGE} ='';
 
@@ -10,8 +10,8 @@ my $w =DBIx::Web->new(
 #,-logo		=>'<img src="/icons/p.gif" border="0" />'
  ,-debug	=>1		# debug level
  ,-log          =>0             # logging
- ,-serial	=>2		# serial operation level
- ,-dbiarg	=>["DBI:mysql:cgibus","cgibus","d83nfmJR971Yv3gVI35"]
+ ,-serial	=>1		# serial operation level
+ ,-dbiarg	=>["DBI:mysql:cgibus","cgibus","********"]
  ,-dbiACLike	=>'rlike'	# dbi access control comparation, i.e. 'eq lc', 'rlike'
  ,-keyqn	=>1		# key query null comparation
  ,-path		=>'-ServerRoot' # datastore path
@@ -22,7 +22,7 @@ my $w =DBIx::Web->new(
 #,-login	=>/cgi-bin/ntlm/# login URL
 #,-AuthUserFile	=>''		# apache users file
 #,-AuthGroupFile=>''		# apache groups file
- ,-usernt	=>1		# windows NT style for user names (0 - @, 1 - \\)
+#,-usernt	=>1		# windows NT style for user names (0 - @, 1 - \\)
 #,-userln	=>0		# short local usernames (0 - off, 1 - default)
  ,-ugadd	=>['Everyone','Guests']	# additional user groups
 #,-rac		=>0		# record access control (0 - off, 1 - default)
@@ -111,9 +111,9 @@ $w->{-a_cmdbh_fsvrlds} =sub{		# -ldstyle with severity colours
 				if (!defined($v) || ($v eq '4')) 
 				&& $_[3]->{-rec}->{record}
 				&& ($_[3]->{-rec}->{record} eq 'unavlbl')
-				&& $w->{-a_cmdbh_fsvrclr}->{'3.5'};
-			(defined($v) && ($v ne '') && ($w->{-a_cmdbh_fsvrclr}->{$v}) 
-			&& ('background-color: ' .$w->{-a_cmdbh_fsvrclr}->{$v})) 
+				&& $_[0]->{-a_cmdbh_fsvrclr}->{'3.5'};
+			(defined($v) && ($v ne '') && ($_[0]->{-a_cmdbh_fsvrclr}->{$v}) 
+			&& ('background-color: ' .$_[0]->{-a_cmdbh_fsvrclr}->{$v})) 
 			|| ''};
 
 $w->set(
@@ -1062,7 +1062,7 @@ $w->set(
 		,{-fld=>'votime'
 			,-flg=>'f', -hidel=>1
 			,-expr=> "CONCAT("
-				."IF(hdesk.status IN('draft','do','progress','edit','rollback','delay'), '', ' ')"
+				."IF(hdesk.status IN('new','draft','appr-do','scheduled','do','progress','rollback','delay','appr-ok','appr-no','edit'), '', ' ')"
 				.", COALESCE(hdesk.etime, hdesk.utime))"
 			,-lbl=>'Execution', -cmt=>'Fulfilment records order'
 			,-lbl_ru=>'Вып-е', -cmt_ru=>'Упорядочение по выполнению записей'
@@ -1073,7 +1073,7 @@ $w->set(
 		,{-fld=>'votimej'
 			,-flg=>'-', -hidel=>1
 			,-expr=> "CONCAT("
-				."IF(hdesk.status IN('draft','do','progress','edit','rollback','delay'), '', ' ')"
+				."IF(hdesk.status IN('new','draft','appr-do','scheduled','do','progress','rollback','delay','appr-ok','appr-no','edit'), '', ' ')"
 				.", GREATEST(COALESCE(MAX(j.utime),hdesk.utime),hdesk.utime))"
 			,-lbl=>'Exec/below', -cmt=>'Record/subrecords update order'
 			,-lbl_ru=>'Вып/под', -cmt_ru=>'Упорядочение по изменению записи/подзаписей'
@@ -1338,24 +1338,27 @@ $w->set(
 			}
 		,{-fld=>$w->tn('-rvcState')
 			,-flg=>'euq', -null=>undef
-			,-cmt=>"Status of the record or activity: planning ('draft', 'do') --> progress ('progress','rollback','edit','delay') --> result ('ok', 'no') --> approvement ('ok-appr','no-appr').\n"
-				."'Actors' operates the record ('progress','edit','delay', 'ok', 'no').\n"
-				."'Managers' are responsible for planning ('draft', 'do'), approvement ('ok-appr','no-appr') and moderation; the record may be offered for 'Managers' ('draft', 'do')."
-			,-cmt_ru=>"Статус записи/деятельности: планирование ('набросок', 'выполнить') --> состояние работ ('выполнение','возврат','редактирование','задержка') --> результат ('завершено', 'отклонено') --> одобрение ('утверждено','утверждено отклоненение').\n"
-				."'Исполнители' сопровождают запись ('выполнение','редактирование','задержка', 'завершено', 'отклонено').\n"
-				."'Менеджеры' выполняют планирование ('набросок', 'выполнить') и одобрение ('утверждено','утверждено отклоненение'), модерируют сопровождение записи; запись может быть предложена 'Менеджерам' ('набросок', 'выполнить')."
-			,-inp=>{-values=>[qw(draft do progress rollback edit delay ok no ok-appr no-appr deleted)]
+			,-cmt=>"Status of the record or activity: planning ('new', 'draft', 'appr-do', 'scheduled', 'do') --> progress ('progress', 'rollback', 'delay', 'edit') --> approval ('appr-ok', 'appr-no') --> result ('ok', 'no').\n"
+				."'Managers' are responsible for acception ('new'; 'appr-do'), moderation, approvement ('appr-ok', 'appr-no').\n"
+				."'Actors' operates the record ('draft'; 'do', 'progress', 'delay', 'edit')."
+			,-cmt_ru=>"Статус записи/деятельности: планирование ('запрос', 'проект', 'утвердить', 'план', 'выполнить') --> состояние работ ('выполнение', 'возврат', 'задержка', 'редактирование') --> одобрение ('утв.зврш', 'утв.откл') --> результат ('завершено', 'отклонено').\n"
+				."'Менеджеры' выполняют приемку ('запрос'; 'утвердить') и одобрение ('утв.зврш', 'утв.откл'), модерируют сопровождение записи.\n"
+				."'Исполнители' сопровождают запись ('проект'; 'выполнить', 'выполнение', 'возврат', 'задержка', 'редактирование')."
+			,-inp=>{-values=>[qw(new draft appr-do scheduled do progress rollback delay edit appr-ok appr-no ok no deleted)]
 				,-labels_ru=>{	''=>''
-						,'draft'=>'набросок'
+						,'new'=>'запрос'
+						,'draft'=>'проект'
+						,'appr-do'=>'утвердить'
+						,'scheduled'=>'план'
 						,'do'=>'выполнить'
 						,'progress'=>'выполн-е'
 						,'rollback'=>'возврат'
-						,'edit'=>'редакт-е'
 						,'delay'=>'задержка'
+						,'edit'=>'редакт-е'
+						,'appr-ok'=>'утв.зврш'
+						,'appr-no'=>'утв.откл'
 						,'ok'=>'завершено'
 						,'no'=>'отклонено'
-						,'ok-appr'=>'утверждено'
-						,'no-appr'=>'утв-откл'
 						,'deleted'=>'удалено'}
 				}
 			,-lhstyle=>'width: 5ex'
@@ -1367,7 +1370,7 @@ $w->set(
 				#		-table=>'hdesk'
 				#		,-data=>['idrm','status']
 				#		,-group=>['idrm','status']
-				#		,-where=>"status IN('draft','do','progress','rollback','delay','edit') AND (idrm IS NOT NULL AND idrm<>'')");
+				#		,-where=>"status IN('new','draft','appr-do','scheduled','do','progress','rollback','delay','edit','appr-ok','appr-no') AND (idrm IS NOT NULL AND idrm<>'')");
 				#		while(my $t=$h->fetchrow_hashref()) {
 				#			$r->{-a_sg}->{$t->{idrm}} =''
 				#				if !$r->{-a_sg}->{$t->{idrm}};
@@ -1381,16 +1384,16 @@ $w->set(
 				#		$h =1;
 				#	}
 					$r->{-a_st} =$_[0]->strtime() if !$r->{-a_st};
-					($v =~/^(?:ok|ok-appr)$/
+					($v =~/^(?:ok)$/
 					? '' 
 					: $v 
-					&& ($v=~/^(?:do|progress|rollback|delay|edit)$/)
+					&& ($v=~/^(?:new|draft|appr-do|scheduled|do|progress|rollback|delay|edit|appr-ok|appr-no)$/)
 					&& $r->{etime}
 					&& ($r->{-a_st} gt $r->{etime})
 					? 'color: red; font-weight: bold;'
 					: 'color: brown; font-weight: bold')
 					.($v
-					&& ($v =~/^(?:draft|do|progress|rollback|delay|edit)$/)
+					&& ($v =~/^(?:do|progress|rollback|delay|edit)$/)
 					&& $r->{-a_sg} && !$r->{-a_sg}->{$r->{id}}
 					? '; background-color: yellow'
 					: '')}
@@ -1643,8 +1646,8 @@ $w->set(
 		,-racReader	=>[qw(auser arole puser prole rrole), $w->tn('-rvcUpdBy'), $w->tn('-rvcInsBy')]
 		,-racWriter	=>[$w->tn('-rvcUpdBy'), 'auser', 'arole', 'mrole']
 		,-urm		=>[$w->tn('-rvcUpdWhen')]
-		,-rvcAllState	=>['draft','do','progress','rollback','delay','chk-out','edit','ok','no','ok-appr','no-appr','deleted']
-		,-rvcFinState	=>['status'=>'ok','no','ok-appr','no-appr','deleted']
+		,-rvcAllState	=>['new','draft','apr-do','scheduled','do','progress','rollback','delay','chk-out','edit','appr-ok','appr-no','ok','no','deleted']
+		,-rvcFinState	=>['status'=>'ok','no','deleted']
 		,-rvcChgState	=>[$w->tn('-rvcState')=>'draft','edit']
 		,-rfa		=>1
 		,-cgiRun0A	=>sub{	$_[0]->{-udisp} ='+'
@@ -1724,51 +1727,69 @@ $w->set(
 					} @{$_[1]->{-cmdt}->{-mdefld}->{record}->{-inp}->{-values}}]
 				,'record');
 
+			if (!$_[0]->uadmin()	# Manager appears
+			&&  $_[2] && $_[3]
+			&&  $_[2]->{mrole} && !$_[3]->{mrole}
+			&&  !(exists($_[0]->{-a_cmdbh_vmrole}->{$_[2]->{record}}) && !$_[0]->{-a_cmdbh_vmrole}->{$_[2]->{record}})
+			&&  !$_[0]->recActor($_[1], $_[2],'-racManager')
+				) {
+				$_[2]->{status} =
+					  $_[3]->{status} =~/^(?:do)/
+					? 'new'
+					: $_[3]->{status} =~/^(?:ok)/
+					? 'appr-ok'
+					: $_[3]->{status} =~/^(?:no)/
+					? 'appr-no'
+					: $_[2]->{status};
+			}
+
 			$_[0]->uadmin()		# States of record
 			? 1
 			: !$_[1]->{-edit} || !($_[2] ? $_[2]->{-editable} : 1)
 			? 1
-			: ($_[3]
-				? ($_[3]->{mrole} && !(exists($_[0]->{-a_cmdbh_vmrole}->{$_[3]->{record}}) && !$_[0]->{-a_cmdbh_vmrole}->{$_[3]->{record}}))
-				: ($_[2]->{mrole} && !(exists($_[0]->{-a_cmdbh_vmrole}->{$_[2]->{record}}) && !$_[0]->{-a_cmdbh_vmrole}->{$_[2]->{record}})))
+			: (!$_[3] || (!$_[3]->{mrole} && $_[2]->{mrole})
+				? ($_[2]->{mrole} && !(exists($_[0]->{-a_cmdbh_vmrole}->{$_[2]->{record}}) && !$_[0]->{-a_cmdbh_vmrole}->{$_[2]->{record}}))
+				: ($_[3]->{mrole} && !(exists($_[0]->{-a_cmdbh_vmrole}->{$_[3]->{record}}) && !$_[0]->{-a_cmdbh_vmrole}->{$_[3]->{record}}))
+				)
 			? $_[0]->recActLim(@_[1..3]
 				,[!$_[3]
-				? ( $_[0]->recActor(@_[1..3],'-racManager')
-				  ? qw(draft do progress rollback edit delay ok no ok-appr no-appr)
+				|| ($_[3] && !$_[3]->{mrole})
+				? ( $_[0]->recActor($_[1], !$_[3]->{mrole} ? $_[2] : $_[3],'-racManager')
+				  ? qw(new draft appr-do scheduled do progress rollback delay edit appr-ok appr-no ok no)
 				  : $_[0]->recActor(@_[1..3],'-racActor')
-				  ? qw(draft do progress rollback edit delay ok no)
-				  : qw(draft do))
+				  ? qw(new appr-do progress rollback delay edit appr-ok appr-no)
+				  : qw(new))
 				: $_[0]->recActor(@_[1..3],'-racManager')
 					&& $_[0]->recActor(@_[1..3],'-racActor')
-				? ( $_[3]->{status} =~/^(?:draft)$/
-				  ? qw(draft do progress rollback edit delay ok no ok-appr no-appr deleted)
-				  : $_[3]->{status} =~/^(?:do)$/
-				  ? qw(do progress rollback edit delay ok no ok-appr no-appr deleted)
-				  : $_[3]->{status} =~/^(?:progress|rollback|edit|delay|ok|no)$/
-				  ? qw(progress rollback edit delay ok no ok-appr no-appr deleted)
+				? ( $_[3]->{status} =~/^(?:new|draft|appr-do)$/
+				  ? qw(new draft appr-do scheduled do progress rollback delay edit appr-ok appr-no ok no deleted)
+				  : $_[3]->{status} =~/^(?:scheduled|do)$/
+				  ? qw(scheduled do progress rollback delay edit appr-ok appr-no ok no deleted)
+				  : $_[3]->{status} =~/^(?:progress|rollback|delay|edit|appr-ok|appr-no)$/
+				  ? qw(progress rollback delay edit appr-ok appr-no ok no deleted)
 				  : $_[3]->{status}
 				  )
-				: $_[3]->{status} =~/^(?:draft)$/
+				: $_[3]->{status} =~/^(?:new|draft|appr-do)$/
 				? ($_[0]->recActor(@_[1..3],'-racManager')
-					? qw(draft do progress rollback edit delay ok no ok-appr no-appr deleted)
+					? qw(new draft appr-do scheduled do progress rollback delay edit appr-ok appr-no ok no deleted)
+					: $_[3]->{status} =~/^(?:draft)/
+					? qw(draft appr-do appr-no)
 					: $_[3]->{status})
-				: $_[3]->{status} =~/^(?:do)$/
+				: $_[3]->{status} =~/^(?:scheduled|do)$/
 				? ($_[0]->recActor(@_[1..3],'-racManager')
-					? qw(do progress rollback edit delay ok no ok-appr no-appr)
-					: qw(do progress rollback edit delay ok no))
-				: $_[3]->{status} =~/^(?:progress|rollback|edit|delay)$/
-				? ($_[0]->recActor(@_[1..3],'-racManager')
-					? qw(progress rollback edit delay ok no ok-appr no-appr)
-					: qw(progress rollback edit delay ok no))
-				: $_[3]->{status} =~/^(?:ok|no)$/
-				? ($_[0]->recActor(@_[1..3],'-racManager')
-					? qw(progress rollback edit delay ok no ok-appr no-appr)
-					: qw(progress rollback edit delay ok no))
+					? qw(scheduled do progress rollback delay edit appr-ok appr-no ok no)
+					: qw(progress rollback delay edit appr-ok appr-no))
+				: $_[3]->{status} =~/^(?:progress|rollback|delay|edit|appr-ok|appr-no)$/
+				? (!$_[0]->recActor(@_[1..3],'-racManager')
+					? qw(progress rollback delay edit appr-ok appr-no)
+					: $_[3]->{status} =~/^(?:appr-no)$/
+					? qw(draft scheduled do progress rollback delay edit appr-no no)
+					: qw(progress rollback delay edit appr-ok appr-no ok no))
 				: $_[3]->{status}
 					]
 				,'status')
 			: $_[0]->recActLim(@_[1..3]
-				,[qw(do progress rollback edit delay ok no deleted)]
+				,[qw(do progress rollback delay edit ok no deleted)]
 				,'status');
 
 			!$_[3]			# Access to record
@@ -1776,23 +1797,23 @@ $w->set(
 			: $_[0]->uadmin()
 			? 1
 			: $_[3]->{mrole} && !(exists($_[0]->{-a_cmdbh_vmrole}->{$_[3]->{record}}) && !$_[0]->{-a_cmdbh_vmrole}->{$_[3]->{record}})
-			? (	$_[0]->recActor(@_[1..3],'-racOwner','-racManager')
-				&& ($_[3]->{status} =~/^(?:draft|do)$/)
+			? (	$_[0]->recActor(@_[1..3],'-racOwner')
+				  && ($_[3]->{status} =~/^(?:new|draft|appr-do|scheduled|do)$/)
 				? 1
 				: $_[0]->recActor(@_[1..3],'-racManager')
-				&& $_[0]->recActor(@_[1..3],'-racActor')
+				  && $_[0]->recActor(@_[1..3],'-racActor')
 				? $_[0]->recActLim(@_[1..3],'v', qw(-recDel))
 				: $_[0]->recActor(@_[1..3],'-racManager')
-				? ( $_[3]->{status} =~/^(?:draft|do)$/
-				  ? 1
-				  : $_[3]->{status} =~/^(?:progress|rollback|edit|delay|ok|no)$/
+				? ( $_[3]->{status} =~/^(?:new|draft|appr-do|scheduled|do)$/
+				  ? $_[0]->recActLim(@_[1..3],'v', qw(-recDel))
+				  : $_[3]->{status} =~/^(?:progress|rollback|delay|edit|appr-ok|appr-no|ok|no)$/
 				  ? ($_[0]->recActLim(@_[1..3],'v', qw(-recDel))
-				  && $_[0]->recActLim(@_[1..3],'v!', qw(auser status etime cost status comment)))
+				    && $_[0]->recActLim(@_[1..3],'v!', qw(auser status etime cost status comment)))
 				  : $_[0]->recActLim(@_[1..3],'-recRead')
 				  )
-				: $_[3]->{status} =~/^(?:progress|rollback|edit|delay|ok|no)$/
+				: $_[3]->{status} =~/^(?:scheduled|do|progress|rollback|delay|edit|appr-ok|appr-no)$/
 				? $_[0]->recActLim(@_[1..3],'v', qw(-recDel))
-				&& $_[0]->recActLim(@_[1..3],'v!', qw(auser status cost comment))
+				  && $_[0]->recActLim(@_[1..3],'v!', qw(auser status cost comment))
 				: $_[0]->recActLim(@_[1..3],'-recRead')
 				)
 			: $_[0]->recActor(@_[1..3],'-racOwner')
@@ -2115,14 +2136,24 @@ sub a_hdesk_stbar {
  my $acn=$s->{-table}->{'hdesk'}->{-mdefld}
 	&&$s->{-table}->{'hdesk'}->{-mdefld}->{'severity'}->{-inp}
 	&&$s->lngslot($s->{-table}->{'hdesk'}->{-mdefld}->{'severity'}->{-inp},'-labels');
+ my $acr=$s->{-table}->{'hdesk'}->{-mdefld}
+	&&$s->{-table}->{'hdesk'}->{-mdefld}->{'record'}->{-inp}
+	&&$s->lngslot($s->{-table}->{'hdesk'}->{-mdefld}->{'record'}->{-inp},'-labels');
+ my $alr=$s->{-table}->{'hdesk'}->{-mdefld}
+	&&$s->{-table}->{'hdesk'}->{-mdefld}->{'record'}->{-inp}
+	&&$s->{-table}->{'hdesk'}->{-mdefld}->{'record'}->{-inp}->{-values};
+    $alr=[map {	!$_ ||!$acr->{$_} ||(/^(?:work|task|analysis)$/)
+		? ()
+		: ($_)	} @$alr] if $alr;
  my $avs={};	# severities
+ my $avr={};	# rectypes
  my $avg={};	# groups
  my $avp={};	# person current
  my $avc={};	# group current
  my $avu={};	# group current users
  my $qh =$s->recSel(-table=>'hdesk'
 		,-data=>[qw(arole auser prole puser severity utime status record)]
-		,-where=>"status IN('do','progress','rollback','delay','edit') OR (TO_DAYS(etime)=TO_DAYS(CURRENT_DATE()))"
+		,-where=>"status IN('new','draft','appr-do','scheduled','do','progress','rollback','delay','edit','appr-ok','appr-no') OR (TO_DAYS(etime)=TO_DAYS(CURRENT_DATE()))"
 		);
  my $vinit =sub{ # val init (record, key, store) -> store elem
 		return($_[2]->{$_[1]}) if $_[2]->{$_[1]};
@@ -2149,9 +2180,13 @@ sub a_hdesk_stbar {
 		if (!defined($qv->{severity}) ||($qv->{severity} eq '4') ||($qv->{severity} eq ''))
 		&& ($qv->{record} && ($qv->{record} eq 'unavlbl'));
 	if (defined($qv->{severity}) && $ac->{$qv->{severity}}
-	&& (!defined($qv->{record}) || ($qv->{record}!~/^(?:work|task)$/))) {
+	&& (!defined($qv->{record}) || ($qv->{record}!~/^(?:work|task|analysis)$/))) {
 		&$vinit($qv, $qv->{severity}, $avs);
 		&$vset($qv, $qv->{severity}, $avs);
+	}
+	if ($qv->{record} && ($qv->{record} !~/^(?:work|task|analysis)$/)) {
+		&$vinit($qv, $qv->{record}, $avr);
+		&$vset($qv, $qv->{record}, $avr);
 	}
 	if (1) {
 		my $qn =lc($qv->{arole}||'');
@@ -2191,6 +2226,19 @@ sub a_hdesk_stbar {
 			&$vinit($qv, 'req', $avc);
 			&$vset($qv, 'req', $avc);
 			$avc->{req}->{arole} =$s->{-pcmd}->{-quname};
+	}
+ }
+ if (0 && scalar(%$avs)) {
+	foreach my $k (keys %$acn) {
+		next if $avs->{$k} ||($k eq '');
+		&$vinit({}, $k, $avs);
+	}
+ }
+ if (scalar(%$avr)) {
+	foreach my $k (@$alr) {
+		next if $avr->{$k};
+		&$vinit({}, $k, $avr);
+		$avr->{$k}->{severity} ='';
 	}
  }
  if ($ah) {
@@ -2237,6 +2285,28 @@ sub a_hdesk_stbar {
 		} sort { $b <=> $a
 			} keys %$avs)
  	.'&nbsp;&nbsp;&nbsp;'))
+ .(!%$avr
+  ? ''
+  :(join('&nbsp;',
+	map {	my $k =$_;
+		# $s->logRec('***',$k,$avr->{$k});
+		my $vl =$acr->{$k} ||$k;
+		my $vt =$k;
+		$s->htmlMQH(-html=>'&nbsp;' .$vl .'&nbsp;'
+		,-title=>$vt
+			.($avr->{$k}->{count} ? ', ' .$avr->{$k}->{count} : '')
+			.($acn && defined($avr->{$k}->{severity}) && ($avr->{$k}->{severity} ne '') 
+				? ', ^' .($acn->{$avr->{$k}->{severity}} ||$avr->{$k}->{severity}) 
+				: '')
+		,-qwhere=>'record=' .$s->dbiQuote($k)
+		,-urm=>$avr->{$k}->{utime} ||''
+		,-style=>'background-color: ' 
+			.($ac->{$avr->{$k}->{severity}}||$ac->{''})
+		)} @$alr)
+ 	.'&nbsp;&nbsp;&nbsp;'))
+ .(%$avs || %$avr
+  ? '</div><div style="margin-bottom: 0.4ex; margin-top: 0.5ex;">'
+  : '')
  .join('&nbsp;',
 	map {	my $k =$_;
 		# $s->logRec('*1*',$_,$avg->{$_});

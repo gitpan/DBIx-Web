@@ -2857,10 +2857,14 @@ Hyperlink will be highlited if current query matches options defined.
 May be used within C<-frmLso1C>.
 Display value may be defined using -label option for text or 
 immediate -html option.
+
 HTML hyperlink options: -title, -style, -class, -target.
+
 Query options: -qwhere, -qkey, -qurole, -quname, -qorder, -qkeyord.
-Query exclusion options: -xpar => 0 excluding 
-| 1 excluding some | 2 excluding all
+Value of C<-qwhere> may be eclosed in '[[ ]]' or '/* */' brackets distinguishing from another condition.
+
+Query exclusion options: -xpar => 0 - excluding none
+| 1 - excluding some | 2 - excluding all (default)
 | -option name | [-option names];
 -xkey => -qkey key | [-qkey keys].
 
@@ -3070,12 +3074,14 @@ $_[3] && C<recActor>(@_[1..3],...) && C<recActLim>(@_[1..3],...)
 
 
 
-=item recActLim (table name | {table meta} | {command}, {record}, ?{database record}, 'options', field name | -operation,... ) -> true || die
+=item recActLim (table name | {table meta} | {command}, {record}, ?{database record}, option, field name | -operation,... ) -> true || die
 
 C<Database Operation>.
 Restricts access of user current to record current in C<-recFlim0R>.
 
 '-C<recRead>' option may be used to prevent modification of the record by some of C<-racAdmWtr> conditionally by C<ugmember>.
+
+[list] option defines values acceptable for field(s).
 
 'v' option makes fields listed not editable by user, values of the fields may be read-only or computed in subsequent triggers.
 
@@ -4062,6 +4068,23 @@ another options may be implemented within script itself.
 =head1 VERSION
 
 =over
+
+=head2 2007-11-07 - Development Version 0.71
+
+CMDB example - changed record status flow.
+
+Improvements/corrections for PerlEx.
+
+Error processing improvements.
+
+C<logRec>() corrected.
+
+Query length limit increased.
+
+C<htmlMQH>()/C<cgiSel>() conditions catenation added 
+using C<-qwhere> with '[[]]/**/' syntax for C<htmlMQH>.
+
+
 
 =head2 2007-09-07 - Development Version 0.70
 
