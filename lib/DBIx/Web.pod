@@ -733,6 +733,14 @@ i.e. 'dbi:Proxy:hostname=127.0.0.1;port=3334;proxy_no_finish=1;dsn=DBI:mysql:...
 
 
 
+=item -dbiexpl
+
+	=> not exists || boolean
+
+(C<SubObjects>)
+DBI explain switch, default is On, may be used along with C<-debug>, for speed.
+
+
 =item -dbiph
 
 	=> not exists || boolean
@@ -4068,6 +4076,19 @@ another options may be implemented within script itself.
 =head1 VERSION
 
 =over
+
+
+=head2 2007-12-27 - Development Version 0.72
+
+
+Corrections for PerlEx: C<-serial>=>0, error handling.
+
+Data quoting correction.
+
+CMDB example corrections.
+
+New C<-dbiexpl>.
+
 
 =head2 2007-11-07 - Development Version 0.71
 

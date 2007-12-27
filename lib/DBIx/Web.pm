@@ -30,7 +30,6 @@
 # - using '_search' frame for menu
 # - osCmd xcopy replace
 # - osCmd cacls may buzz sometimes somewhy
-# - may buzz when -serial=>2
 # - innice htmlML() selection: _frmName.value=_form.value ? _form.value : '';
 # - w32umail() slow
 # - cmdb-e: service graph view
@@ -44,7 +43,7 @@
 # - test examples: behaviour, versioning, checkouts, attachments, triggers
 #
 # Done:
-# 2007-11-07 starting 0.72 version
+#
 
 
 package DBIx::Web;
@@ -56,7 +55,7 @@ use Fcntl qw(:DEFAULT :flock :seek :mode);
 
 use vars qw($VERSION @ISA @EXPORT @EXPORT_OK %EXPORT_TAGS $AUTOLOAD $SELF $CACHE $LNG $IMG);
 
-	$VERSION= '0.71';
+	$VERSION= '0.72';
 	$SELF   =undef;				# current object pointer
 	$CACHE	={};				# cache for pointers to subobjects
 	*isa    = \&UNIVERSAL::isa; isa('','');	# isa function
@@ -487,6 +486,7 @@ sub initialize {
  # ,-dbidsn	=>undef		# DBI connection string from -dbiarg
  # ,-dbiph	=>undef		# DBI placeholders ('?') dialect switch
  # ,-dbiACLike	=>undef		# DBI ACL LIKE options: rlike regexp,...
+ # ,-dbiexpl	=>undef		# DBI explain switch: 0/1
  # ,-cgi	=>undef		# CGI object
    ,-serial	=>1		# Serialised: 1 - updates, 2 - updates & reads, 3 - reads
    ,-keyqn	=>1		# query key ''/undef compatibility
@@ -793,19 +793,30 @@ sub set {
 	}
  }
  if ($opt{-die}) {
-	my $s =$_[0];
+	my ($s, $he, $hw) =($_[0]);
 	if    (ref($opt{-die})) {}
 	elsif ($opt{-die} =~/^(perl|core)$/i) {
 		$s->{-warn} =\&CORE::warn; $s->{-die} =\&CORE::die;
 	}
 	elsif ($opt{-die}) {
 		my $m =($s->{-die} =~/^([^\s]+)\s*/ ? $1 : $s->{-die}) .'::';
-		# $s->cgi() if $s->{-die} =~/^CGI/;
+		($he, $hw) =($SIG{__DIE__}, $SIG{__WARN__});
 		$s->{-warn} =eval('use ' .$s->{-die} .';\\&' .$m .($s->{-debug} ?'cluck'   :'carp' ));
 		$s->{-die}  =eval('use ' .$s->{-die} .';\\&' .$m .($s->{-debug} ?'confess' :'croak'));
+		$he =($he ||'') ne ($SIG{__DIE__}||'') ? $SIG{__DIE__} : undef;
+		$hw =($hw ||'') ne ($SIG{__WARN__}||'') ? $SIG{__WARN__} : undef;
 	}
-	$SIG{__DIE__}	=sub{return if ineval(); eval{$s->logRec('Die', ($_[0] =~/(.+)[\n\r]+$/ ? $1 : $_[0]))}; eval{$s->recRollback()}};
-	$SIG{__WARN__}	=sub{return if ineval(); eval{$s->logRec('Warn',($_[0] =~/(.+)[\n\r]+$/ ? $1 : $_[0]))}};
+	$SIG{__DIE__}	=sub{	return if ineval();
+				my $s =$SELF; # || (*DB::args{ARRAY} && $DB::args[0]);
+				$s =undef if !isa($s, 'DBIx::Web');
+				$s && eval{$s->logRec('Die', ($_[0] =~/(.+)[\n\r]+$/ ? $1 : $_[0]))};
+				$s && eval{$s->recRollback()};
+				ref($he) && &$he};
+	$SIG{__WARN__}	=sub{	return if ineval();
+				my $s =$SELF; # || (*DB::args{ARRAY} && $DB::args[0]);
+				$s =undef if !isa($s, 'DBIx::Web');
+				$s && eval{$s->logRec('Warn',($_[0] =~/(.+)[\n\r]+$/ ? $1 : $_[0]))};
+				ref($hw) && &$hw};
  }
  if (exists $opt{-locale}) {
 	$s->{-lng}	='';
@@ -3933,7 +3944,7 @@ sub mdeQuote {	# Quote field value if needed
     !ref($t) || !$t->{-mdefld} || !$t->{-mdefld}->{$_[2]} || !$t->{-mdefld}->{$_[2]}->{-flg}
   ? (	  !defined($_[3])
 	? 'NULL'
-	: ($_[3] =~/\d+/) && ($_[3] =~/^[+-]{0,1}[\d]+(?:.[\d]+){0,1}$/)
+	: ($_[3] =~/\d+/) && ($_[3] =~/^[+-]{0,1}[\d]+(?:\.[\d]+){0,1}$/)
 			  ## ($_[3] =~/^[+-]{0,1}[\d ,]+(?:.[\d ,]+){0,1}$/)
 	? $_[3]
 	: !$_[0]->{-dbi}
@@ -3946,7 +3957,7 @@ sub mdeQuote {	# Quote field value if needed
   ? $_[3]
   : !defined($_[3])
   ? 'NULL'
-  : ($_[3] =~/\d/) && ($_[3] =~/^[+-]{0,1}[\d]+(?:.[\d]+){0,1}$/)
+  : ($_[3] =~/\d/) && ($_[3] =~/^[+-]{0,1}[\d]+(?:\.[\d]+){0,1}$/)
 		   ## ($_[3] =~/^[+-]{0,1}[\d ,]+(?:.[\d ,]+){0,1}$/)
   ? $_[3]
   : !$_[0]->{-dbi}
@@ -4990,7 +5001,7 @@ sub dbiIns {    # Insert record into database
 
 sub dbiExplain {# Explain DML plan
  my $s =shift;
- return() if !$s->{-debug};
+ return() if !$s->{-debug} || (defined($s->{-dbiexpl}) && !$s->{-dbiexpl});
  my $i =ref($_[0]) ? shift : $s->dbi;
  my $q =shift;
  eval {
@@ -6505,7 +6516,7 @@ sub cgiRun {	# Execute CGI query
 	eval{$s->logRec('Die', $e)} if !$ermu;
 	eval{$s->recRollback()};
 	$s->{-c}->{-httpheader} =$s->{-c}->{-httpheader} ||"Content-type: text/html\n\n"
-		if *fatalsToBrowser;
+		if *fatalsToBrowser{CODE};
 	eval{	$s->output($s->htmlStart());
 		local $s->{-pcmd}->{-cmd}	='frmErr';
 		local $s->{-pcmd}->{-cmg}	='frmHelp';
@@ -6557,17 +6568,21 @@ sub cgiRun {	# Execute CGI query
 		if ($ermu)	{goto cgiRunEND}
 		else		{CORE::die(@_)}
 	}};
- if (*fatalsToBrowser)	{
-	$SIG{__DIE__} ='DEFAULT';
-	!*CGI::Carp::set_message{CODE} && eval('use CGI::Carp'); 
+ if (*fatalsToBrowser{CODE})	{
+	!*CGI::Carp::set_message{CODE} && eval('use CGI::Carp');
+	$SIG{__DIE__}	=\&CGI::Carp::die;
 	CGI::Carp::set_message($he);
  }
  else {
-	$SIG{__DIE__} =$he
+	$SIG{__DIE__} =$he;
  }
  if (1 && ($ENV{GATEWAY_INTERFACE} && ($ENV{GATEWAY_INTERFACE} =~/PerlEx/))) {
-	$SIG{__DIE__} ='DEFAULT';
-	$s->{-die} =$he
+	$SIG{__DIE__}	='DEFAULT';
+	$s->{-die}	=$he;
+	if ($s->{-serial}) {	# prevent locking buzz
+		$s->logRec('cgiRun', 'PerlEx', -serial =>0);
+		$s->{-serial}	=0;
+	}
  }
 
 		# Start operation
@@ -7293,7 +7308,7 @@ sub htmlStart {	# HTTP/HTML/Form headers
 			# !!! 'DBIx_Web.' or 'forms[0].' syntax inflexible
 			)
  ) ."\n";
- eval{warningsToBrowser(1)} if *warningsToBrowser;
+ eval{warningsToBrowser(1)} if *warningsToBrowser{CODE};
  $r;
 }
 

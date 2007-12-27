@@ -10,7 +10,7 @@ my $w =DBIx::Web->new(
 #,-logo		=>'<img src="/icons/p.gif" border="0" />'
  ,-debug	=>1		# debug level
  ,-log          =>0             # logging
- ,-serial	=>1		# serial operation level
+ ,-serial	=>0		# serial operation level
  ,-dbiarg	=>["DBI:mysql:cgibus","cgibus","********"]
  ,-dbiACLike	=>'rlike'	# dbi access control comparation, i.e. 'eq lc', 'rlike'
  ,-keyqn	=>1		# key query null comparation
@@ -92,7 +92,7 @@ $w->{-a_cmdbh_rectype} ={		# record subtypes
 			 'incident'	=>[qw(svc-rst svc-req sys-rst sys-evt)]
 			,'work'		=>['','vendor']
 			,'task'		=>['','vendor']
-			,'solutuion'	=>['','faq','howto']
+			,'solution'	=>['','faq','howto']
 			,'error'	=>[qw(bug enhancmnt)]
 			,'change'	=>[qw(change project release)]
 			,'unavlbl'	=>[qw(part-schd full-schd part-uschd full-uschd)]
@@ -1196,7 +1196,7 @@ $w->set(
 				."'task' strict assignment with most fields and deletion resticted;\n"
 				."'note' general - description/documentation;\n"
 				."Incident Managenent: 'incident', 'unavailability';\n"
-				."Problem Management: 'problem', 'solutuion', 'error';\n"
+				."Problem Management: 'problem', 'solution', 'error';\n"
 				."Change Management: 'change', 'unavailability';\n"
 				."Asset Management: 'purchase'"
 			,-cmt_ru=>"Тип записи:\n"
@@ -1209,14 +1209,14 @@ $w->set(
 				."Управление Изменениями: 'изменение', 'недоступность';\n"
 				."Управление Активами: 'приобретение'"
 			,-inp=>{-values=>[qw(request work task note analysis)]
-				,-values=>[qw(request work task incident problem solutuion error change unavlbl purchase note analysis)]
+				,-values=>[qw(request work task incident problem solution error change unavlbl purchase note analysis)]
 				,-labels=>{	''=>''
 						,'request'	=>'request'
 						,'work'		=>'work'
 						,'task'		=>'task'
 						,'incident'	=>'incident'
 						,'problem'	=>'problem'
-						,'solutuion'	=>'solutuion'
+						,'solution'	=>'solution'
 						,'error'	=>'error'
 						,'change'	=>'change'
 						,'unavlbl'	=>'unavlbl'
@@ -1229,7 +1229,7 @@ $w->set(
 						,'task'		=>'задание'
 						,'incident'	=>'инцидент'
 						,'problem'	=>'проблема'
-						,'solutuion'	=>'решение'
+						,'solution'	=>'решение'
 						,'error'	=>'ошибка'
 						,'change'	=>'изменение'
 						,'unavlbl'	=>'недоступн'
@@ -1542,8 +1542,8 @@ $w->set(
 			,-lbl=>'Description', -cmt=>'A brief description, summary, subject or title'
 			,-lbl_ru=>'Описание', -cmt_ru=>'Краткое описание заявки, событий или работ; тема или заглавие записи'
 			,-fnhref=>sub{
-				(($_[0]->{-pout}->{record} && ($_[0]->{-pout}->{record} =~/^(?:incident|error|solutuion)/))
-				||($_[0]->{-pout}->{recprc} && ($_[0]->{-pout}->{recprc} =~/^(?:incident|error|solutuion)/)))
+				(($_[0]->{-pout}->{record} && ($_[0]->{-pout}->{record}  =~/^(?:incident|error|solution|change)/))
+				||($_[0]->{-pout}->{recprc} && ($_[0]->{-pout}->{recprc} =~/^(?:incident|error|solution|change)/)))
 				&& $_[0]->urlCmd('',-form=>'hdesk'
 					,-qwhere=>
 					($_[0]->{-pout}->{object} ||$_[0]->{-pout}->{application} ||$_[0]->{-pout}->{location}
