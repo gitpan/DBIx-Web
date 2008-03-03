@@ -43,7 +43,7 @@
 # - test examples: behaviour, versioning, checkouts, attachments, triggers
 #
 # Done:
-#
+# 2008-03-03 starting 0.74 version
 
 
 package DBIx::Web;
@@ -55,7 +55,7 @@ use Fcntl qw(:DEFAULT :flock :seek :mode);
 
 use vars qw($VERSION @ISA @EXPORT @EXPORT_OK %EXPORT_TAGS $AUTOLOAD $SELF $CACHE $LNG $IMG);
 
-	$VERSION= '0.72';
+	$VERSION= '0.73';
 	$SELF   =undef;				# current object pointer
 	$CACHE	={};				# cache for pointers to subobjects
 	*isa    = \&UNIVERSAL::isa; isa('','');	# isa function
@@ -69,6 +69,7 @@ my	$LIMRS	=512;		# limit of result set
 my	$LIMLB	=8 *$LIMRS;	# limit of result set for listboxes
 my	$KSORD	='-aall';	# default key sequental order
 my	$HS	=';';		# hyperlink parameters separation style '&'
+my	$TW32	=($^O eq 'MSWin32') && (*Win32::GetTickCount{CODE}) && eval{Win32::GetTickCount()};
 
 
 	# see also '-tn' definitions
@@ -120,7 +121,8 @@ $LNG ={
 	,'frmHelp'	=>['Help',	'Help screen']
 	,'frmErr'	=>['Error',	'Error screen']
 	,'frmName'	=>['Form',	'Form choice']
-	,'frmLso'	=>['Selection',	'Records selection, may overlap other query conditions spacified']
+	,'frmLso'	=>['Selection',	"Records selections, may overlap other query conditions specified, may be switched off by '--x' choices"]
+	,'frmLsoff'	=>['------------x', 'Switch off selections below']
 	,'frmLsc'	=>['Ordering',	'Records ordering, may overlap other query conditions spacified']
 	,'frmName1'	=>['Create',	'Create new record with form choosen to insert into database']
 	,'recNew'	=>['Create',	'Create new record to insert into database']
@@ -262,11 +264,12 @@ $LNG ={
 	,'login'	=>['Войти',	'Открыть персонифицированный сеанс']
 	,'frmCall'	=>['Вып',	'Выполнить переход, действие, поиск']
 	,'frmCallOpn'	=>['Открыть']
-	,'frmCallNew'	=>['Создать в',	'Создать новую запись, чтобы затем вставить ее в']
+	,'frmCallNew'	=>['Создать для', 'Создать новую запись, чтобы затем вставить ее в']
 	,'frmHelp'	=>['Справка',	'Справочная страница']
 	,'frmErr'	=>['Ошибка',	'Сообщение об ошибке']
 	,'frmName'	=>['Форма',	'Выбор формы']
-	,'frmLso'	=>['Выборка',	'Отбор записей, может перекрывать другие заданные условия запроса']
+	,'frmLso'	=>['Выборка',	"Выборки записей, могут перекрывать другие заданные условия запроса, отключаются выбором '--x'"]
+	,'frmLsoff'	=>['------------x', 'Отключить нижеуказанный отбор']
 	,'frmLsc'	=>['Упорядочение','Упорядочение записей, может перекрывать другие заданные условия запроса']
 	,'frmName1'	=>['Создать',	'Создать новую запись выбранной формы, чтобы затем вставить ее в базу данных']
 	,'recNew'	=>['Создать',	'Создать новую запись, чтобы затем вставить ее в базу данных']
@@ -1943,13 +1946,29 @@ sub url {	# CGI script URL
 sub dbi {       # DBI connection object
  return ($_[0]->{-dbi}) if $_[0]->{-dbi};
  $_[0]->{-dbidsn} =ref($_[0]->{-dbiarg}) ? $_[0]->{-dbiarg}->[0] : $_[0]->{-dbiarg};
- eval('use PerlEx::DBI') if $ENV{GATEWAY_INTERFACE} =~/PerlEx/;
- eval('use Apache::DBI') if $ENV{MOD_PERL};
- $_[0]->{-dbi} =eval("use DBI; 1;")
-	##	&& DBI->connect(ref($_[0]->{-dbiarg}) ? @{$_[0]->{-dbiarg}} : $_[0]->{-dbiarg})
-		&& $_[0]->dbiConnect()
+ $_[0]->{-dbi} =$_[0]->dbiConnect()
 		|| &{$_[0]->{-die}}($_[0]->lng(0,'dbi') .": DBI::conect() -> failure\n");
  $_[0]->{-dbi}->{AutoCommit} =$_[0]->{-autocommit};
+ if (!$_[0]->{-dbistart}) {
+ }
+ elsif (ref($_[0]->{-dbistart}) eq 'CODE') {
+	&{$_[0]->{-dbistart}}(@_)
+ }
+ elsif (ref($_[0]->{-dbistart}) eq 'ARRAY') {
+	foreach my $v (@{$_[0]->{-dbistart}}) {
+		$_[0]->logRec('dbi',$v);
+		eval{$_[0]->{-dbi}->do($v)};
+		next if !$_[0]->{-dbi}->err;
+		$_[0]->logRec($_[0]->lng(0,'Error'), $_[0]->{-dbi}->errstr);
+	}
+ }
+ else {
+	$_[0]->logRec('dbi',$_[0]->{-dbistart});
+	eval{$_[0]->{-dbi}->do($_[0]->{-dbistart})};
+	if ($_[0]->{-dbi}->err) {
+		$_[0]->logRec($_[0]->lng(0,'Error'), $_[0]->{-dbi}->errstr);
+	}
+ }
  $_[0]->{-dbi}
 }
 
@@ -1966,7 +1985,9 @@ sub dbiEng {	# DBI engine name
 
 
 sub dbiConnect {# DBI connecting with optional DBI:Proxy:hostname=127.0.0.1
- eval("use DBI; 1;");
+ eval('use PerlEx::DBI') if $ENV{GATEWAY_INTERFACE} =~/PerlEx/;
+ eval('use Apache::DBI') if $ENV{MOD_PERL};
+ return(undef) if !eval("use DBI; 1;");
  my $c=ref($_[0]->{-dbiarg}) ? $_[0]->{-dbiarg}->[0] : $_[0]->{-dbiarg};
  if ($c =~/^DBI:Proxy:hostname=127\.0\.0\.1;/i) {
 	# "dbi:Proxy:hostname=127.0.0.1;port=3334;proxy_no_finish=1;dsn=DBI:mysql:"
@@ -2008,7 +2029,9 @@ sub dbiConnect {# DBI connecting with optional DBI:Proxy:hostname=127.0.0.1
 	}
 	return($r)
  }
- DBI->connect(ref($_[0]->{-dbiarg}) ? @{$_[0]->{-dbiarg}} : $_[0]->{-dbiarg})
+ (0 && $_[0]->{-autocommit}
+ && (eval{DBI->connect_cached(ref($_[0]->{-dbiarg}) ? @{$_[0]->{-dbiarg}} : $_[0]->{-dbiarg})}))
+ || (eval{DBI->connect(ref($_[0]->{-dbiarg}) ? @{$_[0]->{-dbiarg}} : $_[0]->{-dbiarg})})
 }
 
 
@@ -2635,7 +2658,11 @@ sub logRec {    # Add record to log file
  	,"\t",logEsc($_[0],@_[1..$#_]),"\n") if $_[0]->{-log};
  $_[0]->{-c}->{-logm} =[] if $_[0]->{-logm} && !$_[0]->{-c}->{-logm};
  splice @{$_[0]->{-c}->{-logm}}, 2, 2, '...' if $_[0]->{-logm} && scalar(@{$_[0]->{-c}->{-logm}}) >$_[0]->{-logm};
- push @{$_[0]->{-c}->{-logm}}, $_[0]->logEsc('(' .(time()-$^T) .') '. $_[1], @_[2..$#_]) if $_[0]->{-logm};
+ push @{$_[0]->{-c}->{-logm}}, $_[0]->logEsc('(' 
+	.($TW32
+	? (Win32::GetTickCount() -$TW32)/1000
+	: (time()-$^T))
+	.') '. $_[1], @_[2..$#_]) if $_[0]->{-logm};
  1
 }
 
@@ -2663,9 +2690,9 @@ sub logEsc {	# Escape list for logging
 		: $v =~/^-\w+[\d\w]*$/
 		? $v .'=>'
 		: ($i ==2) &&($_[1] =~/^dbi/)
-		&&($v =~/^(?:select|insert|update|delete|drop|commit|rollback)\s+/i)
+		&&($v =~/^(?:select|insert|update|delete|drop|commit|rollback|fetch)\s+/i)
 		? $v .';'
-		: ($i ==2) &&($_[1] =~/^dbi/) &&($v =~/^(?:keDel|kePut|affected|single)\b/i)
+		: ($i ==2) &&($_[1] =~/^dbi/) &&($v =~/^(?:keDel|kePut|affected|single|fetch)\b/i)
 		? $v
 		: (strquot($s, $v) .',')) .$b
  }
@@ -2902,7 +2929,8 @@ sub uglist {	# User & Group List
 			$fm =[map {lc($_)} split /[\t]+/, $r];
 			last;
 		}
-		$fh->close()
+		$fh->close();
+		return($r) if !ref($fm) || !@$fm;
 	}
 	$fm =undef if $fm && (!ref($fm) || !@$fm);
 	$fn =$s->{-AuthUserFile};
@@ -2971,7 +2999,7 @@ sub uglist {	# User & Group List
 			}
 			$fh->close()
 		}
-		$fm =undef if $fm && (!ref($fm) || !@$fm);
+		return($r) if !ref($fm) || !scalar(@$fm);
 	}
 	my $fh=$s->hfNew('<', $fn)->lock(LOCK_SH);
 	while(my $rr =$fh->readline()) {
@@ -3818,7 +3846,7 @@ sub ldapLst {	# LDAP list	# may be useful instead of 'ugf_ldap'
  $o ='-ug'	if !$o;
  $r =[]		if !$r;
  $a =$s->{-ldapattr}	if !$a;
- my $fq =($f =~/[=]/	? $f 
+ my $fq =($f =~/[=]/	? $f
 	: ($o =~/ug/)
 	|| ($o!~/[ug]/)	? ($s->{-ldapfu} && $s->{-ldapfg}
 				? '(|' .$s->{-ldapfu} .$s->{-ldapfg} .')'
@@ -5883,6 +5911,7 @@ sub recSel {    # Select records from database
  my	$s =$_[0];
  my	$a =@_< 3 && ref($_[1]) ? dsdClone($s, $_[1]) : {map {ref($_) ? dsdClone($s, $_) : $_} @_[1..$#_]};
 	$a->{-table}=recType($s, $a, $a);
+ local	$s->{-affect}=undef;
  my	$m =mdeTable($s,$a->{-table});
 	$a->{-cmd}    ='recSel';
 	$a->{-version}= ref($a->{-version})
@@ -6420,6 +6449,7 @@ sub dbiSel {    # Select records from database
 	$r->{-rfr} =[map {\($r->{-rec}->{$_})} @{$r->{NAME}}];
 	$r->{-flt} =$cf;
 	$r->bind_columns(undef, @{$r->{-rfr}});
+	$s->logRec('dbiSel', 'FETCH')	if !$s->{-affect} || ($s->{-affect} >1);
 	$s->dbiExplain(@c) if $s->{-debug} && $s->dbiEng('mysql');
  }
  elsif (($s->{-table}->{$f}->{-dbd} ||$s->{-dbd} ||$s->{-tn}->{-dbd}) eq 'dbm') {
@@ -6631,7 +6661,7 @@ sub cgiRun {	# Execute CGI query
 		,'<frameset rows="50%,*">',"\n"
 		,'<frame name="TOP" src="' 
 			.($s->{-pcmd}->{-form} eq 'default'
-			? $s->htmlEscape($s->url)
+			? $s->htmlEscape($s->urlCmd('',-frame=>'BOTTOM'))
 			: $s->htmlEscape($s->urlOpt(-frame=>'BOTTOM',
 				uc($ENV{REQUEST_METHOD}||'') ne 'GET'
 				? ()
@@ -6865,10 +6895,10 @@ sub cgiParse {	# Parse CGI call parameters
 	else {
 		$c->{-cmd}  =$c->{-cmg} =($frm =~/[+]+\s*$/
 					? 'recNew'
-					: $frm =~/[&.]+\s*$/
+					: $frm =~/[&.^]+\s*$/
 					? 'recForm'
 					: 'recList');
-		$frm =($frm=~/^(.+)(?:\s*[+&.]+\s*)$/ ? $1 : $frm);
+		$frm =($frm=~/^(.+)(?:\s*[+&.^]+\s*)$/ ? $1 : $frm);
 		if ($frm ne ($c->{-form}||'')) {
 			# !!! query parameters for current view only, not table
 			map {delete $c->{$_}
@@ -7533,14 +7563,14 @@ sub htmlMenu {	# Screen menu bar
 					} sort keys %$kq))
 			}
 		: ()
-		, htmlEscape($s, $c->{-qkeyord}	? lng($s, 0, '-qkeyord')  .' ' .lng($s, 0, $c->{-qkeyord} =~/^-*[db]/ ? 'desc' : 'asc') : '')
-		, htmlEscape($s, $c->{-qwhere}||'')
-		, htmlEscape($s, $c->{-qjoin}	? ($c->{-qjoin} =~/^\s*(?:CROSS|JOIN|INNER|STRAIGHT_JOIN|LEFT|NATURAL|RIGHT|OUTER)\b/i ? '' : (lng($s, 0, '-qjoin') .' ')) .$c->{-qjoin} : '')
-		, htmlEscape($s, $c->{-qurole}	? lng($s, 0, '-qurole')   .' ' .$c->{-qurole} .' /*' .$s->mddUrole($om, $c->{-qurole}) .'*/' : '')
-		, htmlEscape($s, $c->{-quname}	? lng($s, 0, '-quname')   .' ' .$c->{-quname} : '')
-		, htmlEscape($s, $c->{-qftext}	? lng($s, 0, '-qftext')   .' ' .$c->{-qftext} : '')
-		, htmlEscape($s, $c->{-qversion}? lng($s, 0, '-qversion') .' ' .$c->{-qversion} : '')
-		, htmlEscape($s, $c->{-qorder}	? lng($s, 0, '-qorder')	  .' ' .($c->{-qorder} !~/^-/ ? $c->{-qorder} : lng($s, 0, $c->{-qorder} =~/^-[db]/ ? 'desc' : 'asc')) : '')
+		, ($c->{-qkeyord} ? htmlEscape($s, lng($s, 0, '-qkeyord')  .' ' .lng($s, 0, $c->{-qkeyord} =~/^-*[db]/ ? 'desc' : 'asc')) : '')
+		, (!$c->{-qwhere} ? '' : $c->{-qwhere} =~/^[\[\]\/\*]*$/ ? '' : htmlEscape($s, $c->{-qwhere}))
+		, ($c->{-qjoin}	  ? htmlEscape($s, ($c->{-qjoin} =~/^\s*(?:CROSS|JOIN|INNER|STRAIGHT_JOIN|LEFT|NATURAL|RIGHT|OUTER)\b/i ? '' : (lng($s, 0, '-qjoin') .' ')) .$c->{-qjoin}) : '')
+		, ($c->{-qurole}  ? htmlEscape($s, lng($s, 0, '-qurole')   .' ' .$c->{-qurole} .' /*' .$s->mddUrole($om, $c->{-qurole}) .'*/') : '')
+		, ($c->{-quname}  ? htmlEscape($s, lng($s, 0, '-quname')   .' ' .$c->{-quname}) : '')
+		, ($c->{-qftext}  ? htmlEscape($s, lng($s, 0, '-qftext')   .' ' .$c->{-qftext}) : '')
+		, ($c->{-qversion}? htmlEscape($s, lng($s, 0, '-qversion') .' ' .$c->{-qversion}) : '')
+		, ($c->{-qorder}  ? htmlEscape($s, lng($s, 0, '-qorder')	  .' ' .($c->{-qorder} !~/^-/ ? $c->{-qorder} : lng($s, 0, $c->{-qorder} =~/^-[db]/ ? 'desc' : 'asc'))) : '')
 	);
     $mc = ($g eq 'recList') && ($om->{-frmLso1C} ||($ot->{-frmLso1C} && !exists($om->{-frmLso1C})))
 	? &{$om->{-frmLso1C}||$ot->{-frmLso1C}}($s,$on,$om,$c,$mc)
@@ -7730,6 +7760,7 @@ sub htmlML {	# CGI menu bar list
 	? $_[0]->{-pcmd}->{'-' .$_[1]} ||''
 	: '';
  my $li =$_[3];
+ my $f1 =undef;
  ($_[0]->{-icons}
 	? '<td class="' .$cs .' MenuButton" valign="middle" title="'
 		.$_[0]->htmlEscape(lng($_[0], 1, $_[1]))
@@ -7750,8 +7781,8 @@ sub htmlML {	# CGI menu bar list
 		? '_frmName1.value=&quot;&quot;; ' 
 		: '')
 	."if((_frmName.value=='-frame=set') && (self.name.match(/^(?:TOP|BOTTOM)\$/) || document.getElementsByName('_frame').length)){window.document.DBIx_Web.target='_parent'; _frmName.value=_form.value ? _form.value : ''; if (document.getElementsByName('_frame').length) {_frame.value=''}}"
-	."else if(_frmName.value.match(/\\+\$/) && (self.name.match(/^(?:TOP|BOTTOM)\$/) || document.getElementsByName('_frame').length)){var v=_frmName.value; _frmName.value=_form.value ? _form.value : ''; window.document.open('" .$_[0]->url ."?_cmd=frmCall;_frmName=' +encodeURIComponent(v), '_blank', '', false); return(true)}"
-	."else {var v=_frmName.value; document.body.style.cursor=_frmName.style.cursor='wait'; _frmName.value=_form.value ? _form.value : ''; window.document.open('" .$_[0]->url ."?_cmd=frmCall;_frmName=' +encodeURIComponent(v), '_self', '', false); document.body.style.cursor=_frmName.style.cursor='auto'; return(true)};"
+	."else if(_frmName.value.match(/[+^]\$/) && (self.name.match(/^(?:TOP|BOTTOM)\$/) || document.getElementsByName('_frame').length)){var v=_frmName.value; _frmName.value=_form.value ? _form.value : ''; window.document.open('" .$_[0]->url ."?_cmd=frmCall;_frmName=' +encodeURIComponent(v), '_blank', '', false); return(true)}"
+	."else {var v=_frmName.value; document.body.style.cursor=_frmName.style.cursor='wait'; _frmName.value=_form.value ? _form.value : ''; window.document.open('" .$_[0]->url ."?_cmd=frmCall;_frmName=' +encodeURIComponent(v) +(document.getElementsByName('_frame').length ? ';_frame=' +_frame.value : ''), '_self', '', false); document.body.style.cursor=_frmName.style.cursor='auto'; return(true)};"
 	.'window.document.DBIx_Web.submit(); return(false);}">')
   : 'return(true)}')
  ."\n\t"
@@ -7761,18 +7792,19 @@ sub htmlML {	# CGI menu bar list
 				? ucfirst($_[0]->lng(0, $_))
 				: !$_
 				? '--- ' .$_[0]->lng(0, 'frmCallNew') .' ---'
-				: (do {	my($n, $x) =/([+&.]*)$/ ? ($`, $1) : ($_,'');
+				: (do {	my($n, $x) =/([+&.^]*)$/ ? ($`, $1) : ($_,'');
 					my $o =$_[0]->{-form}->{$n} ||$_[0]->{-table}->{$n};
 					$o =$_[0]->lngslot($o,'-lbl') if $o;
 					$o =&$o($_[0]) if ref($o);
 					($o || ucfirst($_[0]->lng(0, $n)))
-					.($x && (substr($x,0,1) eq '+') ? " $x$x" : '')
+					.(!$f1 && $x && (substr($x,0,1) eq '+') ? " $x$x" : '')
 					}))
 			: ref($_) eq 'ARRAY'
 			? ($_->[0]
 				, (ref($_->[1]) ? $_[0]->lnglbl($_->[1]) : $_->[1])
 				|| ucfirst($_[0]->lng(0, $_->[0])))
 			: ($_->{-val}||$_->{-lbl}, $_[0]->lnglbl($_) ||ucfirst($_[0]->lng(0, $_->{-val})));
+		$f1 =1	if (!$_ || !$n) && ($_[1] =~/^frmName/);
 		'<option ' 
 			.($i && ($n eq $i) 
 			? do{$i =''; 'selected'}
@@ -7839,7 +7871,7 @@ sub htmlMChs {	# Adjust CGI forms list
 				} @{$_[0]->{-menuchs}};
  if ($_[0]->{-menuchs} && !$_[0]->uguest()) {
 	my @a =( ['','--- ' .lng($_[0], 0, 'frmCallNew') .' ---']
-		, map {[$_->[0] .'+', $_->[1] .' ++']
+		, map {[$_->[0] .'+', $_->[1] ] # .' ++' # also $f1 in htmlML()
 			} grep { my $m;
 				  ($m =$_[0]->{-form}->{$_->[0]})
 				?  $m->{-field}
@@ -9346,12 +9378,13 @@ sub cgiQuery {	# Query records
 		&& (($q->{-order}||'') ne ($t->{-rvcUpdWhen} .' desc'));
 	my $ou =[$s->mdeRoles($t)];
 	my $oa =!(exists($m->{-frmLsoAdd}) && !$m->{-frmLsoAdd}) && ($m->{-frmLsoAdd}||$t->{-frmLsoAdd});
+	my $off=$s->lng(0,'frmLsoff') ||'-------------';
 	$m->{-frmLso} =
 		[(1 && @$ou 
-		?(['-urole'		=>'-------------']) : ())
+		?(['-urole'		=>$off]) : ())
 		,(grep {$_ ne 'all'} @$ou)
 		,(1 && ($oe ||$oo ||$od ||$of ||$ov)
-		?(['-todo'		=>'-------------']) : ())
+		?(['-todo'		=>$off]) : ())
 		,($of ? (['todo'])	:())
 		,($oe ? ([$oe])		:())
 	#	,($oo ? ([$oo])		:())
@@ -9367,7 +9400,7 @@ sub cgiQuery {	# Query records
 		push @{$m->{-frmLso}}
 			,(substr(ref($oa->[0]) eq 'HASH' ? $oa->[0]->{-val}||$oa->[0]->{-lbl} : $oa->[0]->[0], 0, 1) 
 				ne '-'
-			? (['-add'	=>'-------------'])
+			? (['-add'	=>$off])
 			: ())
 			, @$oa
 	}
@@ -9627,8 +9660,8 @@ sub cgiSel {	# Select records from database
  local $q->{-where} =$q->{-where};
 	if ($q->{-where} && !ref($q->{-where}) && ($q->{-where} =~/^(?:\[\[|\/\*)/)) {
 		my $a ='';
-		while (($q->{-where} =~/^\[\[(.+?)\]\]/) ||($q->{-where} =~/^\/\*(.+?)\*\//)) {
-			$a =$a ? "$a AND ($1)" : "($1)";
+		while (($q->{-where} =~/^\[\[(.*?)\]\]/) ||($q->{-where} =~/^\/\*(.*?)\*\//)) {
+			$a =!$1 ? $a : $a ? "$a AND ($1)" : "($1)";
 			$q->{-where} =$'
 		}
 		$q->{-where} =join(' AND ', $a ? ($a) : (), $q->{-where} ? ('(' .$q->{-where} .')') : ())
@@ -9879,7 +9912,7 @@ sub htmlMQH {	# Menu Query Hyperlink
 	delete @{$qw->{-qkey}}{ref($a->{-xkey}) ? @{$a->{-xkey}} : $a->{-xkey}};
  }
  if (!$qq->{-qwhere} && $qw->{-qwhere}
- && (($qw->{-qwhere} =~/^\[\[(.+?)\]\]/) ||($qw->{-qwhere} =~/^\/\*(.+?)\*\//))
+ && (($qw->{-qwhere} =~/^\[\[(.*?)\]\]/) ||($qw->{-qwhere} =~/^\/\*(.*?)\*\//))
 	) {
 	$qw->{-qwhere} =$'
  }
@@ -9931,7 +9964,7 @@ sub htmlMQH {	# Menu Query Hyperlink
 			: $vf =~/\Q$vq\E/
 			? $vf
 			: $vq =~/^(?:\[\[|\/\*)/
-			? (do{	$vf =($vf =~/^\[\[(.+?)\]\]/) ||($vf =~/^\/\*(.+?)\*\//)
+			? (do{	$vf =($vf =~/^\[\[(.*?)\]\]/) ||($vf =~/^\/\*(.*?)\*\//)
 					? $'
 					: $vf;
 				$vq .$vf
@@ -10476,7 +10509,7 @@ sub cgiHelp {	# Print CGI Help screen form
 					} @{$_[1]})
 			) if ref($_[1]) eq 'ARRAY';
 		my $f =($_[0]->{-mdefld} && $_[0]->{-mdefld}->{$_[1]})
-			|| ($mt->{-mdefld} && $mt->{-mdefld}->{$_[1]});
+			|| ($mt && $mt->{-mdefld} && $mt->{-mdefld}->{$_[1]});
 		$_[2] && $f
 		? $s->htmlEscape($s->lngcmt($f) ||$s->lng(1,$_[1]))
 		: $_[2]
@@ -10512,16 +10545,51 @@ sub cgiHelp {	# Print CGI Help screen form
 		$v =~s/[\r\n]+/<br \/>/g;
 		$v
 		};
+ my $ch =sub {	my $v =ref($_[0]) ? &{$_[0]}($s) : $_[0];
+		return $v if ($s->ishtml($v));
+		&$ce($v)
+		};
 
  $s->output("\n<table $cs2>\n");
- $s->output("<tr>"
-		,$th1, "<br />"
+ if ($s->lngslot($s,'-help')) {
+	$s->output("<tr>"
+		,$th1
 		,''
-		,'</th>'
-		,$td1, "<br />"
-		,$s->htmlEscape($s->lngslot($s,'-help'))
-		,"</td></tr>\n"
-		) if $s->lngslot($s,'-help');
+		,'</th>', $td1
+		,&$ch($s->lngslot($s,'-help'))
+		,"<hr /></td></tr>\n"
+		);
+ }
+ if (1) {
+	$s->htmlMChs() if !$s->{-menuchs};
+	if ($s->{-menuchs}) {
+		$s->output(
+		"<tr>", $th1, '','</th>'
+		, $td1
+		, join(',&nbsp;'
+			, map {
+				my ($on, $ol) =ref($_) eq 'ARRAY' ? (@$_) : ($_, undef);
+				$on =$' if $on =~/[.^&+]+$/;
+				if (!$ol) {
+					my $o =$s->{-form}->{$on} ||$s->{-table}->{$on};
+					$o =$_[0]->lngslot($o,'-lbl') if $o;
+					$o =&$o($_[0]) if ref($o);
+					$ol =$o ||$on
+				}
+				$ol
+				? '<nobr><a href="'
+					.$s->urlOpt(-form=>$on, -cmd=>'frmHelp')
+					."\" class=\"$cs\""
+					.($on eq $n ? ' style="font-weight: bolder;"' : '')
+					.">"
+					.$s->htmlEscape($ol)
+					.'</a></nobr>'
+				: ()
+				} @{$s->{-menuchs}})
+		, "<hr /></td></tr>\n"
+		);
+	}
+ }
 
  foreach my $oc ('f','t') {
 	my $om;
@@ -10547,7 +10615,7 @@ sub cgiHelp {	# Print CGI Help screen form
 		,$th2
 		,'</th>'
 		,$td2
-		,&$ce($s->lngslot($om,'-help')||'')
+		,&$ch($s->lngslot($om,'-help')||'')
 		,"</td></tr>\n"
 		) if $s->lngslot($om,'-help');
 	$th =join(' ', $on ? $on : ());

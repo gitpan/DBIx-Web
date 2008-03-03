@@ -43,9 +43,10 @@ my $w =DBIx::Web->new(
 #		};
 $w->{-a_cmdbh_lmrole} =			# Manager roles
 		$w->{-a_cmdbh_larole};
-$w->{-a_cmdbh_vmrole} ={ '' => ''	# Manager assign (rec=>value||{values})
+$w->{-a_cmdbh_vmrole} ={ '' => ''	# Manager assign (rec=>value||[values]||{values})
 			,'work' => undef	# all off: $w->{-a_cmdbh_vmrole} =undef
-			,'incident' => undef
+		#	,'incident' => undef
+		#	,'problem' =>  ['Everyone','']
 			};
 $w->{-a_cmdbh_lrrole} ={ '' => ''	# Read levels
 			,'Everyone'	=> 'Everyone'
@@ -94,7 +95,7 @@ $w->{-a_cmdbh_rectype} ={		# record subtypes
 			,'task'		=>['','vendor']
 			,'solution'	=>['','faq','howto']
 			,'error'	=>[qw(bug enhancmnt)]
-			,'change'	=>[qw(change project release)]
+			,'change'	=>[qw(implementn change project release)]
 			,'unavlbl'	=>[qw(part-schd full-schd part-uschd full-uschd)]
 			,'note'		=>['','faq','howto']
 			};
@@ -155,6 +156,7 @@ $w->set(
 			},''
 		,{-fld=>$w->tn('-rvcUpdWhen')
 			,-flg=>'wq'
+			,-fhprop=>'nowrap=true'
 			,-ldstyle=>'width: 20ex'
 			,-ldprop=>'nowrap=true'
 			,-lsthtml=>sub{/(?::\d\d)$/ ? $` : $_}
@@ -291,6 +293,7 @@ $w->set(
 			}, ''
 		,{-fld=>$w->tn('-rvcUpdWhen')
 			,-flg=>'wq'
+			,-fhprop=>'nowrap=true'
 			,-ldstyle=>'width: 25ex'
 			,-ldprop=>'nowrap=true'
 			},''
@@ -365,7 +368,10 @@ $w->set(
 			,-fdstyle=>sub{$_[2] =~/p/ ? 'font-size: larger; font-weight: bolder; color: red': 'font-size: larger; font-weight: bolder;'}
 			,-fnhref=>sub{
 				$_ && ($_[2] !~/p/)
-				&& $_[0]->urlCmd('',-form=>'hdesk',-qwhere=>$_[0]->dbi->quote($_) .' IN(object, application, location)',-cmd=>'recList')
+				&& $_[0]->urlCmd('',-form=>'hdesk',-cmd=>'recList'
+					,-qwhere=>$_[0]->dbi->quote($_) .' IN(hdesk.object, hdesk.application, hdesk.location)'
+					.' OR hdesk.subject LIKE ' .$_[0]->dbiQuote("%$_%")
+					)
 				}
 			,-colspan=>3
 			}
@@ -733,6 +739,12 @@ $w->set(
 		#	,-flg=>'euq'
 		#	,-hidel=>1
 		#	,-ddlb =>sub{$_[0]->cgiQueryFv('','stmt')}, -form=>'cmdbm'
+		#	,-fnhref=>sub{
+		#		$_ && ($_[2] !~/p/)
+		#		&& $_[0]->urlCmd('',-form=>'hdesk',-cmd=>'recList'
+		#			,-qwhere=>'hdesk.subject LIKE ' .$_[0]->dbiQuote("%$_%")
+		#			)
+		#		}
 		#	}
 		,{-fld=>'definition'
 			,-lbl=>'Def', -cmt=>'Configuration item short definition'
@@ -1039,6 +1051,7 @@ $w->set(
 		,"\n\t\t"
 		,{-fld=>$w->tn('-rvcUpdWhen')
 			,-flg=>'wq'
+			,-fhprop=>'nowrap=true'
 			,-fdprop=>'nowrap=true'
 			,-ldstyle=>$w->{-a_cmdbh_fsvrlds}
 			,-ldprop=>'nowrap=true'
@@ -1137,12 +1150,15 @@ $w->set(
 				}
 			,$w->{-a_cmdbh_lmrole}
 			? (-inp=>{-labels=>
-				sub {	$_[0]->{-a_cmdbh_vmrole}
-					&& $_[0]->{-pcmd}->{-edit}
-					&& $_[0]->{-pout}->{record}
-					&& ref($_[0]->{-a_cmdbh_vmrole}->{$_[0]->{-pout}->{record}})
-					? $_[0]->{-a_cmdbh_vmrole}->{$_[0]->{-pout}->{record}}
-					: $_[0]->{-a_cmdbh_lmrole}
+				sub {	return($_[0]->{-a_cmdbh_lmrole})
+					if !$_[0]->{-pcmd}->{-edit}
+					|| !$_[0]->{-pout}->{record}
+					|| !$_[0]->{-a_cmdbh_vmrole}->{$_[0]->{-pout}->{record}};
+					my $v =$_[0]->{-a_cmdbh_vmrole}->{$_[0]->{-pout}->{record}};
+					  ref($v) eq 'HASH'
+					? $v
+					: {map {($_ => $_[0]->{-a_cmdbh_lmrole}->{$_} ||$_)
+						} ref($v) eq 'ARRAY' ? (@$v) : ($v)}
 				}
 				,-loop=>1})
 			: (-ddlb=>sub{$_[0]->uglist('-ug',{})}
@@ -1197,7 +1213,7 @@ $w->set(
 				."'note' general - description/documentation;\n"
 				."Incident Managenent: 'incident', 'unavailability';\n"
 				."Problem Management: 'problem', 'solution', 'error';\n"
-				."Change Management: 'change', 'unavailability';\n"
+				."Change Management: 'change', 'unavailability', 'schedule';\n"
 				."Asset Management: 'purchase'"
 			,-cmt_ru=>"Тип записи:\n"
 				."'заявка' - общего характера - регистрация/выполнение;\n"
@@ -1206,10 +1222,10 @@ $w->set(
 				."'заметка' - общего характера описание/документация;\n"
 				."Управление Инцидентами: 'инцидент', 'недоступность';\n"
 				."Управление Проблемами: 'проблема', 'решение', 'ошибка';\n"
-				."Управление Изменениями: 'изменение', 'недоступность';\n"
+				."Управление Изменениями: 'изменение', 'недоступность', 'расписание';\n"
 				."Управление Активами: 'приобретение'"
 			,-inp=>{-values=>[qw(request work task note analysis)]
-				,-values=>[qw(request work task incident problem solution error change unavlbl purchase note analysis)]
+				,-values=>[qw(request work task incident problem solution error change unavlbl purchase schedule note analysis)]
 				,-labels=>{	''=>''
 						,'request'	=>'request'
 						,'work'		=>'work'
@@ -1221,6 +1237,7 @@ $w->set(
 						,'change'	=>'change'
 						,'unavlbl'	=>'unavlbl'
 						,'purchase'	=>'purchase'
+						,'schedule'	=>'schedule'
 						,'note'		=>'note'
 					}
 				,-labels_ru=>{	''=>''
@@ -1234,10 +1251,14 @@ $w->set(
 						,'change'	=>'изменение'
 						,'unavlbl'	=>'недоступн'
 						,'purchase'	=>'приобретение'
+						,'schedule'	=>'график'
 						,'note'		=>'заметка'
 					}
 				,-loop=>1
 				}
+			,-fnhtml=>sub{	$_[2] eq 'e'
+					? '<input type="hidden" name="record__P" value="' .($_[3]->{'record'}||'') .'">'
+					: ''}
 			}, ''
 		,{-fld=>'rectype'
 			,-flg=>'euq'
@@ -1263,6 +1284,7 @@ $w->set(
 						,'full-schd'	=>'full/scheduled'
 						,'part-uschd'	=>'partial/unscheduled'
 						,'full-uschd'	=>'full/unscheduled'
+						,'implementn'	=>'implementation'
 						,'change'	=>'change'
 						,'project'	=>'project'
 						,'release'	=>'release'
@@ -1282,6 +1304,7 @@ $w->set(
 						,'full-schd'	=>'полн/план'
 						,'part-uschd'	=>'част/непл'
 						,'full-uschd'	=>'полн/непл'
+						,'implementn'	=>'воплощение'
 						,'change'	=>'изменение'
 						,'project'	=>'проект'
 						,'release'	=>'релиз'
@@ -1435,6 +1458,14 @@ $w->set(
 				: $_[2] =~/e/
 				? $_[0]->urlCmd('',-form=>'cmdbmn',-key=>{'record'=>'computer'},-cmd=>'recList')
 				: ''}
+			,-fvhref=>sub{
+				$_
+				? $_[0]->urlCmd('',-form=>'hdesk',-cmd=>'recList'
+					,-qwhere=>'hdesk.object=' .$_[0]->dbiQuote($_)
+					.' OR hdesk.subject LIKE ' .$_[0]->dbiQuote("%$_%"))
+				: $_[2] =~/[eq]/
+				? $_[0]->urlCmd('',-form=>'hdeskc',-cmd=>'recList', -frmLsc=>'object')
+				: ''}
 			},''
 		,{-fld=>'application'
 			,-flg=>'euq'
@@ -1452,6 +1483,12 @@ $w->set(
 				? $_[0]->urlCmd('',-form=>'cmdbm',-key=>{'name'=>$_},-cmd=>'recRead')
 				: $_[2] =~/e/
 				? $_[0]->urlCmd('',-form=>'cmdbmn',-key=>{'record'=>'service'},-cmd=>'recList')
+				: ''}
+			,-fvhref=>sub{
+				$_
+				? $_[0]->urlCmd('',-form=>'hdesk',-cmd=>'recList',-key=>{'application'=>$_})
+				: $_[2] =~/[eq]/
+				? $_[0]->urlCmd('',-form=>'hdeskc',-cmd=>'recList', -frmLsc=>'application')
 				: ''}
 			},''
 		,{-fld=>'location'
@@ -1526,10 +1563,13 @@ $w->set(
 			,-inp=>{-maxlength=>80}
 			,-fnhref=>sub{
 				$_
-				? $_[0]->urlCmd('',-form=>'cmdbm',-key=>{'name'=>$_},-cmd=>'recRead')
+			#	? $_[0]->urlCmd('',-form=>'cmdbm',-key=>{'name'=>$_},-cmd=>'recRead')
+				? $_[0]->urlCmd('',-wikn=>$_,-cmd=>'recRead')
 				: $_[2] =~/e/
-				? $_[0]->urlCmd('',-form=>'cmdbmh',-cmd=>'recList')
+			#	? $_[0]->urlCmd('',-form=>'cmdbmh',-cmd=>'recList')
+				? $_[0]->urlCmd('',-form=>'default')
 				: ''}
+			,-fhprop=>'nowrap=true'
 			},''
 		,{-fld=>'cost'
 			,-flg=>'euq', -hide=>sub{!$_ && ($_[2] !~/e/)}
@@ -1556,6 +1596,7 @@ $w->set(
 					 : "hdesk.record IN('error','solution')")
 					,-qorder=>'hdesk.subject asc'
 					)}
+			,-fhprop=>'nowrap=true'
 			,-inp=>{-asize=>89, -maxlength=>255}
 			,-colspan=>10
 			}
@@ -1828,11 +1869,18 @@ $w->set(
 			: $_[0]->recActLim(@_[1..3],'v', qw(-recDel));
 			}
 		,-recEdt0R	=> sub{
-			$_[2]->{mrole} =$_[0]->{-a_cmdbh_vmrole}->{$_[2]->{record}}
+			$_[2]->{mrole} =
+				!ref($_[0]->{-a_cmdbh_vmrole}->{$_[2]->{record}})
+				? $_[0]->{-a_cmdbh_vmrole}->{$_[2]->{record}}
+				: (ref($_[0]->{-a_cmdbh_vmrole}->{$_[2]->{record}}) eq 'ARRAY')
+					&& $_[0]->{-cgi}
+					&& (($_[0]->{-cgi}->param('record__P') ||'') ne $_[2]->{record})
+					&& $_[1]->{-cmd}
+					&& ($_[1]->{-cmd} =~/^(?:recNew|recForm)$/)
+				? $_[0]->{-a_cmdbh_vmrole}->{$_[2]->{record}}->[0]
+				: $_[2]->{mrole}
 				if $_[2]->{record}
 				&& $_[0]->{-a_cmdbh_vmrole}
-				&& exists($_[0]->{-a_cmdbh_vmrole}->{$_[2]->{record}})
-				&& !ref($_[0]->{-a_cmdbh_vmrole}->{$_[2]->{record}})
 				&& $_[0]->{-a_cmdbh_vmrole}->{$_[2]->{record}};
 			delete $_[2]->{rectype}
 				if $_[2]->{rectype} && $_[2]->{record}
@@ -1995,7 +2043,7 @@ $w->set(
 				  ,-keyord	=>'-aall'
 					}
 		,-limit		=>1024
-		,-qhref		=>{-key=>['name'], -form=>'cmdbm', -cmd=>'recRead'}
+		,-qhref		=>{-key=>['name','status','record','utime'], -form=>'cmdbm', -cmd=>'recRead'}
 		,-frmLsc	=>
 				[{-val=>'alphabetically',-cmd=>{}}
 				,['utime',undef, {-order=>'utime',-keyord=>'-dall'}]
@@ -2121,6 +2169,7 @@ $w->set(
 
 #$w->set(-index=>1);
 #$w->set(-setup=>1);
+$w->logRec('cgiRun') if $w->{-debug};
 $w->cgiRun();
 
 ##############################
@@ -2139,6 +2188,9 @@ sub a_hdesk_stbar {
  my $acr=$s->{-table}->{'hdesk'}->{-mdefld}
 	&&$s->{-table}->{'hdesk'}->{-mdefld}->{'record'}->{-inp}
 	&&$s->lngslot($s->{-table}->{'hdesk'}->{-mdefld}->{'record'}->{-inp},'-labels');
+ my $act=$s->{-table}->{'hdesk'}->{-mdefld}
+	&&$s->{-table}->{'hdesk'}->{-mdefld}->{'rectype'}->{-inp}
+	&&$s->lngslot($s->{-table}->{'hdesk'}->{-mdefld}->{'rectype'}->{-inp},'-labels');
  my $alr=$s->{-table}->{'hdesk'}->{-mdefld}
 	&&$s->{-table}->{'hdesk'}->{-mdefld}->{'record'}->{-inp}
 	&&$s->{-table}->{'hdesk'}->{-mdefld}->{'record'}->{-inp}->{-values};
@@ -2147,19 +2199,30 @@ sub a_hdesk_stbar {
 		: ($_)	} @$alr] if $alr;
  my $avs={};	# severities
  my $avr={};	# rectypes
+ my $avt={};	# subtypes
  my $avg={};	# groups
  my $avp={};	# person current
  my $avc={};	# group current
  my $avu={};	# group current users
  my $qh =$s->recSel(-table=>'hdesk'
-		,-data=>[qw(arole auser prole puser severity utime status record)]
+		,-data=>[qw(arole auser prole puser mrole severity utime status record rectype)]
 		,-where=>"status IN('new','draft','appr-do','scheduled','do','progress','rollback','delay','edit','appr-ok','appr-no') OR (TO_DAYS(etime)=TO_DAYS(CURRENT_DATE()))"
 		);
+ my $qpk   =!$c ||!ref($c->{-qkey})
+ 		? undef
+ 		: $c->{-qkey}->{record} || $c->{-qkey}->{rectype}
+ 		? {-qkey => {map {
+			$c->{-qkey}->{$_} ? ($_ => $c->{-qkey}->{$_}) : ()
+ 			} qw(record rectype)}}
+ 		: undef;
+
+ my %xpar  =(-xpar=>['-frmLso','-qurole','-quname']
+		,-xkey=>[qw(record rectype severity auser)]);
  my $vinit =sub{ # val init (record, key, store) -> store elem
 		return($_[2]->{$_[1]}) if $_[2]->{$_[1]};
 		my $v =$_[2]->{$_[1]} ={%{$_[0]}};
 		foreach my $k (keys %$v) {$v->{$k} ='' if !defined($v->{$k})};
-		$v->{severity} =4 if !defined($v->{severity}) ||($v->{severity} eq '');
+		$v->{severity} ='' if !defined($v->{severity}) ||($v->{severity} eq '');
 		$v->{count} =0;
 		$v
 	};
@@ -2167,15 +2230,17 @@ sub a_hdesk_stbar {
 		my $q =$_[0];
 		my $v =$_[2]->{$_[1]};
 		$v->{severity} =$q->{severity}
-			if defined($q->{severity}) && ($q->{severity} ne '')
-			&& ($v->{severity} >$q->{severity});
+			if defined($q->{severity}) 
+			&& ($q->{severity} ne '')
+			&& (!defined($v->{severity}) || ($v->{severity} eq '')
+				|| ($v->{severity} >$q->{severity}));
 		$v->{utime} =$q->{utime}
 			if defined($q->{utime}) && ($q->{utime} ne '')
 			&& ($v->{utime} lt $q->{utime});
 		$v->{count}++
 			if !$q->{status} || ($q->{status} =~/^(?:do|progress|rollback|delay|edit)$/);
 	};
- while (my $qv =$qh->fetchrow_hashref()) {
+ while (my $qv =$qh->fetch() && $qh->{-rec}) { # $qh->fetchrow_hashref()
 	$qv->{severity} =3.5
 		if (!defined($qv->{severity}) ||($qv->{severity} eq '4') ||($qv->{severity} eq ''))
 		&& ($qv->{record} && ($qv->{record} eq 'unavlbl'));
@@ -2187,6 +2252,18 @@ sub a_hdesk_stbar {
 	if ($qv->{record} && ($qv->{record} !~/^(?:work|task|analysis)$/)) {
 		&$vinit($qv, $qv->{record}, $avr);
 		&$vset($qv, $qv->{record}, $avr);
+	}
+	if ($qpk && $qpk->{-qkey}->{record}
+	&& ($qpk->{-qkey}->{record} ne ($qv->{record}||''))) {
+		next
+	}
+	if ($avt && $qpk->{-qkey}->{record}) {
+		&$vinit($qv, $qv->{rectype}, $avt);
+		&$vset($qv, $qv->{rectype}, $avt);
+	}
+	if ($avt && $qpk && $qpk->{-qkey}->{rectype}
+	&& ($qpk->{-qkey}->{rectype} ne ($qv->{rectype}||''))) {
+		next
 	}
 	if (1) {
 		my $qn =lc($qv->{arole}||'');
@@ -2227,6 +2304,12 @@ sub a_hdesk_stbar {
 			&$vset($qv, 'req', $avc);
 			$avc->{req}->{arole} =$s->{-pcmd}->{-quname};
 	}
+	if ($qv->{mrole} && $s->{-pcmd}->{-quname}
+	&& (lc($s->{-pcmd}->{-quname}) eq lc($qv->{mrole})) ) {
+			&$vinit($qv, 'mgr', $avc);
+			&$vset($qv, 'mgr', $avc);
+			$avc->{mgr}->{arole} =$s->{-pcmd}->{-quname};
+	}
  }
  if (0 && scalar(%$avs)) {
 	foreach my $k (keys %$acn) {
@@ -2234,11 +2317,19 @@ sub a_hdesk_stbar {
 		&$vinit({}, $k, $avs);
 	}
  }
- if (scalar(%$avr)) {
+ if (ref($avr)) {
 	foreach my $k (@$alr) {
 		next if $avr->{$k};
 		&$vinit({}, $k, $avr);
 		$avr->{$k}->{severity} ='';
+	}
+ }
+ if ($avt && $qpk && $qpk->{-qkey}->{record} 
+ && $s->{-a_cmdbh_rectype}->{$qpk->{-qkey}->{record}}) {
+	foreach my $k (@{$s->{-a_cmdbh_rectype}->{$qpk->{-qkey}->{record}}}) {
+		next if $avt->{$k};
+		&$vinit({}, $k, $avt);
+		$avt->{$k}->{severity} ='';
 	}
  }
  if ($ah) {
@@ -2256,12 +2347,22 @@ sub a_hdesk_stbar {
  }
  if ($s->{-pcmd}->{-quname} && $s->{-pcmd}->{-qurole}
  && $avg->{lc($s->{-pcmd}->{-quname})} ){
-	foreach my $k (qw(self svc req)) {
+	foreach my $k (qw(self svc req mgr)) {
 		next if $avc->{$k};
 		&$vinit({}, $k, $avc);
 		$avc->{$k}->{arole} =$s->{-pcmd}->{-quname};
 	}
 	$avc->{act} =$avg->{lc($s->{-pcmd}->{-quname})}
+ }
+ if (1 && $s->{-pcmd}->{-quname}) {
+ 	foreach my $n (@{$s->uglist('-u',$s->{-pcmd}->{-quname})}) {
+		my $k =lc($n);
+		next if $avu->{$k};
+		&$vinit({}, $k, $avu);
+		$avu->{$k}->{severity} ='';
+		$avu->{$k}->{auser} =$k;
+		$avu->{$k}->{arole} =$s->{-pcmd}->{-quname};
+	}
  }
 #<div style="margin-bottom: 1ex; margin-top: 1ex;">
 #<span style="border: 1px solid">
@@ -2276,10 +2377,11 @@ sub a_hdesk_stbar {
 		my $vt =($acn->{$k} ||$k);
 		$s->htmlMQH(-html=>'&nbsp;' .$vl .'&nbsp;'
 			,-title=>"$vl, $vt"
+			,%xpar
 			,$k eq '3.5'
 			? (-qkey=>{'record'=>'unavlbl'})
 			: (-qkey=>{'severity'=>$k}
-			  ,-qwhere=>"record NOT IN('work','task')")
+			  ,-qwhere=>"[[hdesk.record NOT IN('work','task')]]")
 			,-urm=>$avs->{$k}->{utime} ||''
 			,-style=>'background-color: ' .$ac->{$k}||$ac->{''})
 		} sort { $b <=> $a
@@ -2298,12 +2400,41 @@ sub a_hdesk_stbar {
 			.($acn && defined($avr->{$k}->{severity}) && ($avr->{$k}->{severity} ne '') 
 				? ', ^' .($acn->{$avr->{$k}->{severity}} ||$avr->{$k}->{severity}) 
 				: '')
-		,-qwhere=>'record=' .$s->dbiQuote($k)
+		,%xpar
+		,-qkey=>{'record'=>$k}
 		,-urm=>$avr->{$k}->{utime} ||''
 		,-style=>'background-color: ' 
 			.($ac->{$avr->{$k}->{severity}}||$ac->{''})
 		)} @$alr)
  	.'&nbsp;&nbsp;&nbsp;'))
+ .$s->htmlMQH(-html=>'&nbsp;x&nbsp;'
+		,-title=>"reset"
+		,%xpar
+		,-frmLso=>''
+		,-qkey=>{}
+		,-qwhere=>'[[]]'
+		,-style=>'background-color: buttonface; border-width: 0px'
+		)
+ .($avt && scalar(%$avt)
+  ? '</div><div style="margin-bottom: 0.4ex; margin-top: 0.5ex;">'
+   .join('&nbsp;',
+	map {	my $k =$_;
+		# $s->logRec('***',$k,$avt->{$k});
+		my $vl =$act->{$k} ||$k;
+		my $vt =$k;
+		$s->htmlMQH(-html=>'&nbsp;' .$vl .'&nbsp;'
+		,-title=>$vt
+			.($avt->{$k}->{count} ? ', ' .$avt->{$k}->{count} : '')
+			.($acn && defined($avt->{$k}->{severity}) && ($avt->{$k}->{severity} ne '') 
+				? ', ^' .($acn->{$avt->{$k}->{severity}} ||$avt->{$k}->{severity})
+				: '')
+		,%xpar
+		,-qkey=>{'record'=>$qpk->{-qkey}->{record},'rectype' => $k}
+		,-urm=>$avt->{$k}->{utime} ||''
+		,-style=>'background-color: ' 
+			.($ac->{$avt->{$k}->{severity}}||$ac->{''})
+		)} @{$s->{-a_cmdbh_rectype}->{$qpk->{-qkey}->{record}}})
+  : '')
  .(%$avs || %$avr
   ? '</div><div style="margin-bottom: 0.4ex; margin-top: 0.5ex;">'
   : '')
@@ -2321,6 +2452,8 @@ sub a_hdesk_stbar {
 			.($acn && defined($avg->{$k}->{severity}) && ($avg->{$k}->{severity} ne '') 
 				? ', ^' .($acn->{$avg->{$k}->{severity}} ||$avg->{$k}->{severity}) 
 				: '')
+		,%xpar
+		,$qpk ? %$qpk : ()
 		,-frmLso=>'actors', -quname=>$avg->{$k}->{arole}
 		,-urm=>$avg->{$k}->{utime} ||''
 		,-style=>'background-color: '
@@ -2350,10 +2483,12 @@ sub a_hdesk_stbar {
 			.($acn && defined($avp->{$k}->{severity}) && ($avp->{$k}->{severity} ne '') 
 				? ', ^' .($acn->{$avp->{$k}->{severity}} ||$avp->{$k}->{severity}) 
 				: '')
+		,%xpar
+		, $qpk ? %$qpk : ()
 		, $k eq 'auser' 
-		? (-qwhere=>$s->dbi->quote($s->user) .' IN(hdesk.auser,hdesk.puser)')
+		? (-qwhere=>'[[' .$s->dbi->quote($s->user) .' IN(hdesk.auser,hdesk.puser)]]')
 		: $k eq 'auser+'
-		? (-qwhere=>$s->dbi->quote($s->user) .' IN(hdesk.auser,hdesk.puser,hdesk.cuser,hdesk.uuser)')
+		? (-qwhere=>'[[' .$s->dbi->quote($s->user) .' IN(hdesk.auser,hdesk.puser,hdesk.cuser,hdesk.uuser)]]')
 		: (-frmLso=>'actor', -quname=>$avp->{$k}->{auser})
 		,-urm=>$avp->{$k}->{utime} ||''
 		,-style=>'background-color: '
@@ -2369,6 +2504,7 @@ sub a_hdesk_stbar {
 			: $k eq 'svc'		? $s->lng(0,'arole')
 			: $k eq 'req'		? $s->lng(0,'users')
 			: $k eq 'act'		? ($ah && $ah->{lc($avc->{$k}->{arole})} ||$s->udisp($avc->{$k}->{arole}))
+			: $k eq 'mgr'		? $s->lng(0,'mrole')
 			: '?';
 		my $vt =($ah  && $ah->{lc($avc->{$k}->{arole})}
 				||$s->udisp($avc->{$k}->{arole})) ." - $vl";
@@ -2378,21 +2514,27 @@ sub a_hdesk_stbar {
 			.($acn && defined($avc->{$k}->{severity}) && ($avc->{$k}->{severity} ne '') 
 				? ', ^' .($acn->{$avc->{$k}->{severity}} ||$avc->{$k}->{severity}) 
 				: '')
+		,%xpar
+		, $qpk ? %$qpk : ()
 		, $k eq 'self'
-		? (-qwhere=>'arole=prole',-frmLso=>'actors', -quname=>$avc->{$k}->{arole})
+		? (-qwhere=>'[[hdesk.arole=hdesk.prole]]',-frmLso=>'actors', -quname=>$avc->{$k}->{arole})
 		: $k eq 'svc'
-		? (-qwhere=>'arole<>prole',-frmLso=>'actors', -quname=>$avc->{$k}->{arole})
+		? (-qwhere=>'[[hdesk.arole<>hdesk.prole]]',-frmLso=>'actors', -quname=>$avc->{$k}->{arole})
 		: $k eq 'req'
-		? (-qwhere=>'(arole<>prole)',-frmLso=>'principals', -quname=>$avc->{$k}->{arole})
+		? (-qwhere=>'[[hdesk.arole<>hdesk.prole]]',-frmLso=>'principals', -quname=>$avc->{$k}->{arole})
 		: $k eq 'act'
 		? (-frmLso=>'actors', -quname=>$avc->{$k}->{arole})
+		: $k eq 'mgr'
+		? (-frmLso=>'managers', -quname=>$avc->{$k}->{arole})
 		: (-frmLso=>'actors', -quname=>$avc->{$k}->{arole})
 		,-urm=>$avc->{$k}->{utime} ||''
 		,-style=>'background-color: '
 			.$ac->{$avc->{$k}->{severity}}||$ac->{''}
-		)} grep {$avc->{$_}} qw (act svc self req))
+		)} grep {$avc->{$_}} qw (act svc self req mgr))
  	.'&nbsp;&nbsp;&nbsp;'))
- . join('&nbsp;',
+ .(!%$avu
+  ? ''
+  :(join('&nbsp;',
 	map {	my $k =$_;
 		# $s->logRec('***',$k,$avu->{$k});
 		my $vl =$s->udisp($k);
@@ -2404,13 +2546,19 @@ sub a_hdesk_stbar {
 			.($acn && defined($avu->{$k}->{severity}) && ($avu->{$k}->{severity} ne '') 
 				? ', ^' .($acn->{$avu->{$k}->{severity}} ||$avu->{$k}->{severity}) 
 				: '')
-		,(-qkey=>{'auser'=>$avu->{$k}->{auser}}, -frmLso=>'actors', -quname=>$avu->{$k}->{arole})
+		,%xpar
+		,-qkey=>{'auser'=>$avu->{$k}->{auser}
+			, $qpk ? %{$qpk->{-qkey}} : ()
+				}
+		,-frmLso=>'actors'
+		,-quname=>$avu->{$k}->{arole}
 		,-urm=>$avu->{$k}->{utime} ||''
 		,-style=>'background-color: '
 			.$ac->{$avu->{$k}->{severity}}||$ac->{''}
 		)
 		} sort { lc($s->udisp($a)) cmp lc($s->udisp($b))
 			} keys %$avu)
+	.'&nbsp;&nbsp;&nbsp;'))
  . '<br />'
  . '</div>'
  .$mc;

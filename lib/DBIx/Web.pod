@@ -730,7 +730,7 @@ DBI connection arguments string or array, used in C<dbi> call.
 Started with 'DBI:Proxy:hostname=127.0.0.1...' connection string
 starts L<DBI::ProxyServer|DBI/ProxyServer> process if not found connecting,
 i.e. 'dbi:Proxy:hostname=127.0.0.1;port=3334;proxy_no_finish=1;dsn=DBI:mysql:...'.
-
+See also C<-dbistart>.
 
 
 =item -dbiexpl
@@ -748,6 +748,16 @@ DBI explain switch, default is On, may be used along with C<-debug>, for speed.
 (C<SubObjects>)
 Placeholders ('?') usage switch for arguments of DBI commands.
 Default behaviour is embedding values quoted as hinted via C<-flg> or analysed.
+
+
+
+=item -dbistart
+
+	=> not exists || 'start comands' || ['start command',...] || sub{}(self)
+
+(C<SubObjects>)
+DBI connection startup to be executed by C<dbi> when connecting.
+
 
 
 =item -ddlb
@@ -1132,7 +1142,7 @@ Form value URL to underline display of field.
 
 =item -help
 
-	=> not exists || help text
+	=> not exists || help text || help html || sub{}(self) -> text || html
 
 (C<Database Description>, C<Table/Form Description>, C<Field Description>)
 Help text for C<cgiHelp>.
@@ -1542,7 +1552,20 @@ See also C<-mdeTable>.
 	=> not exists || [[form name => form label] || {-val => form name, -lbl => form label} || form name,...]
 
 (C<User Interface>)
-User Interface forms list. Default will be generated from C<-form> and C<-table>.
+User Interface forms list. 
+Default will be generated from C<-form> and C<-table>.
+One of special postfixes below may be supplied to form name in C<-menuchs>,
+while C<-menuchs1> is expected for '+' only:
+
+none	- C<recList> view
+
+'+'	- C<recNew> form
+
+'&'	- C<recForm> action immediate
+
+'.'	- C<recForm> action dialog
+
+'^'	- C<recForm> page pointer
 
 
 =item -new
@@ -4077,6 +4100,17 @@ another options may be implemented within script itself.
 
 =over
 
+=head2 2008-03-03 - Development Version 0.73
+
+Misc corrections and improvements in C<cgiRun>, C<cgiSel>, C<uglist>, C<htmlMenu>, C<htmlML>.
+
+New C<-dbistart>.
+
+Extended C<-help> using HTML and improved C<cgiHelp>.
+
+CMDB example improvements.
+
+
 
 =head2 2007-12-27 - Development Version 0.72
 
@@ -4681,10 +4715,10 @@ under the same terms as Perl itself.
 Without specially written agreement
 prohibited to use completely, partially or in ideas
 for impairing nature industries
-in Archangel region (wood and timber, geological and mining, space);
+in Archangel region (wood and timber, geological and mining, space and war);
 Russian procrastination structures and kgbists.
 
-A help in the revival of Pomor'e will be good.
+A help in the revival of Pomor'e will be good: L<http://www.pomor-rus.org>
 
 
 =head1 AUTHOR

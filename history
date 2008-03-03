@@ -1,3 +1,17 @@
+# 2008-02-29 extnd -help using html
+# 2008-02-20 chgd cgiRun(), htmlML() restoring '_frame' lost needed for Mozilla
+# 2008-02-20 chgd htmlML(), cgiParse() name postfixes: [+&.] -> [+&.^]
+#		htmlML():	_frmName.value.match(/\\+\$/) -> (/[+^]\$/)
+#		htmlML():	disabled auto '++' gen under 'frmCallNew'
+#		htmlMChs():	disabled auto '++' gen under 'frmCallNew'
+# 2008-02-19 new 'frmLsoff'
+# 2008-02-19 new -dbistart, changed dbi(), dbiConnect()
+# 2008-01-14 htmlMenu() changed considering '[[]]' -qwhere
+# 2008-01-14 uglist('-u',groupname) corrected, may return empty [].
+#		uglist('-u',groupname,[]) reads users file to distinguish users from groups
+# 2008-01-13 cmdb example development
+# 2007-12-29 cgiSel() correction: empty '[[]]' exam: /^\[\[(.*?)\]\]/ instead of /^\[\[(.+?)\]\]/
+# 2007-12-27 starting 0.73 version
 # 2007-12-21 *fatalsToBrowser -> *fatalsToBrowser{CODE} - globbing variables, perlref, perlmod
 # 2007-12-18 set() error handler redesign using values of ($SIG{__DIE__}, $SIG{__WARN__})
 # 2007-12-18 set() error handler redesign using $SELF ||$DB::args[0]; instead of $s
