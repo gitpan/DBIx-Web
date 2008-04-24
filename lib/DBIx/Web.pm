@@ -5,16 +5,16 @@
 # makarow at mail.com, started 2003-09-16
 #
 # Future ToDo:
-# - htmlMenu scroll
-# - !!! ??? review
-# - code review
-# - root hierarchical record functionality: -ridRoot
+# - !!! ??? review, code review
 # - record references finder via 'wikn://', 'key://', bracket notation
+# - root hierarchical record functionality: -ridRoot
+# - calendar views: type and start/end time; start sub{}, entry sub{}, periodical rec.
 # - mail-in interface - records and message browser source
 # - logfile reading interface - message browser source
 # - acknowledgements feature - message browser implementation
 # - replication feature - distributing data
 # - 'recRead' alike calls may return an objects, knows metadata
+# - remake in three tiers: database with triggers, web interface, communicator
 #
 # Problems - Think:
 # - strDiff() breaks hyperlinks
@@ -26,24 +26,27 @@
 #	# pc: uglist, user, ugroups, udisp
 # - store for users preferences, homepages, notes, etc.
 #
+# Limitation Issues:
+# - html page scrolling with menu bar
+#	# no simple means
+# - innice htmlML() selection: _frmName.value=_form.value ? _form.value : '';
+#	# ms-help://MS.MSDNQTR.2005JAN.1033/DHTML/workshop/samples/author/dhtml/refs/oncontextmenu.htm
+# - dbmSeek() -key=>{[{}]} syntax of cgiForm(recQBF)/cgiQKey
+#	# dbm not used at all, it seems
+#
 # ToDo:
-# - using '_search' frame for menu
+# - utf8 if $] <5.008; cptran() & Encode module
 # - osCmd xcopy replace
 # - osCmd cacls may buzz sometimes somewhy
-# - innice htmlML() selection: _frmName.value=_form.value ? _form.value : '';
 # - w32umail() slow
+# CMDB / Service Desk:
 # - cmdb-e: service graph view
 # - cmdb: process - define hierarchy in cmdb?
-# - calendar views: type and start/end time; start sub{}, entry sub{}, periodical rec.
-# - display of future records, periodical records.
 # - cmdb: graphics (of workload (of personal))
-# - cmdb: idrm??? not recursive -recFlim0R should be
-# - cmdb-s: update vtime, recprc in old records
-# - dbmSeek() -key=>{[{}]} syntax of cgiForm(recQBF)/cgiQKey
-# - test examples: behaviour, versioning, checkouts, attachments, triggers
+# - cmdb-s: update vtime/-rvcVerWhen, recprc in old records
 #
 # Done:
-# 2008-03-03 starting 0.74 version
+# 2008-04-24 starting 0.75 version
 
 
 package DBIx::Web;
@@ -55,7 +58,7 @@ use Fcntl qw(:DEFAULT :flock :seek :mode);
 
 use vars qw($VERSION @ISA @EXPORT @EXPORT_OK %EXPORT_TAGS $AUTOLOAD $SELF $CACHE $LNG $IMG);
 
-	$VERSION= '0.73';
+	$VERSION= '0.74';
 	$SELF   =undef;				# current object pointer
 	$CACHE	={};				# cache for pointers to subobjects
 	*isa    = \&UNIVERSAL::isa; isa('','');	# isa function
@@ -79,7 +82,10 @@ if	($ENV{MOD_PERL}) {
 }
 
 $LNG ={
-''	=>{''		=>['',		'']
+''	=>undef
+,-die	=>sub{CORE::die(@_)}
+,-warn	=>sub{CORE::warn(@_)}
+,''	=>{''		=>['',		'']
 	,-lang		=>['en',	'']
 	,-charset	=>['windows-1252','']
 
@@ -113,6 +119,7 @@ $LNG ={
 	,'fldChkStp'	=>['constraint','constraint violated']
 
 	,'home'		=>['Home',	'Home screen']
+	,'schpane'	=>['Navigation','Navigation/Search pane']
 	,'back'		=>['<',		'Back screen']
 	,'login'	=>['Login',	'Login as personated user']
 	,'frmCall'	=>['Go',	'Goto/execute choise']
@@ -260,6 +267,7 @@ $LNG ={
 	,'fldChkStp'	=>['ограничение','ограничение нарушено']
 
 	,'home'		=>['Начало',	'Начальная страница']
+	,'schpane'	=>['Навигатор',	'Панель навигации/поиска']
 	,'back'		=>['<',		'Предыдущая страница']
 	,'login'	=>['Войти',	'Открыть персонифицированный сеанс']
 	,'frmCall'	=>['Вып',	'Выполнить переход, действие, поиск']
@@ -374,13 +382,13 @@ $LNG ={
 	,'comment'	=>['Коммент',	"Текст или HTML комментария. Гиперссылки могут быть начаты с 'urlh://' (компьютер), 'urlr://' (это приложение), 'urlf://' (присоединенные файлы), 'key://' (ключ записи или таблица${RISM1}ключ), 'wikn://' (имя записи); могут быть в скобочной записи [[xxx://...]], [[xxx://...][label]], [[xxx://...|label]]. Начало текста <where>условие</where> может использоваться для встроенной выборки записей"]
 	,'cargo'	=>['Карго',	'Дополнительные данные']
 	}
-,'utf8ru' => {	# http://adult-hosting.ru/adult/hosting4/UTF-8.html
+,'utf8ru' => {	# See cptran(), utf8enc(), utf8dec(), $] >=5.008
+		# !!! Text::Iconv may be better
+		# http://adult-hosting.ru/adult/hosting4/UTF-8.html
 		# UTF-8 (8-bit Unicode Transformation Format) is a variable-length character encoding for Unicode created by Ken Thompson and Rob Pike. It is able to represent any universal character in the Unicode standard, yet is backwards compatible with ASCII.
 		# UTF-8 uses one to four bytes (strictly, octets) per character, depending on the Unicode symbol. For example, only one byte is needed to encode the 128 US-ASCII characters in the Unicode range U+0000 to U+007F.
 		# http://phpclub.ru/faq/wakka.php?wakka=encodings&v=35q
 		# http://forum.net.ru/viewforum.php?f=4
-		# !!! Text::Iconv may be better
-		# See cptran(), utf8enc(), utf8dec()
 	 "\xD0\x90"=>"\xC0","\xD0\x91"=>"\xC1","\xD0\x92"=>"\xC2","\xD0\x93"=>"\xC3","\xD0\x94"=>"\xC4"
 	,"\xD0\x95"=>"\xC5","\xD0\x81"=>"\xA8","\xD0\x96"=>"\xC6","\xD0\x97"=>"\xC7","\xD0\x98"=>"\xC8"
 	,"\xD0\x99"=>"\xC9","\xD0\x9A"=>"\xCA","\xD0\x9B"=>"\xCB","\xD0\x9C"=>"\xCC","\xD0\x9D"=>"\xCD"
@@ -402,6 +410,8 @@ $LNG ={
 
 $IMG={
 	 'home'		=>'portal.gif'
+	,'schpane'	=>'folder.gif'
+	,'schframe'	=>'folder.gif'
 	,'back'		=>'back.gif'
 	,'login'	=>'small/key.gif'
 	,'frmCall'	=>'hand.up.gif'
@@ -455,8 +465,8 @@ sub initialize {
  # ,-lngcmt	=>''		# -cmt key
 
    ,-debug      =>0		# Debug Mode
-   ,-die        =>\&CORE::die	# die  / croak / confess: &{$s->{-die} }('error')
-   ,-warn       =>\&CORE::warn	# warn / carp  / cluck  : &{$s->{-warn}}('warning')
+   ,-die        =>$LNG->{-die}	# die  / croak / confess: &{$s->{-die} }('error')
+   ,-warn       =>$LNG->{-warn}	# warn / carp  / cluck  : &{$s->{-warn}}('warning')
    ,-ermu	=>''		# err markip user
    ,-ermd	=>''		# err markup delimiter
  # ,-end0	=>undef		# 'end' before trigger
@@ -677,6 +687,7 @@ sub initialize {
  # ,-htmlstart  =>{}
    ,-icons	=>'/icons'	# Icons URL
  # ,-logo	=>''		# Logotype to display
+ # ,-search	=>''		# '_search' frame URL
    ,-login	=>'/cgi-bin/ntlm/'# Login URL
  # ,-menuchs	=>[[]]
  # ,-menuchs1	=>[[]]
@@ -799,7 +810,7 @@ sub set {
 	my ($s, $he, $hw) =($_[0]);
 	if    (ref($opt{-die})) {}
 	elsif ($opt{-die} =~/^(perl|core)$/i) {
-		$s->{-warn} =\&CORE::warn; $s->{-die} =\&CORE::die;
+		$s->{-warn} =$LNG->{-warn}; $s->{-die} =$LNG->{-die};
 	}
 	elsif ($opt{-die}) {
 		my $m =($s->{-die} =~/^([^\s]+)\s*/ ? $1 : $s->{-die}) .'::';
@@ -964,11 +975,15 @@ sub lngcmt {	# localised comment (self, object,...)
 }
 
 
-sub charset {	# character set name
+sub charset {	# character set name, as for web
  return($LNG->{''}->{-charset}->[0]) if !$_[0]->{-charset};
  $_[0]->{-charset} =~/^\d/ ? 'windows-' .$_[0]->{-charset} : $_[0]->{-charset}
 }
 
+
+sub charpage {	# character page name, as for Encode
+	charset($_[0]) =~/^windows-(\d+)/ ? "cp$1" : charset($_[0]);
+}
 
 sub ineval {	# is inside eval{}?
 		# for PerlEx and mod_perl
@@ -1639,14 +1654,29 @@ sub timeadd {	# Adjust time to years, months, days,...
 
 
 sub cptran {	# Translate strings between codepages
- my ($s,$f,$t,@s) =@_;		# !!! Text::Iconv may be better
- foreach my $v ($f, $t) {	# See also utf8enc, utf8dec
-   if    ($v =~/oem|866/i)   {$v ='ЂЃ‚ѓ„…р†‡€‰Љ‹ЊЌЋЏђ‘’“”•–—™њ›љќћџ ЎўЈ¤Ґс¦§Ё©Є«¬­®Їабвгдежзиймлкноп'}
-   elsif ($v =~/ansi|1251/i) {$v ='АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЬЫЪЭЮЯабвгдеёжзийклмнопрстуфхцчшщьыъэюя'}
-   elsif ($v =~/koi/i)       {$v ='бвчздеіцъйклмнопртуфхжигюыэшщяьасБВЧЗДЕЈЦЪЙКЛМНОПРТУФХЖИГЮЫЭШЩЯЬАС'}
-   elsif ($v =~/8859-5/i)    {$v ='°±ІіґµЎ¶·ё№є»јЅѕїАБВГДЕЖЗИЙМЛКНОПРСТУФХсЦЧШЩЪЫЬЭЮЯабвгдежзиймлкноп'}
+ my ($s,$f,$t,@s) =@_;
+ if (($] >=5.008) && eval("use Encode; 1")) {
+	map {$_=  /oem|866/i	? 'cp866'
+		: /ansi|1251/i	? 'cp1251'
+		: /koi/i	? 'koi8-r'
+		: /8859-5/i	? 'iso-8859-5'
+		: $_
+		} $f, $t;
+	map {Encode::is_utf8($_)
+		? ($_ =Encode::encode($t, $_))
+		: Encode::from_to($_, $f, $t)
+		if defined($_)
+		} @s;
  }
- map {eval("~tr/$f/$t/") if defined($_)} @s; 
+ else {
+	foreach my $v ($f, $t) {	# See also utf8enc, utf8dec
+		if    ($v =~/oem|866/i)   {$v ='ЂЃ‚ѓ„…р†‡€‰Љ‹ЊЌЋЏђ‘’“”•–—™њ›љќћџ ЎўЈ¤Ґс¦§Ё©Є«¬­®Їабвгдежзиймлкноп'}
+		elsif ($v =~/ansi|1251/i) {$v ='АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЬЫЪЭЮЯабвгдеёжзийклмнопрстуфхцчшщьыъэюя'}
+		elsif ($v =~/koi/i)       {$v ='бвчздеіцъйклмнопртуфхжигюыэшщяьасБВЧЗДЕЈЦЪЙКЛМНОПРТУФХЖИГЮЫЭШЩЯЬАС'}
+		elsif ($v =~/8859-5/i)    {$v ='°±ІіґµЎ¶·ё№є»јЅѕїАБВГДЕЖЗИЙМЛКНОПРСТУФХсЦЧШЩЪЫЬЭЮЯабвгдежзиймлкноп'}
+	}
+	map {eval("~tr/$f/$t/") if defined($_)} @s;
+ }
  @s >1 ? @s : $s[0];
 }
 
@@ -1717,7 +1747,7 @@ sub urlUnescape {
 
 
 sub urlCat {
- my $r =$_[1] .'?';
+ my $r =$_[1] =~/\?/ ? ($_[1] .$HS) : ($_[1] .'?');
  for (my $i =2; $i <$#_; $i+=2) {$r .=urlEscape($_[0], $_[$i]) .'=' .urlEscape($_[0], $_[$i+1]) .$HS}
  chop($r); $r
 }
@@ -1851,6 +1881,14 @@ sub xmlsTag {	# Attribute list to xml strings list
 
 sub utf8enc {	# Encode to UTF8, see also cptran()
 	my $r =$_[1];
+	if ($] >=5.008) {
+		my $cp =eval('!${^ENCODING}') && $_[0]->charpage();
+		eval("use encoding '$cp', STDIN=>undef, STDOUT=>undef") if $cp;
+		eval("use Encode");
+		$r =Encode::encode_utf8($r);
+		eval('no encoding') if !$cp;
+		return($r);
+	}
 	my $t =$LNG->{'utf8' .($_[0]->{-lang}||'')};
 	return($r) if !$t;
 	foreach my $k (keys %$t) { 
@@ -1863,6 +1901,15 @@ sub utf8enc {	# Encode to UTF8, see also cptran()
 
 sub utf8dec {	# Decode from UTF8, see also cptran()
 	my $r =$_[1];
+	if ($] >=5.008) {
+		my $cp =eval('!${^ENCODING}') && $_[0]->charpage();
+		eval("use encoding '$cp', STDIN=>undef, STDOUT=>undef") if $cp;
+		eval("use Encode");
+		$r =Encode::decode_utf8($r);
+		eval('no encoding')		if $cp;
+		$r =Encode::encode($cp,$r)	if $cp;
+		return($r);
+	}
 	my $t =$LNG->{'utf8' .($_[0]->{-lang}||'')};
 	return($r) if !$t;
 	foreach my $k (keys %$t) { 
@@ -2873,7 +2920,7 @@ sub ugnames {	# current user and group names
 sub ugrexp {	# current user and group names regexp source
  return($_[0]->{-c}->{-ugrexp}) if $_[0]->{-c}->{-ugrexp};
  my $n =join('|', @{$_[0]->ugnames()}); $n =~s/([\\.?*\$\@])/\\$1/g;
- $_[0]->{-c}->{-ugrexp} =eval('sub{(($_[0]=~/\\b(' . $n.')\\b/i) && $1)}')
+ $_[0]->{-c}->{-ugrexp} =eval('sub{(($_[0]=~/(?:^|,|;)\\s*(' .$n .')\\s*(?:,|;|$)/i) && $1)}')
 }
 
 
@@ -3134,7 +3181,11 @@ sub udispq {	# display user name quick
  ? $_[1]
  : $_[0]->{-c}->{-udisp}
  ? $_[0]->{-c}->{-udisp}->{lc($_[1])} ||$_[1]
- : udisp(@_)
+ : ref($CACHE) && $CACHE->{-udisp}
+ ? $CACHE->{-udisp}->{lc($_[1])} ||$_[1]
+ : (do{	my $v =udisp(@_);
+ 	$CACHE->{-udisp} =$_[0]->{-c}->{-udisp} if ref($CACHE);
+ 	$v})
 }
 
 
@@ -5546,10 +5597,10 @@ sub dbmSeek {	# Select records from dbm file using -key and -where
 		: [];
 	$wr	=sub {	foreach my $n (@$wn) {
 				foreach my $v (@$wx) {
-					return(undef) if $_[2]->{$v} =~/\b\Q$n\E\b/i
+					return(undef) if $_[2]->{$v} =~/(?:^|,|;)\s*\Q$n\E\s*(?:,|;|$)/i
 				}
 				foreach my $v (@$wl) {
-					return($n) if $_[2]->{$v} =~/\b\Q$n\E\b/i
+					return($n) if $_[2]->{$v} =~/(?:^|,|;)\s*\Q$n\E\s*(?:,|;|$)/i
 				}
 			}
 			undef
@@ -5718,6 +5769,10 @@ sub dbiACLike {	# SQL Access Control LIKE / RLIKE
 	  ? $_[0]->dbi->quote('%[[:<:]](' 
 		.join('|', map {$_[0]->dbiLikesc($_)} @{$_[5]}) 
 		.')[[:>:]]%')
+	  : $e eq 'RLIKE'
+	  ? $_[0]->dbi->quote( '(^|,|;)[:blank:]*(' 
+		.join('|', map {$_[0]->dbiLikesc($_)} @{$_[5]}) 
+		.')[:blank:]*(,|;|$)')
 	  : $_[0]->dbi->quote( '[[:<:]](' 
 		.join('|', map {$_[0]->dbiLikesc($_)} @{$_[5]}) 
 		.')[[:>:]]')
@@ -5739,7 +5794,7 @@ sub dbiACLike {	# SQL Access Control LIKE / RLIKE
 				foreach my $n (@$l) {
 					return(undef) 
 						if defined($_[3]->{$v})
-						&& $_[3]->{$v} =~/\b\Q$n\E\b/i
+						&& $_[3]->{$v} =~/(?:^|,|;)\s*\Q$n\E\s*(?:,|;|$)/i
 				}
 			} !$e || &$e(@_) }
 		: sub {	foreach my $v (@$f) {
@@ -5754,7 +5809,7 @@ sub dbiACLike {	# SQL Access Control LIKE / RLIKE
 				foreach my $n (@$l) {
 					return(!$e || &$e(@_))
 						if defined($_[3]->{$v})
-						&& $_[3]->{$v} =~/\b\Q$n\E\b/i
+						&& $_[3]->{$v} =~/(?:^|,|;)\s*\Q$n\E\s*(?:,|;|$)/i
 				}
 			} undef }
  }
@@ -6644,7 +6699,47 @@ sub cgiRun {	# Execute CGI query
 	$s->end();
 	return($s);
  }
-		# Frameset creation
+
+			# Navigation Search Pane or LEFT / RIGHT Frameset
+ if ($s->{-pcmd}->{-search} && (length($s->{-pcmd}->{-search}) >1)) {
+	$s->{-c}->{-search} =$s->{-pcmd}->{-search}
+ }
+ elsif ($s->{-search}) {
+	$s->{-c}->{-search} =ref($s->{-search}) ? &{$s->{-search}}($s,$s->{-pcmd}) : $s->{-search};
+	delete $s->{-c}->{-search}
+		if ($s->{-c}->{-search} =~/\b_frame=RIGHT\b/)
+		&& !$s->{-pcmd}->{-search}
+		&& ($on !~/^(?:default|start|index)$/);
+ }
+ if ($s->{-pcmd}->{-search} && ($s->{-c}->{-search} =~/\b_frame=RIGHT\b/)) {
+	my $sch =$s->{-c}->{-search};
+	$sch =~s/\b_search=1\b/_search=0/;
+	$sch =$s->url .$sch	if $sch =~/^?/;
+	$s->output(''
+		, $s->cgi->header(-charset => $s->charset()
+		,-type => 'text/html')
+		,'<html xmlns="http://www.w3.org/1999/xhtml"' 
+			.($s->{-lang} ? ' lang="' .$s->lang(0,'-lang') .'"' : '')
+			.">\n<head>\n"
+		,'<title>'
+		,$s->{-title} ||$s->cgi->server_name()
+		,"</title>\n"
+		,'<meta http-equiv="Content-Type" content="text/html; charset=' .$s->charset() .'">' ."\n"
+		,'</head>',"\n"
+		,'<frameset cols="15%,*">'
+		,'<frame name="LEFT" src="'
+		,$s->htmlEscape($sch)
+		,'">'
+		,'<frame name="RIGHT" src="' 
+		,$s->urlOpt(-search=>0)
+		,'">'
+		,'</frameset>'
+		,'</html>',"\n");
+	$s->end();
+	return($s)
+ }
+
+		# TOP / BOTTOM Frameset
  if ($s->{-pcmd}->{-frame} && ($s->{-pcmd}->{-frame} eq 'set')) {
 	delete $s->{-pcmd}->{-frame};
 	$s->output(''
@@ -6673,6 +6768,16 @@ sub cgiRun {	# Execute CGI query
 			.'">',"\n"
 		,'</frameset>',"\n"
 		,'</html>',"\n");
+	return($s);
+ }
+
+ if (($on =~/\.psp$/i)	# Perlscript file immediate
+ &&  ($oa =~/^(?:frmCall|recForm|recList)$/)) {
+ 	return(&{$s->{-die}}($s->lng(0,'cgiRun') .": Operation object '$on' illegal" .$s->{-ermd}) && undef) 
+		if $on =~/[\\\/]\.+[\\\/]/;
+ 	my $f =$0 =~/^(.+[\\\/])[^\\\/]+$/ ? $1 .$on : $on;
+	$s->psEval('-', $f, undef, $on, $om, $s->{-pcmd}, $s->{-pdta});
+	$s->end();
 	return($s);
  }
 
@@ -6844,7 +6949,7 @@ sub cgiParse {	# Parse CGI call parameters
 	elsif($k =~/^_(new|file)$/) {		# record attribute
 		$s->{-pdta}->{"-$k"} =$d->{$k}
 	}
-	elsif ($k =~/^_(cmd|cmg|frmCall|frmName\d*|frmLso|frmLsc|frmHelp|recNew|recRead|recPrint|recXML|recHist|recEdit|recIns|recUpd|recDel|recForm|recList|recQBF|submit.*|app.*|form|key|wikn|proto|urm|qjoin|qkey|qwhere|qurole|quname|qftext|qversion|qorder|qkeyord|qlist|qlimit|qdisplay|qftwhere|qftord|qftlimit|edit|backc|login|print|xml|hist|refresh|style|frame)(?:\.[xXyY]){0,1}$/i) {
+	elsif ($k =~/^_(cmd|cmg|frmCall|frmName\d*|frmLso|frmLsc|frmHelp|recNew|recRead|recPrint|recXML|recHist|recEdit|recIns|recUpd|recDel|recForm|recList|recQBF|submit.*|app.*|form|key|wikn|proto|urm|qjoin|qkey|qwhere|qurole|quname|qftext|qversion|qorder|qkeyord|qlist|qlimit|qdisplay|qftwhere|qftord|qftlimit|edit|backc|login|print|xml|hist|refresh|style|frame|search)(?:\.[xXyY]){0,1}$/i) {
 		my ($c, $v) =($1, $d->{$k});	# command
 		$v =$1	if ($k !~/^_(key|proto|qkey|qftext)/i)
 			&& ($v =~/^\s*(.+?)\s*$/);
@@ -6855,6 +6960,9 @@ sub cgiParse {	# Parse CGI call parameters
 		}
 		if ($c =~/^(?:rec|frmCall|frmHelp|submit)/i) {
 			$s->{-pcmd}->{-cmd} =$c
+		}
+		elsif (($c eq 'frmLso') && ($v =~/,/)) {
+			$s->{-pcmd}->{"-$c"}=[split /\s*,\s*/, $v];
 		}
 		else {
 			$s->{-pcmd}->{"-$c"}=$v
@@ -6946,7 +7054,7 @@ sub cgiParse {	# Parse CGI call parameters
  }
  elsif	($c->{-cmd} eq 'frmHelp') {
 	$c->{-edit} =undef;
-	$c->{-backc}=0;
+	$c->{-backc}=0 if ($c->{-cmg} ne $c->{-cmd});
  }
  elsif	($c->{-cmd} !~/^(recIns|recUpd|recForm)/) {
 	$c->{-edit} =undef
@@ -6981,6 +7089,7 @@ sub cgiParse {	# Parse CGI call parameters
  }
  $c->{-backc} =(    ($c->{-cmd} eq 'recForm')
 		||  ($c->{-cmd} eq 'recIns')
+		||  ($c->{-cmd} eq 'frmHelp')
 		|| (($c->{-cmd} eq 'recRead') || ($c->{-cmg} eq 'recRead'))
 		|| (($c->{-cmd} eq 'recList') || ($c->{-cmg} eq 'recList'))
 		? ($c->{-backc}||0) +1
@@ -7302,13 +7411,13 @@ sub htmlStart {	# HTTP/HTML/Form headers
 				#.".MenuArea {background-color: navy; color: white;}\n"
 				.".MenuButton {background-color: buttonface; color: black; text-decoration:none; font-size: 7pt}\n"
 				.".MenuInput {font-size: 8pt}\n"
-				.".htmlMQHsel {text-decoration: none; font-weight: bolder; border-style: inset;}"
+				.".htmlMQHsel {text-decoration: none; font-weight: bolder; border-style: inset;}\n"
 				}
-			,-title	=> (do{	my $v =eval{$om && $s->lnglbl($om)};
+			,-title	=> 
+				(do{	my $v =($s->{-pcmd} && $s->{-pcmd}->{-cmd} ||'') eq 'frmHelp'
+						? $s->lng(0,'frmHelp')
+						: (eval{$om && $s->lnglbl($om)});
 					$v ? $v .' - ' : ''})
-				.($s->{-pcmd}->{-cmd} eq 'frmHelp'
-					? $s->lng(0,'frmHelp') .' - '
-					: '')
 				.($s->{-title} ||$s->cgi->server_name())
 			,-class	=> "Body $cs"
 			,$s->{-pcmd}->{-frame}
@@ -7352,7 +7461,7 @@ sub htmlEnd {	# End of HTML/HTTP output
 	return($s->cgi->endform()
 	,"\n"
 	,$s->htmlOnLoadW(
-		!$s->{-c}->{-jswload}
+		(!$s->{-c}->{-jswload}
 		|| !(grep {($_=~/\.target/) && ($_=~/'BASE'/)} @{$s->{-c}->{-jswload}})
 		? "{var e=document.getElementsByTagName('BASE'); if(e && e[0] && (e[0].target=='_self')){e[0].target=(self.name=='BOTTOM' ? 'TOP1' : self.name=='TOP' ? 'BOTTOM'"
 			.($s->{-pcmd}->{-frame}
@@ -7361,6 +7470,13 @@ sub htmlEnd {	# End of HTML/HTTP output
 				: '')
 			." : e[0].target)}}"
 		: ())
+		,($s->{-pcmd}->{-search} && $s->{-c}->{-search}
+		? ("{window.document.open('" 
+			.($s->{-c}->{-search} =~/^\?/
+			? $s->url() .$s->{-c}->{-search}
+			: $s->{-c}->{-search}) ."','_search','',true)}")
+		: ())
+		)
 	,$s->cgi->end_html())
  }
 }
@@ -7432,14 +7548,18 @@ sub htmlMenu {	# Screen menu bar
  local $c->{-cmdt} =$ot || $om;	# table metadata
  local $c->{-cmdf} =$om || $ot;	# form  metadata
  my @r =();
- if	($s->{-logo}) {			# Logotype	# ||$_[0]->{-icons}
+ if	($s->{-logo}) {			# Logotype
 	push @r, htmlMB($s, 'logo');
  }
- if	($s->{-icons}) {		# Home # && $s->cgiHook('recOp')
-	push @r,htmlMB($s, 'home');
+ elsif	($s->{-icons}) {		# Home
+	push @r, htmlMB($s, $s->{-c}->{-search}	? 'schpane' : 'home');
  }
  if	(1) {				# 'back' js button
-	push @r, htmlMB($s, 'back', $s->url, ($c->{-backc}||1));
+	push @r, htmlMB($s, 'back'
+		, $g ne 'recList'
+		? $s->urlCmd('',-form=>$on, -cmd=>'recList', $c->{-frame} ? (-frame=>$c->{-frame}) : ())
+		: $s->urlCmd('',$c->{-frame} ? (-frame=>$c->{-frame}) : ())
+		, ($c->{-backc}||1));
  }
  if	($s->uguest()
 	&& $s->{-login}) {		# Login
@@ -7535,13 +7655,13 @@ sub htmlMenu {	# Screen menu bar
  if ($a ne 'frmHelp') {			# Help button
 	push @r, htmlMB($s, 'frmHelp');
  }
-
+ delete $c->{-htmlMQH};
  my $mi	='[\'<i>'	.htmlEscape($s,lng($s, 0, $c->{-cmd}))
 	.'\'@\''	.htmlEscape($s,lng($s, 0, $c->{-cmg}))
 	.'\',  '	.htmlEscape($s, $s->user()) .'</i>]';
  my $mh =htmlEscape($s
 		,($a eq 'frmHelp' 
-			? $s->lng(0, 'frmHelp') .': ' .$s->lnglbl($om, $ot)
+			? $s->lng(0, 'frmHelp')
 			: $s->lngcmt($om, $ot))
 		 || (($s->{-title} ||$s->cgi->server_name() ||'') .' - ' .($c->{-form} ||'')));
  my $mc =$g ne 'recList'
@@ -7564,7 +7684,11 @@ sub htmlMenu {	# Screen menu bar
 			}
 		: ()
 		, ($c->{-qkeyord} ? htmlEscape($s, lng($s, 0, '-qkeyord')  .' ' .lng($s, 0, $c->{-qkeyord} =~/^-*[db]/ ? 'desc' : 'asc')) : '')
-		, (!$c->{-qwhere} ? '' : $c->{-qwhere} =~/^[\[\]\/\*]*$/ ? '' : htmlEscape($s, $c->{-qwhere}))
+		, (!$c->{-qwhere} 
+				? ''
+				: $c->{-qwhere} =~/^(?:\[\[\]\]|\/\*\*\/)+(.*)/
+				? htmlEscape($s, $1)
+				: htmlEscape($s, $c->{-qwhere}))
 		, ($c->{-qjoin}	  ? htmlEscape($s, ($c->{-qjoin} =~/^\s*(?:CROSS|JOIN|INNER|STRAIGHT_JOIN|LEFT|NATURAL|RIGHT|OUTER)\b/i ? '' : (lng($s, 0, '-qjoin') .' ')) .$c->{-qjoin}) : '')
 		, ($c->{-qurole}  ? htmlEscape($s, lng($s, 0, '-qurole')   .' ' .$c->{-qurole} .' /*' .$s->mddUrole($om, $c->{-qurole}) .'*/') : '')
 		, ($c->{-quname}  ? htmlEscape($s, lng($s, 0, '-quname')   .' ' .$c->{-quname}) : '')
@@ -7675,6 +7799,21 @@ sub htmlMB {	# CGI menu bar button
 	.'" border=0  align="bottom" height="22" class="' .$cs .'" />'
 	.htmlEscape($_[0], lng($_[0], 0, 'login')) ."</a>\n</nobr></td>"
  }
+ elsif ($_[1] eq 'schpane') {
+	my $pu =$_[0]->{-c}->{-search};
+	my $fr =$pu=~/\b_frame=RIGHT\b/;
+	my $su =$fr ? $_[0]->urlOpt(-search=>1) : $_[0]->{-c}->{-search};
+	my $tl =htmlEscape($_[0], lng($_[0], 1, 'schpane'));
+        $td0 
+	.$tdb
+	.' title="' .$tl .'"'
+	.'><a href="' .$su .'" '
+	.' title="' .$tl .'"'
+	.' class="' .$cs .'"'
+	.' target="' .($fr ? '_top' : '_search') .'"><img src="' 
+	.$_[0]->{-icons} .'/' .($fr ? $IMG->{'schframe'} : $IMG->{'schpane'}) .'" border=0 align="bottom" class="' .$cs .'" '
+	.' /></a>' ."\n</nobr></td>"
+ }
  elsif ($_[1] eq 'home') {
 	my $jc =' onclick="{window.document.open(\'' 
 		.$_[0]->urlCat($_[0]->url,$_[0]->{-pcmd}->{-frame} ? ('_frame'=>$_[0]->{-pcmd}->{-frame}) : ())
@@ -7683,15 +7822,13 @@ sub htmlMB {	# CGI menu bar button
         $td0 
 	.($tdb ? $tdb .$jc : '')
 	.' title="' .$tl .'"'
-	.'><a href="' .($_[0]->url) .'" '
+	.'><a href="' .($_[2] ||$_[0]->url) .'" '
 	.($tdb ? '' : $jc)
 	.' title="' .$tl .'"'
 	.' class="' .$cs .'" target="_self"><img src="' .$_[0]->{-icons} .'/' .$IMG->{'home'} .'" border=0 align="bottom" class="' .$cs .'" '
 	.' /></a>' ."\n</nobr></td>"
  }
  elsif ($_[1] eq 'back') {
-	my $pb =1 || (($ENV{HTTP_USER_AGENT}||'') =~/MSIE/); 
-			# js off, url only, may be needed for some browsers
 	my $jc =' onclick="{'
 		.(!$_[3] ||$_[3] <2
 			? 'window.history.back(); '
@@ -7703,12 +7840,13 @@ sub htmlMB {	# CGI menu bar button
 			:('window.history.back();' x $_[3])
 				)
 		.'return(false)}" ';
-	my $tl =htmlEscape($_[0], ($pb ? '<-' .($_[3]||1) .'- ' : '') .lng($_[0], 1, 'back'));
+	my $jo =$jc =~/window\.document\.open/i;
+	my $tl =htmlEscape($_[0], (!$jo ? '<-' .($_[3]||1) .'- ' : '') .lng($_[0], 1, 'back'));
 	$td0 
 	.' title="' .$tl .'"'
-	.($pb && $tdb ? $tdb .$jc : '') ."><nobr>\n"
-	.'<a href="' .($_[2]||$_[0]->url) .'" ' 
-	.($pb || $tdb ? '' : $jc)
+	.($tdb ? $tdb .$jc : '') ."><nobr>\n"
+	.'<a href="' .($jo ? $_[2] ||$_[0]->url : $_[0]->url) .'" '
+	.($tdb ? '' : $jc)
 	.' title="' .$tl .'"'
 	.' class="' .$cs .'" target="_self"><img src="' .$_[0]->{-icons} .'/' .$IMG->{'back'} .'" border=0 align="bottom" height="22" class="' .$cs .'" '
 	.' /></a>' ."\n</nobr></td>"
@@ -7757,7 +7895,9 @@ sub htmlML {	# CGI menu bar list
 	||$_[0]->{-pcmd}->{'-' .$_[1]}
 	||$_[0]->{-pcmd}->{-form} ||''
 	: $_[1] eq 'frmLso'
-	? $_[0]->{-pcmd}->{'-' .$_[1]} ||''
+	? (($_[0]->{-pcmd}->{'-' .$_[1]} ||'') eq '-all'
+		? ''
+		: ($_[0]->{-pcmd}->{'-' .$_[1]} ||''))
 	: '';
  my $li =$_[3];
  my $f1 =undef;
@@ -7782,7 +7922,8 @@ sub htmlML {	# CGI menu bar list
 		: '')
 	."if((_frmName.value=='-frame=set') && (self.name.match(/^(?:TOP|BOTTOM)\$/) || document.getElementsByName('_frame').length)){window.document.DBIx_Web.target='_parent'; _frmName.value=_form.value ? _form.value : ''; if (document.getElementsByName('_frame').length) {_frame.value=''}}"
 	."else if(_frmName.value.match(/[+^]\$/) && (self.name.match(/^(?:TOP|BOTTOM)\$/) || document.getElementsByName('_frame').length)){var v=_frmName.value; _frmName.value=_form.value ? _form.value : ''; window.document.open('" .$_[0]->url ."?_cmd=frmCall;_frmName=' +encodeURIComponent(v), '_blank', '', false); return(true)}"
-	."else {var v=_frmName.value; document.body.style.cursor=_frmName.style.cursor='wait'; _frmName.value=_form.value ? _form.value : ''; window.document.open('" .$_[0]->url ."?_cmd=frmCall;_frmName=' +encodeURIComponent(v) +(document.getElementsByName('_frame').length ? ';_frame=' +_frame.value : ''), '_self', '', false); document.body.style.cursor=_frmName.style.cursor='auto'; return(true)};"
+	#."else {var v=_frmName.value; document.body.style.cursor=_frmName.style.cursor='wait'; _frmName.value=_form.value ? _form.value : ''; window.document.open('" .$_[0]->url ."?_cmd=frmCall;_frmName=' +encodeURIComponent(v) +(document.getElementsByName('_frame').length ? ';_frame=' +_frame.value : '') +((v=='-frame=set') && _form.value ? ';_form=' +_form.value : ''), '_self', '', false); document.body.style.cursor=_frmName.style.cursor='auto'; return(true)};"
+	."else {var v=_frmName.value; _frmName.value=_form.value ? _form.value : ''; _frmName.disabled=true; window.document.open('" .$_[0]->url ."?_cmd=frmCall;_frmName=' +encodeURIComponent(v) +(document.getElementsByName('_frame').length ? ';_frame=' +_frame.value : '') +((v=='-frame=set') && _form.value ? ';_form=' +_form.value : ''), '_self', '', false); _frmName.disabled=false; return(true)};"
 	.'window.document.DBIx_Web.submit(); return(false);}">')
   : 'return(true)}')
  ."\n\t"
@@ -7986,8 +8127,14 @@ sub cgiForm {	# Print CGI screen form
 		, '<td valign="top" align="left" colspan="10">'
 		, $c->{-frmLso}
 		? $s->htmlField('_frmLso', $s->lng(1,'frmLso')
-			, {-labels=>{$c->{-frmLso}=>$s->lng(0,$c->{-frmLso})}}
-			, $c->{-frmLso})
+			, {-labels=>
+				{ref($c->{-frmLso}) eq 'ARRAY'
+				? ($c->{-frmLso}->[0]=>$s->lng(0,$c->{-frmLso}->[0]))
+				: ($c->{-frmLso}=>$s->lng(0,$c->{-frmLso}))
+				}}
+			, ref($c->{-frmLso}) eq 'ARRAY'
+			? $c->{-frmLso}->[0]
+			: $c->{-frmLso})
 		: ()
 		, "\n</td>\n</tr>\n"
 		)
@@ -9415,6 +9562,10 @@ sub cgiQuery {	# Query records
 	my $ov =($t->{-rvcActPtr}   ||$s->{-rvcActPtr})   && 'tvmVersions';
 	my $oa =($m->{-frmLsoAdd}||$t->{-frmLsoAdd});
 	my $qo =($c->{-qkeyord} ||$q->{-keyord} ||'');
+	my $qq =$c->{-qwhere}
+		&& (	($c->{-qwhere} =~/^(\[\[.*?\]\])/)
+		   ||	($c->{-qwhere} =~/^(\/\*.*?\*\/)/))
+		&& $1;
 	$c->{-frmLso} =$c->{-qurole}
 			if !exists($c->{-frmLso})
 			&& !$s->uguest()
@@ -9480,6 +9631,8 @@ sub cgiQuery {	# Query records
 			}
 			elsif (ref($rv) eq 'HASH') {
 				@{$c}{keys %$rv} =values %$rv;
+				$c->{-qwhere} =$qq .$rv->{-qwhere}
+					if $qq && $rv->{-qwhere};
 				if ($c->{-qkeyadd}) {
 					$c->{-qkey} ={}	if !$c->{-qkey};
 					@{$c->{-qkey}}{keys %{$c->{-qkeyadd}}}
@@ -9573,6 +9726,7 @@ sub cgiQuery {	# Query records
 			delete @{$c->{-qkey}}{keys %{$x->{-qkeyadd}}}
 				if $c->{-qkey} && $x->{-qkeyadd};
 		}
+		$c->{-qwhere} =$qq		if $qq;
 	}}
 	$c->{-frmLso} =$c->{-frmLso}->[0]	if ref($c->{-frmLso});
  }
@@ -9973,6 +10127,7 @@ sub htmlMQH {	# Menu Query Hyperlink
 		: $vq;
 	$qw->{$k} =$vq if length($s->urlCmd('', %$qw)) >$ql;
  }
+ $s->{-pcmd}->{-htmlMQH} = $a	if $qm;
  local $a->{-href}  = $s->urlCmd('', %$qw);
  local $a->{-OnClick}=$s->urlCmd('', %$qw
 			, $s->{-pcmd}->{-frame}
@@ -10480,6 +10635,8 @@ sub cgiHelp {	# Print CGI Help screen form
  my $td2 ="<td align=\"left\" valign=\"top\" $cs2>";
  my $th3 =$th2;
  my $td3 =$td2;
+ my $cfs ='<div style="margin-left: 3em;"><code>';
+ my $cfe ='</code></div>';
  my ($th, @td);
 
  my $hl  =$LNG->{$s->{-lng}} || $LNG->{''};
@@ -10508,8 +10665,10 @@ sub cgiHelp {	# Print CGI Help screen form
 		return(join(', ', map {&$cf($_[0],$_,$#_ >1 ? @_[2..$#_] : ())
 					} @{$_[1]})
 			) if ref($_[1]) eq 'ARRAY';
-		my $f =($_[0]->{-mdefld} && $_[0]->{-mdefld}->{$_[1]})
-			|| ($mt && $mt->{-mdefld} && $mt->{-mdefld}->{$_[1]});
+		my $f =!$_[1]
+			? undef
+			: (($_[0]->{-mdefld} && $_[0]->{-mdefld}->{$_[1]})
+				|| ($mt && $mt->{-mdefld} && $mt->{-mdefld}->{$_[1]}));
 		$_[2] && $f
 		? $s->htmlEscape($s->lngcmt($f) ||$s->lng(1,$_[1]))
 		: $_[2]
@@ -10568,20 +10727,30 @@ sub cgiHelp {	# Print CGI Help screen form
 		, $td1
 		, join(',&nbsp;'
 			, map {
-				my ($on, $ol) =ref($_) eq 'ARRAY' ? (@$_) : ($_, undef);
+				my ($on, $ol, $ot) =ref($_) eq 'ARRAY' ? (@$_) : ($_);
 				$on =$' if $on =~/[.^&+]+$/;
-				if (!$ol) {
-					my $o =$s->{-form}->{$on} ||$s->{-table}->{$on};
-					$o =$_[0]->lngslot($o,'-lbl') if $o;
-					$o =&$o($_[0]) if ref($o);
-					$ol =$o ||$on
+				my $o =$s->{-form}->{$on} ||$s->{-table}->{$on};
+				if ($o && !$ol) {
+					$ol=$_[0]->lngslot($o,'-lbl') if $o;
+					$ol=&$ol($_[0]) if ref($ol);
+					$ol =$ol ||$on;
+				}
+				if ($o) {
+					$ot=$_[0]->lngslot($o,'-cmt');
+					$ot=&$ot($_[0]) if ref($ot);
+					$ot =$ot ||$on;
 				}
 				$ol
 				? '<nobr><a href="'
-					.$s->urlOpt(-form=>$on, -cmd=>'frmHelp')
+					.$s->urlCmd('',-form=>$on
+						, -cmd=>'frmHelp'
+						, $c && $c->{-backc} ? (-backc => $c->{-backc}, -urm=>time()) : ())
 					."\" class=\"$cs\""
-					.($on eq $n ? ' style="font-weight: bolder;"' : '')
-					.">"
+					.($on eq $n 
+					? ' style="font-weight: bolder;"'
+					: '"')
+					.' title="' .$s->htmlEscape($ot)
+					.'">'
 					.$s->htmlEscape($ol)
 					.'</a></nobr>'
 				: ()
@@ -10632,7 +10801,7 @@ sub cgiHelp {	# Print CGI Help screen form
 			, qw(-expr -null)
 			, (grep {/^-(?:cgc|cgv|subst|redirect)/
 			} sort keys %$om));
-	$s->output("<tr>",$th2,'</th>',$td2, '<code>',$th,"</code></td></tr>\n")
+	$s->output("<tr>",$th2,'</th>',$td2,$cfs,$th,"$cfe</td></tr>\n")
 		if $th;
 
 	($th, @td) =($s->htmlEscape(&$cl('-key')));
@@ -10711,10 +10880,10 @@ sub cgiHelp {	# Print CGI Help screen form
 	foreach my $k (qw(-query)
 			) {
 		next	if !exists($om->{$k}) && !exists($s->{$k});
-		my $td ='<code>'
+		my $td =$cfs
 			.$s->htmlEscape(&$cv(exists($om->{$k}) ? $om->{$k} : $s->{$k}))
-			.'</code>';
-		push @td, $td	if $td;
+			.$cfe;
+		push @td, $s->lng(1,$k) .':', $td	if $td;
 		my @td1 =map {$_ eq 'all'
 				? ()
 				: $s->htmlEscape($s->strquot($s->lng(0,$_))
@@ -10785,7 +10954,7 @@ sub cgiHelp {	# Print CGI Help screen form
 					: $s->htmlEscape($_ .'=> ' .&$cv($f->{$_}))
 					} qw(-expr -null -edit -hide -hidel -inp -ddlb -ddlbmult -ddlbtgt)
 				);
-			$s->output("<tr>",$th2,'</th>',$td2,'<code>',$th,"</code></td></tr>\n")
+			$s->output("<tr>",$th2,'</th>',$td2,$cfs,$th,"$cfe</td></tr>\n")
 				if $th;
 		}
 	}
@@ -11648,7 +11817,7 @@ sub open {
  $s->{-lcks}={};
  if (!CORE::open($s->{-handle} =Symbol::gensym, $s->{-mode}, $s->{-name})) {
     $s->{-handle} =undef;
-    return(&{$s->{-parent} ? $s->{-parent}->{-die} : \&die}
+    return(&{$s->{-parent} ? $s->{-parent}->{-die} : $DBIx::Web::LNG->{-die}}
            ("File: open('" .($s->{-mode}||'') ."','" .($s->{-name}||'') ."') -> $!"
 		.($s->{-parent} && $s->{-parent}->{-ermd} ||'')
 		) ||undef)
@@ -11725,7 +11894,7 @@ sub seek {
   return(CORE::tell($_[0]->{-handle})) if @_ <2;
   CORE::seek($_[0]->{-handle}, $_[1], defined($_[2]) ?$_[2] :SEEK_SET) 
    ? $_[0] 
-   : (&{$_[0]->{-parent} ? $_[0]->{-parent}->{-die} : \&die}
+   : (&{$_[0]->{-parent} ? $_[0]->{-parent}->{-die} : $DBIx::Web::LNG->{-die}}
       ("File: seek('" .($_[0]->{-name}||'') ."') -> $!"
 	.($_[0]->{-parent} && $_[0]->{-parent}->{-ermd} ||'')
 	) ||undef)
@@ -11734,7 +11903,7 @@ sub seek {
 
 sub read {
  my $r =CORE::read($_[0]->{-handle}, $_[1], $_[2], $_[3]||0);
- return(&{$_[0]->{-parent} ? $_[0]->{-parent}->{-die} : \&die}
+ return(&{$_[0]->{-parent} ? $_[0]->{-parent}->{-die} : $DBIx::Web::LNG->{-die}}
         ("File: read('" .($_[0]->{-name}||'') ."') -> $!"
 	.($_[0]->{-parent} && $_[0]->{-parent}->{-ermd} ||'')
 	) ||undef)
@@ -11751,7 +11920,7 @@ sub readline {
 sub print {
  my $s =shift;
  my $h =$s->{-handle};
- return(&{$s->{-parent} ? $s->{-parent}->{-die} : \&die}
+ return(&{$s->{-parent} ? $s->{-parent}->{-die} : $DBIx::Web::LNG->{-die}}
         ("File: print('" .($s->{-name}||'') ."') -> $!"
 	.($s->{-parent} && $s->{-parent}->{-ermd} ||'')
 	) ||undef)
@@ -11861,7 +12030,7 @@ sub open {
 
  if (!$s->{-handle}) {
     $s->{-handle} =$s->{-data} =undef;
-    return(&{$s->{-parent} ? $s->{-parent}->{-die} : \&die}
+    return(&{$s->{-parent} ? $s->{-parent}->{-die} : $DBIx::Web::LNG->{-die}}
            ("DBFile: open('" .($s->{-mode}||'') ."','" .($s->{-name}||'') ."') -> $!"
 		.($s->{-parent} && $s->{-parent}->{-ermd} ||'')
 		) ||undef)
@@ -11918,7 +12087,7 @@ sub lock  { # lock value, ?lock key
  my $lv=$l | LOCK_NB ^ LOCK_NB;
  if (!$_[0]->{-fh} && !CORE::open($_[0]->{-fh} =Symbol::gensym, '+<&=' .$_[0]->{-handle}->fd)) {
     $_[0]->{-fh} =undef;
-    return(&{$_[0]->{-parent} ? $_[0]->{-parent}->{-die} : \&die}
+    return(&{$_[0]->{-parent} ? $_[0]->{-parent}->{-die} : $DBIx::Web::LNG->{-die}}
            ("DBFile: open('+<&=','" .($_[0]->{-name}||'') ."') -> $!"
 		.($_[0]->{-parent} && $_[0]->{-parent}->{-ermd} ||'')
 		) ||undef)
@@ -11955,12 +12124,12 @@ sub keyGet {
 
 sub keyPut {
  $_[0]->{-handle}->put($_[1], $_[$#_])
- ? (&{$_[0]->{-parent} ? $_[0]->{-parent}->{-die} : \&die}
+ ? (&{$_[0]->{-parent} ? $_[0]->{-parent}->{-die} : $DBIx::Web::LNG->{-die}}
     ("DBFile: keyPut('" .($_[0]->{-name}||'') ."','" .$_[1] ."') -> $!"
 	.($_[0]->{-parent} && $_[0]->{-parent}->{-ermd} ||'')
 	) ||undef)
  : (@_ >3) && ($_[1] ne $_[2]) && $_[0]->{-handle}->del($_[2])
- ? (&{$_[0]->{-parent} ? $_[0]->{-parent}->{-die} : \&die}
+ ? (&{$_[0]->{-parent} ? $_[0]->{-parent}->{-die} : $DBIx::Web::LNG->{-die}}
     ("DBFile: keyDel('" .($_[0]->{-name}||'') ."','" .$_[2] ."') -> $!"
 	.($_[0]->{-parent} && $_[0]->{-parent}->{-ermd} ||'')
 	) ||undef)
@@ -12127,7 +12296,7 @@ sub kePut {
 	my $ko =krEscapeMv($_[0], $_[2]);
 	foreach my $k (@$kn) {
 		$_[0]->{-handle}->put($k, $d)
-		&& (&{$_[0]->{-parent} ? $_[0]->{-parent}->{-die} : \&die}
+		&& (&{$_[0]->{-parent} ? $_[0]->{-parent}->{-die} : $DBIx::Web::LNG->{-die}}
 		("DBFile: kePut('" .($_[0]->{-name}||'') ."','$k') -> '$!'"
 			.($_[0]->{-parent} && $_[0]->{-parent}->{-ermd} ||'')
 			) ||undef);
@@ -12140,7 +12309,7 @@ sub kePut {
  else {
 	foreach my $k (@{krEscapeMv($_[0], $_[1])}) {
 		$_[0]->{-handle}->put($k, $d)
-		&& (&{$_[0]->{-parent} ? $_[0]->{-parent}->{-die} : \&die}
+		&& (&{$_[0]->{-parent} ? $_[0]->{-parent}->{-die} : $DBIx::Web::LNG->{-die}}
 		("DBFile: kePut('" .($_[0]->{-name}||'') ."','$k') -> '$!'"
 			.($_[0]->{-parent} && $_[0]->{-parent}->{-ermd} ||'')
 			) ||undef);

@@ -196,7 +196,7 @@ Database may have it's own full-text implementation also.
 =item Another
 
 See version info.
-See marked with '!!!' comments in the source code.
+See marked with '!!!' or '???' comments in the source code.
 
 
 =back
@@ -461,8 +461,7 @@ C<-subst>,
 C<-recXXX> (C<-recNew>, C<-recForm>, C<-recIns>, C<-recUpd>, C<-recDel>, C<-recRead>, C<-recList>,...);
 C<-recX#A> (C<-recTrim0A>, C<-recEdt0A>, C<-recEdt0R>, C<-recEdt1A>);
 C<-httpheader>, C<-htmlstart>;
-C<-banner>, C<-logo>, C<-icons>, C<-menuchs>, C<-menuchs1>, C<-frmLso>, C<-frmLsc>;
-C<-login>;
+C<-banner>, C<-logo>, C<-search>, C<-login>, C<-icons>; C<-menuchs>, C<-menuchs1>, C<-frmLso>, C<-frmLsc>;
 C<-cgvXXX>;
 
 C<cgiRun>, C<cgiParse>, C<cgiQuery> (and C<cgiQueryFv>, C<cgiSel>); 
@@ -1503,7 +1502,9 @@ Log strings list max size to be displayed
 	=> '/cgi-bin/ntlm/'
 
 (C<User Identification>)
-Login URL part, where web server authentication is estimated.
+Login URL part, where web server authentication of users is estimated.
+Web server virtual directory with user authentication required.
+Authentication may be required for one virtual directory and may be unnecessary for another.
 
 
 =item -logo
@@ -2266,6 +2267,18 @@ To keep the end of actuality period of version record started with C<-rvcUpdWhen
 C<recUpd> fills this field with C<-rvcUpdWhen> of actual record when recording its old version.
 
 
+=item -search
+
+	=> not exists || URL || sub{}(self) -> (URL || empty)
+
+(C<User Interface>)
+URL may be opened in the '_search' frame of the browser
+when C<-search> button pressed or C<-search> web request parameter specified.
+I.e. sub{$_[0]->urlCmd('',-form=>'navigator.psp',-cmd=>'frmCall')}.
+A frameset with 'LEFT' and 'RIGHT' frames will be used if URL =~/\b_frame=RIGHT\b/.
+See also C<-logo>.
+
+
 =item -serial
 
 	=> 1 || 0 || 2 || 3
@@ -2884,10 +2897,11 @@ Uses C<-pcmd>, C<-pdta>, C<-pout>.
 
 C<User Interface>.
 Generates menu bar styled hyperlink HTML with query options.
-Hyperlink will be highlited if current query matches options defined.
 May be used within C<-frmLso1C>.
 Display value may be defined using -label option for text or 
 immediate -html option.
+Hyperlink will be highlited if current query matches options defined.
+The last matched call may be inspected in $s->{C<-pcmd>}->{-htmlMQH}.
 
 HTML hyperlink options: -title, -style, -class, -target.
 
@@ -4011,7 +4025,7 @@ Special additional parameters of command may be:
 
 -table	=> table name,
 
--form	=> form name,
+-form	=> form name or immediate .psp file name,
 
 -cmdf	=> form metadata, 
 
@@ -4033,9 +4047,11 @@ C<User Interface> introduces additions to special parameters of C<-pcmd>
 mentioned in C<Triggers Interface>.
 Also, some of parameters may be used within URLs replacing leading '-' with '_'.
 
+-ui	=> user interactive sign (C<-pcmd>, C<-pdta>, C<-pout> may be looked),
+
 -cmg	=> enclosing (global) command name,
 
--ui	=> user interactive sign (C<-pcmd>, C<-pdta>, C<-pout> may be looked),
+-login	=> perform login,
 
 -edit	=> editing sign,
 
@@ -4051,7 +4067,9 @@ Also, some of parameters may be used within URLs replacing leading '-' with '_'.
 
 -frame	=> target frame to use ('set' special value produces 'TOP'/'BOTTOM' frameset),
 
--login	=> perform login
+-search	=> open search browser pane with URL given or C<-search>,
+
+-htmlMQH=> C<htmlMQH> call matched
 
 
 =back
@@ -4071,6 +4089,8 @@ C<psParse> method translates perl script string into perl source;
 '@_' will contain application object, options, filename, base URL, additional args.
 
 C<psEval> method executes perl script file by parsing, compiling into sub{}, evaluating.
+
+C<cgiRun> method can C<frmCall> .psp file described in C<-form> with C<-cgcCall>, C<-cgvCall> or immediate file inside the directory of the $0.
 
 
 =back
@@ -4099,6 +4119,23 @@ another options may be implemented within script itself.
 =head1 VERSION
 
 =over
+
+=head2 2008-04-24 - Version 0.74
+
+New C<-search>.
+
+C<Perl Script Pages> may be also called directly by {-cmd=>frmCall, -form=>'filename.psp'},
+without C<-cgcXXX>/C<-cgcURL>/C<-cgvXXX> registration.
+
+Improved C<htmlMenu>, C<cgiParse>, C<cgiQuery>, C<cgiHelp>.
+
+Corrected row-level access control filtering (C<dbiACLike>, C<dbmSeek>).
+
+Corrected behaviour of exeptions.
+
+CMDB and Service Desk example corrections and improvements.
+
+
 
 =head2 2008-03-03 - Development Version 0.73
 

@@ -12,6 +12,7 @@ examples/cgi-bin/webus.cgi
 examples/cmdb-sql.pl
 examples/cgi-bin/cmdb.cgi
 examples/cgi-bin/cmdb-start.psp
+examples/cgi-bin/cmdb-nav.psp
 
 lib/DBIx/Web.pm
 lib/DBIx/Web.pod

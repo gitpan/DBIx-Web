@@ -8,20 +8,27 @@ DESCRIPTION
 
     Based on DBI and DB_File data engines. Based on CGI for user interface.
 
+    Examples included:
+    - Groupware Organizer and Notes,
+      remake of CGI::Bus examples with CGI::Bus compatibility
+    - Service Desk and CMDB application
+
 AUTHOR
     Andrew V Makarow "makarow at mail.com", thanks to Anton Uemlyanin
 
-COPYRIGHT	
+COPYRIGHT
     This program is free software; you can redistribute it and/or modify 
     it under the same terms as Perl itself.
 
-    Without specially written agreement prohibited using completely, 
-    partially or in ideas for impairing nature, wood and timber, mining, 
-    cosmic industries in Archangel region; Russian kgbists, bureaucracy 
-    and vertical functionary structures.
-	
+    Without specially written agreement prohibited to use completely,
+    partially or in ideas for impairing nature industries in Archangel
+    region (wood and timber, geological and mining, space and war); Russian
+    procrastination structures and kgbists.
+
+    A help in the revival of Pomor'e will be good: http://www.pomor-rus.org
+
 PREREQUISITES
-    Currently implemented and tested on Win32 Active Perl 5.6, Apache, IIS.
+    Currently implemented and tested on Win32 Active Perl 5.6/5.8, Apache, IIS.
 
 HOW TO BUILD AND INSTALL
 
@@ -34,16 +41,11 @@ HOW TO BUILD AND INSTALL
 	copy ./lib/DBIx/* into perl/site/lib/DBIx
 
     See examples, which should be configured and installed manually:
-	- copy 'web.cgi' to 'cgi-bin' directory.
-	- edit 'web.cgi' source, set appropriate '-path', '-url', '-urf', 
+	- copy scripts to 'cgi-bin' directory.
+	- edit 'script.cgi' source, set appropriate '-path', '-url', '-urf', 
 	  another settings.
 	- create '-icons' by downloading Apache icons if Microsoft IIS
-	- start 'web.cgi -setup'. File store path and 
+	- start 'script.cgi -setup'. File store path and 
 	  sample web server configuration will be created.
 	- chmod o+rw,g+rw,a+rw '-path'
 	- configure web server according to '-path' files.
-
-EXAMPLES MAY BE USEFUL
-	- remake of CGI::Bus examples of Groupware Organizer and Notes,
-          with CGI::Bus compatibility
-	- sample CMDB and Helpdesk application

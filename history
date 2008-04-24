@@ -1,3 +1,29 @@
+# 2008-04-24 extended cptran() for $] >=5.008
+# 2008-04-07 using '_search' frame / '-search' url
+# 2008-04-07 chg cmdb hesdk 'mailto' =~/^(?:new|draft|appr-do|scheduled|do|delay|progress|rollback|ok-appr|no-appr|ok|no|deleted)$/
+# 2008-04-07 chg dbiACLike(): replaced '\b' with '(?:^|,|;)\s*' and '(^|,|;)[:blank:]*'
+# 2008-04-07 chg dbmSeek(): replaced '\b' with '(?:^|,|;)\s*'
+# 2008-04-07 chg ugrexp(): replaced "=~/\\b('"  with "=~/(?:^|,|;)\\s*('"
+# 2008-04-06 new {-c}->{-search}: -frame=>RIGHT distinguished
+# 2008-03-28 new particular command {-cmd=>frmCall, -form=>'*.psp'} to run unregistered .psp
+# 2008-03-26 new -search url param
+# 2008-03-26 chg cgiHelp(): decorated <code> cgiHelp()
+# 2008-03-25 new -search slot
+# 2008-03-25 new -htmlMQH value in -pcmd by htmlMQH()
+# 2008-03-25 display of future or periodical records - using -frmLsoAdd=>'Nowdays'
+# 2008-03-25 ext webus: new 'Nowdays' view
+# 2008-03-25 changed udispq() using $CACHE
+# 2008-03-20 'Managers' -> 'Manager'; replace -frmLso with -urole
+# 2008-03-20 chg cmdb.cgi: adding new -frmLso=>'Nowdays', deleting 'Today'
+# 2008-03-20 chg cmdb.cgi: replace -frmLso with -urole
+# 2008-03-20 chg cgiQuery(): new my $qq =$c->{-qwhere} && (($c->{-qwhere} =~/^(\[\[.*?\]\])/) || ($c->{-qwhere} =~/^(\/\*.*?\*\/)/)) && $1;
+# 2008-03-20 chg cgiParse(): split 'frmLso' if ','
+# 2008-03-17 testing htmlML() for _frmName.disabled
+# 2008-03-17 improved htmlMB('back') for Mozilla
+# 2008-03-17 corrected htmlML() switching on frameset
+# 2008-03-17 new $LNG->{-die} and $LNG->{-warn} fixing \&CORE::die and \&CORE::warn undefined subroutine behaviour
+# 2008-03-04 cgiHelp/htmlMenu/cgiParse improved
+# 2008-03-03 starting 0.74 version
 # 2008-02-29 extnd -help using html
 # 2008-02-20 chgd cgiRun(), htmlML() restoring '_frame' lost needed for Mozilla
 # 2008-02-20 chgd htmlML(), cgiParse() name postfixes: [+&.] -> [+&.^]

@@ -456,11 +456,16 @@ $w->set(
 			#	, -data=>[qw(otime status auser arole object subject id)]
 			#	, -frmLso=>['author','hierarchy']
 			#	, -frmLso=>['actor']
+				, -frmLso=>['Nowdays']
 				, -order=>'otime'
 				, -keyord=>'-dall'
 				}
 		,-frmLsoAdd	=>
-				[{-val=>'hierarchy', -cmd=>{-qkeyadd=>{'idrm'=>undef}}}
+				[{-val=>'hierarchy'
+					, -cmd=>{-qkeyadd=>{'idrm'=>undef}}}
+				,{-lbl=>'Nowdays', -lbl_ru=>'’ҐЇҐам'
+					,-cmd=>{-qwhere=>"(TO_DAYS(gwo.stime) <=TO_DAYS(NOW()) +6) OR gwo.status NOT IN('do')"}
+					}
 				]
 		,-frmLsc	=>
                                 [{-val=>'otime',-cmd=>{}}
@@ -504,7 +509,7 @@ $w->set(
 		,-lbl_ru	=>'Органайзер   мой'
 		,-cmt_ru	=>'Мои дела в органайзере'
 		,-table		=>'gwo'
-		,-query		=>{	-frmLso=>['actor']
+		,-query		=>{	-frmLso=>['actor','Nowdays']
 					}
 		# ,-frmLsoAdd	=>undef
 		}

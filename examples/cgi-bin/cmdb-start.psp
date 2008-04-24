@@ -15,6 +15,7 @@
 	# list url onclick="<<$jecl>>", +_self:	top>_self, bottom>top:
 	my $jecl ="this.target = self.name=='TOP' ? '_self' : self.name=='BOTTOM' ? 'TOP' : '_self'; return(true)";
 	my $jecf ="if (self.name.match(/^(?:TOP|BOTTOM)\$/) || document.getElementsByName('_frame').length) {this.target='_blank'}; return(true)";
+	my $utfn =$s->{-pcmd}->{-frame} ? ";_frame=BOTTOM" : '';
 	my $ntlm =$s->uguest() ? '' : '/ntlm';
 	my $ih   =$s->cgiQuery('hdesk'
 		,{-table=>'hdesk'
@@ -43,7 +44,8 @@
 				? (-qkey=>{'severity'=>$_->[0]}
 					, -qwhere=>"record NOT IN('work','task')")
 				: (-qkey=>{'record'=>'unavlbl'})
-				,-urm=>$_->[1])
+				,-urm=>$_->[1]
+				,$utfn ? ('-frame' => 'BOTTOM') : ())
 			,-title=>$it->{$_->[0]} ||$_->[0] ||'???'
 			,-target=>"_self"
 			,-onclick=>$jecl
@@ -62,23 +64,23 @@
 </tr>
 <tr>
 
-<th align="left" valign="top" nowrap=true><a href="?_form=index;_cmd=frmCall" target="_self" onclick="<%$jecl%>" title="Content">Service Desk & CMDB</a></th>
+<th align="left" valign="top" nowrap=true><a href="?_form=index;_cmd=frmCall<%$utfn%>" target="_self" onclick="<%$jecl%>" title="Content">Service Desk & CMDB</a></th>
 <td>This is a sample Service Support application.
 </td>
 </tr>
-<tr><td valign="top"><a href="?_form=notes;_cmd=frmCall" target="_self" onclick="<%$jecl%>" title="Notes">Notes</a>
+<tr><td valign="top"><a href="?_form=notes;_cmd=frmCall<%$utfn%>" target="_self" onclick="<%$jecl%>" title="Notes">Notes</a>
 </td><td>Notes store for toplevel documentation.
 </td></tr>
-<tr><td valign="top"><a href="?_form=hdesk;_cmd=frmCall" target="_self" onclick="<%$jecl%>" title="Service Desk">Service Desk</a>
+<tr><td valign="top"><a href="?_form=hdesk;_cmd=frmCall<%$utfn%>" target="_self" onclick="<%$jecl%>" title="Service Desk">Service Desk</a>
 </td><td>Service Desk for Incident, Problem, Change Management.
 </td></tr>
-<tr><td valign="top"><a href="?_form=cmdbm;_cmd=frmCall" target="_self" onclick="<%$jecl%>" title="Configuration Management Database">CMDB</a>
+<tr><td valign="top"><a href="?_form=cmdbm;_cmd=frmCall<%$utfn%>" target="_self" onclick="<%$jecl%>" title="Configuration Management Database">CMDB</a>
 </td><td>Configuration Management Database for Configuration Management.
 See:
 </td></tr>
 <tr><td></td><td>
-<a href="?_form=cmdbmh;_cmd=frmCall" target="_self" onclick="<%$jecl%>" title="ÊÁÄ - Èåðàðõèÿ">Hierarchical view</a>,
-<a href="?_form=cmdbmn;_cmd=frmCall" target="_self" onclick="<%$jecl%>" title="ÊÁÄ - Èìåíà">Named items view</a>
+<a href="?_form=cmdbmh;_cmd=frmCall<%$utfn%>" target="_self" onclick="<%$jecl%>" title="Hierarchy of records">Hierarchical view</a>,
+<a href="?_form=cmdbmn;_cmd=frmCall<%$utfn%>" target="_self" onclick="<%$jecl%>" title="CMDB - Named elements">Named items view</a>
 </td></tr>
 <tr><td valign="top" colspan=2>
 Choose form in the list at the top of this screen.

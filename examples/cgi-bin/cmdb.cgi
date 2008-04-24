@@ -33,6 +33,10 @@ my $w =DBIx::Web->new(
 #,-htmlstart	=>{}		# html start arguments
  ,-smtphost	=>'localhost'	# smtp mail server
  ,-smtpdomain	=>'localhost'	# smtp default domain
+ ,-search=>sub{ 1
+		? $_[0]->urlCmd('',-form=>'cmdb-nav.psp', -cmd=>'frmCall',-frame=>'_main')
+		: $_[0]->urlCmd('',-form=>'cmdb-nav.psp', -cmd=>'frmCall',-frame=>'RIGHT')
+   		}
  );
 
 					### CMDBm Settings
@@ -1976,18 +1980,22 @@ $w->set(
 				,-pout=>$_[2], -pcmd=>$_[1])
 				if $_[2]->{mailto}
 				&& ($_[2]->{$_[0]->tn('-rvcState')}
-					=~/^(?:ok|no|ok-appr|no-appr|do|delay|progress|rollback|deleted)$/);
+					=~/^(?:new|draft|appr-do|scheduled|do|delay|progress|rollback|ok-appr|no-appr|ok|no|deleted)$/);
 
 			}
 		,-query		=>{	 -display=>[qw(votime vrecord status vsubject vauser)]
 					,-order=>'votime'
 					,-keyord=>'-dall'
-					,-frmLso=>'actors'
+					,-frmLso=>['actors','Nowdays']
 					}
 		,-limit		=>256
-		,-frmLsoAdd	=>[{-lbl=>'Today', -lbl_ru=>'Сегодня'
-					,-cmd=>{-qwhere=>'TO_DAYS(hdesk.stime) <=TO_DAYS(NOW())'}
-					}]
+		,-frmLsoAdd	=>[{-lbl=>'Nowdays'
+					,-cmt=>'Current records and next 7 days'
+					,-lbl_ru=>'Теперь'
+					,-cmt_ru=>'Текущие записи и следующие 7 дней'
+					,-cmd=>{-qwhere=>"(TO_DAYS(hdesk.stime) <=TO_DAYS(NOW()) +6) OR hdesk.status NOT IN('scheduled','do')"}
+					}
+				]
 		,-frmLsc	=>
 				[{-val=>'votime',-cmd=>{}}
 				,{-val=>'votimeje',-lbl=>'Exec/under'
@@ -2197,6 +2205,9 @@ sub a_hdesk_stbar {
     $alr=[map {	!$_ ||!$acr->{$_} ||(/^(?:work|task|analysis)$/)
 		? ()
 		: ($_)	} @$alr] if $alr;
+ my $aqa=$s->{-table}->{'hdesk'} 
+	&& $s->{-table}->{'hdesk'}->{-frmLsoAdd};
+
  my $avs={};	# severities
  my $avr={};	# rectypes
  my $avt={};	# subtypes
@@ -2216,9 +2227,11 @@ sub a_hdesk_stbar {
  			} qw(record rectype)}}
  		: undef;
 
- my %xpar  =(-xpar=>['-frmLso','-qurole','-quname']
+ my %xpar  =(-xpar=>['-qurole','-quname','-frmLso']
 		,-xkey=>[qw(record rectype severity auser)]);
+
  my $vinit =sub{ # val init (record, key, store) -> store elem
+ 		return($_[1]) if !defined($_[1]);
 		return($_[2]->{$_[1]}) if $_[2]->{$_[1]};
 		my $v =$_[2]->{$_[1]} ={%{$_[0]}};
 		foreach my $k (keys %$v) {$v->{$k} ='' if !defined($v->{$k})};
@@ -2227,6 +2240,7 @@ sub a_hdesk_stbar {
 		$v
 	};
  my $vset =sub { # val set (record, key, store) -> store elem
+  		return($_[1]) if !defined($_[1]);
 		my $q =$_[0];
 		my $v =$_[2]->{$_[1]};
 		$v->{severity} =$q->{severity}
@@ -2257,7 +2271,7 @@ sub a_hdesk_stbar {
 	&& ($qpk->{-qkey}->{record} ne ($qv->{record}||''))) {
 		next
 	}
-	if ($avt && $qpk->{-qkey}->{record}) {
+	if ($avt && $qpk && $qpk->{-qkey}->{record}) {
 		&$vinit($qv, $qv->{rectype}, $avt);
 		&$vset($qv, $qv->{rectype}, $avt);
 	}
@@ -2367,7 +2381,7 @@ sub a_hdesk_stbar {
 #<div style="margin-bottom: 1ex; margin-top: 1ex;">
 #<span style="border: 1px solid">
 #<fieldset style="padding: 2"><legend>Group box</legend>#&nbsp;</fieldset>
- '<div style="margin-bottom: 0.4ex; margin-top: 0.5ex;">'
+ '<div nowrap="true" style="margin-bottom: 0.4ex; margin-top: 0.5ex;">'
  .(!%$avs
   ? ''
   :(join('&nbsp;',
@@ -2378,6 +2392,7 @@ sub a_hdesk_stbar {
 		$s->htmlMQH(-html=>'&nbsp;' .$vl .'&nbsp;'
 			,-title=>"$vl, $vt"
 			,%xpar
+			,-frmLso=>'-add'
 			,$k eq '3.5'
 			? (-qkey=>{'record'=>'unavlbl'})
 			: (-qkey=>{'severity'=>$k}
@@ -2386,10 +2401,35 @@ sub a_hdesk_stbar {
 			,-style=>'background-color: ' .$ac->{$k}||$ac->{''})
 		} sort { $b <=> $a
 			} keys %$avs)
- 	.'&nbsp;&nbsp;&nbsp;'))
+	))
+ .(!$aqa
+  ? ''
+  :('&nbsp;'
+   .do{	my $vt =$s->lngslot($aqa->[0],'-lbl');
+	my $ymch =$s->{-pcmd}->{-htmlMQH};
+   	my %ypar =$ymch
+   		? ()
+   		: (map {$c->{$_} ? ($_=>$c->{$_}) : ()
+   			} qw(-qurole -quname -qkey));
+	$s->htmlMQH(-html=>'&nbsp;' .$vt .'&nbsp;'
+		,-title=>$s->lngslot($aqa->[0],'-cmt') ||$aqa->[0]->{-cmd}->{-qwhere}
+ 		,-style=>'background-color: buttonface'
+		,%ypar
+		,-qwhere=>(!$ymch && $c->{-qwhere} && ($c->{-qwhere} =~/^(\[\[.+?\]\])/) ? $1 : '')
+			.$aqa->[0]->{-cmd}->{-qwhere}
+ 		)
+ 		.'&nbsp;'
+	.$s->htmlMQH(-html=>'&nbsp;X&nbsp;'
+ 		,-title=>$s->lng(1,'ddlbreset')
+ 		,-style=>'background-color: buttonface; border-width: 0px;'
+ 		,%ypar
+		,!$ymch && $c->{-qwhere} && ($c->{-qwhere} =~/^(\[\[.+?\]\])/) ? (-qwhere=>$1) : ()
+ 		,-frmLso=>'-add') # -add	
+ 	}))
  .(!%$avr
   ? ''
-  :(join('&nbsp;',
+  :('&nbsp;&nbsp;&nbsp;'
+   .join('&nbsp;',
 	map {	my $k =$_;
 		# $s->logRec('***',$k,$avr->{$k});
 		my $vl =$acr->{$k} ||$k;
@@ -2406,17 +2446,19 @@ sub a_hdesk_stbar {
 		,-style=>'background-color: ' 
 			.($ac->{$avr->{$k}->{severity}}||$ac->{''})
 		)} @$alr)
- 	.'&nbsp;&nbsp;&nbsp;'))
- .$s->htmlMQH(-html=>'&nbsp;x&nbsp;'
-		,-title=>"reset"
+	))
+ .'&nbsp;'
+ .$s->htmlMQH(-html=>'&nbsp;X&nbsp;'
+		,-title=>$s->lng(1,'ddlbreset')
 		,%xpar
-		,-frmLso=>''
+		,-frmLso=>'-all'
 		,-qkey=>{}
 		,-qwhere=>'[[]]'
 		,-style=>'background-color: buttonface; border-width: 0px'
 		)
+ ."</div>\n"
  .($avt && scalar(%$avt)
-  ? '</div><div style="margin-bottom: 0.4ex; margin-top: 0.5ex;">'
+  ? '<div nowrap="true" style="margin-bottom: 0.4ex; margin-top: 0.5ex; text-align: center;">'
    .join('&nbsp;',
 	map {	my $k =$_;
 		# $s->logRec('***',$k,$avt->{$k});
@@ -2434,11 +2476,12 @@ sub a_hdesk_stbar {
 		,-style=>'background-color: ' 
 			.($ac->{$avt->{$k}->{severity}}||$ac->{''})
 		)} @{$s->{-a_cmdbh_rectype}->{$qpk->{-qkey}->{record}}})
+	."</div>\n"
   : '')
- .(%$avs || %$avr
-  ? '</div><div style="margin-bottom: 0.4ex; margin-top: 0.5ex;">'
-  : '')
- .join('&nbsp;',
+  .(!%$avg
+  ? ''
+  : ('<div style="margin-bottom: 0.4ex; margin-top: 0.5ex;">'
+    .join('&nbsp;',
 	map {	my $k =$_;
 		# $s->logRec('*1*',$_,$avg->{$_});
 		my $vl =$ah ? $ah->{$k} ||$s->udisp($avg->{$k}->{arole} ||$k) : $s->udisp($avg->{$k}->{arole} ||$k);
@@ -2454,7 +2497,7 @@ sub a_hdesk_stbar {
 				: '')
 		,%xpar
 		,$qpk ? %$qpk : ()
-		,-frmLso=>'actors', -quname=>$avg->{$k}->{arole}
+		,-qurole=>'actors', -quname=>$avg->{$k}->{arole}
 		,-urm=>$avg->{$k}->{utime} ||''
 		,-style=>'background-color: '
 			.($ac->{$avg->{$k}->{severity}}||$ac->{''})
@@ -2464,9 +2507,9 @@ sub a_hdesk_stbar {
 			: !$ah->{$b} 	? -1 
 			: (lc($ah->{$a||''}||'') cmp lc($ah->{$b||''}||''))
 			} keys %$avg)
- .'</div>'
+	."</div>\n"))
  .'<div style="margin-bottom: 0.4ex; margin-top: 0.5ex;">'
- .(!%$avp 
+ .(!%$avp
   ? ''
   :(join('',
 	map {	my $k =$_;
@@ -2489,7 +2532,7 @@ sub a_hdesk_stbar {
 		? (-qwhere=>'[[' .$s->dbi->quote($s->user) .' IN(hdesk.auser,hdesk.puser)]]')
 		: $k eq 'auser+'
 		? (-qwhere=>'[[' .$s->dbi->quote($s->user) .' IN(hdesk.auser,hdesk.puser,hdesk.cuser,hdesk.uuser)]]')
-		: (-frmLso=>'actor', -quname=>$avp->{$k}->{auser})
+		: (-qurole=>'actor', -quname=>$avp->{$k}->{auser})
 		,-urm=>$avp->{$k}->{utime} ||''
 		,-style=>'background-color: '
 			.$ac->{$avp->{$k}->{severity}}||$ac->{''}
@@ -2517,16 +2560,16 @@ sub a_hdesk_stbar {
 		,%xpar
 		, $qpk ? %$qpk : ()
 		, $k eq 'self'
-		? (-qwhere=>'[[hdesk.arole=hdesk.prole]]',-frmLso=>'actors', -quname=>$avc->{$k}->{arole})
+		? (-qwhere=>'[[hdesk.arole=hdesk.prole]]',-qurole=>'actors', -quname=>$avc->{$k}->{arole})
 		: $k eq 'svc'
-		? (-qwhere=>'[[hdesk.arole<>hdesk.prole]]',-frmLso=>'actors', -quname=>$avc->{$k}->{arole})
+		? (-qwhere=>'[[hdesk.arole<>hdesk.prole]]',-qurole=>'actors', -quname=>$avc->{$k}->{arole})
 		: $k eq 'req'
-		? (-qwhere=>'[[hdesk.arole<>hdesk.prole]]',-frmLso=>'principals', -quname=>$avc->{$k}->{arole})
+		? (-qwhere=>'[[hdesk.arole<>hdesk.prole]]',-qurole=>'principals', -quname=>$avc->{$k}->{arole})
 		: $k eq 'act'
-		? (-frmLso=>'actors', -quname=>$avc->{$k}->{arole})
+		? (-qurole=>'actors', -quname=>$avc->{$k}->{arole})
 		: $k eq 'mgr'
-		? (-frmLso=>'managers', -quname=>$avc->{$k}->{arole})
-		: (-frmLso=>'actors', -quname=>$avc->{$k}->{arole})
+		? (-qurole=>'manager', -quname=>$avc->{$k}->{arole})
+		: (-qurole=>'actors', -quname=>$avc->{$k}->{arole})
 		,-urm=>$avc->{$k}->{utime} ||''
 		,-style=>'background-color: '
 			.$ac->{$avc->{$k}->{severity}}||$ac->{''}
@@ -2550,7 +2593,7 @@ sub a_hdesk_stbar {
 		,-qkey=>{'auser'=>$avu->{$k}->{auser}
 			, $qpk ? %{$qpk->{-qkey}} : ()
 				}
-		,-frmLso=>'actors'
+		,-qurole=>'actors'
 		,-quname=>$avu->{$k}->{arole}
 		,-urm=>$avu->{$k}->{utime} ||''
 		,-style=>'background-color: '
@@ -2559,8 +2602,7 @@ sub a_hdesk_stbar {
 		} sort { lc($s->udisp($a)) cmp lc($s->udisp($b))
 			} keys %$avu)
 	.'&nbsp;&nbsp;&nbsp;'))
- . '<br />'
- . '</div>'
+ . "</div>\n"
  .$mc;
 }
 
