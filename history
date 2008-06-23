@@ -1,3 +1,8 @@
+# 2008-06-04 recUpd(), recIns(): before rec read triggers: local $a->{-edit} =undef;
+# 2008-06-04 cmdb.cgi - 'incident' states reduced
+# 2008-06-04 cmdb.cgi - 'mrole' assign moved to -recFlim0R from -recEdt0R
+# 2008-05-07 cmdb.cgi - 'mailto' editable
+# 2008-05-01 corrected utf8enc(), utf8dec(); used 'Encode' module if $] >=5.008
 # 2008-04-24 extended cptran() for $] >=5.008
 # 2008-04-07 using '_search' frame / '-search' url
 # 2008-04-07 chg cmdb hesdk 'mailto' =~/^(?:new|draft|appr-do|scheduled|do|delay|progress|rollback|ok-appr|no-appr|ok|no|deleted)$/

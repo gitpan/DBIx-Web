@@ -35,18 +35,18 @@
 #	# dbm not used at all, it seems
 #
 # ToDo:
-# - utf8 if $] <5.008; cptran() & Encode module
 # - osCmd xcopy replace
 # - osCmd cacls may buzz sometimes somewhy
 # - w32umail() slow
 # CMDB / Service Desk:
 # - cmdb-e: service graph view
-# - cmdb: process - define hierarchy in cmdb?
+# - cmdb: association records, invisible when not needed?
+# - cmdb: process/operation - define hierarchy in cmdb?
 # - cmdb: graphics (of workload (of personal))
 # - cmdb-s: update vtime/-rvcVerWhen, recprc in old records
 #
 # Done:
-# 2008-04-24 starting 0.75 version
+# 2008-06-23 starting 0.76 version
 
 
 package DBIx::Web;
@@ -58,7 +58,7 @@ use Fcntl qw(:DEFAULT :flock :seek :mode);
 
 use vars qw($VERSION @ISA @EXPORT @EXPORT_OK %EXPORT_TAGS $AUTOLOAD $SELF $CACHE $LNG $IMG);
 
-	$VERSION= '0.74';
+	$VERSION= '0.75';
 	$SELF   =undef;				# current object pointer
 	$CACHE	={};				# cache for pointers to subobjects
 	*isa    = \&UNIVERSAL::isa; isa('','');	# isa function
@@ -382,29 +382,8 @@ $LNG ={
 	,'comment'	=>['Коммент',	"Текст или HTML комментария. Гиперссылки могут быть начаты с 'urlh://' (компьютер), 'urlr://' (это приложение), 'urlf://' (присоединенные файлы), 'key://' (ключ записи или таблица${RISM1}ключ), 'wikn://' (имя записи); могут быть в скобочной записи [[xxx://...]], [[xxx://...][label]], [[xxx://...|label]]. Начало текста <where>условие</where> может использоваться для встроенной выборки записей"]
 	,'cargo'	=>['Карго',	'Дополнительные данные']
 	}
-,'utf8ru' => {	# See cptran(), utf8enc(), utf8dec(), $] >=5.008
-		# !!! Text::Iconv may be better
-		# http://adult-hosting.ru/adult/hosting4/UTF-8.html
-		# UTF-8 (8-bit Unicode Transformation Format) is a variable-length character encoding for Unicode created by Ken Thompson and Rob Pike. It is able to represent any universal character in the Unicode standard, yet is backwards compatible with ASCII.
-		# UTF-8 uses one to four bytes (strictly, octets) per character, depending on the Unicode symbol. For example, only one byte is needed to encode the 128 US-ASCII characters in the Unicode range U+0000 to U+007F.
-		# http://phpclub.ru/faq/wakka.php?wakka=encodings&v=35q
-		# http://forum.net.ru/viewforum.php?f=4
-	 "\xD0\x90"=>"\xC0","\xD0\x91"=>"\xC1","\xD0\x92"=>"\xC2","\xD0\x93"=>"\xC3","\xD0\x94"=>"\xC4"
-	,"\xD0\x95"=>"\xC5","\xD0\x81"=>"\xA8","\xD0\x96"=>"\xC6","\xD0\x97"=>"\xC7","\xD0\x98"=>"\xC8"
-	,"\xD0\x99"=>"\xC9","\xD0\x9A"=>"\xCA","\xD0\x9B"=>"\xCB","\xD0\x9C"=>"\xCC","\xD0\x9D"=>"\xCD"
-	,"\xD0\x9E"=>"\xCE","\xD0\x9F"=>"\xCF","\xD0\xA0"=>"\xD0","\xD0\xA1"=>"\xD1","\xD0\xA2"=>"\xD2"
-	,"\xD0\xA3"=>"\xD3","\xD0\xA4"=>"\xD4","\xD0\xA5"=>"\xD5","\xD0\xA6"=>"\xD6","\xD0\xA7"=>"\xD7"
-	,"\xD0\xA8"=>"\xD8","\xD0\xA9"=>"\xD9","\xD0\xAA"=>"\xDA","\xD0\xAB"=>"\xDB","\xD0\xAC"=>"\xDC"
-	,"\xD0\xAD"=>"\xDD","\xD0\xAE"=>"\xDE","\xD0\xAF"=>"\xDF","\xD0\x87"=>"\xAF","\xD0\x86"=>"\xB2"
-	,"\xD0\x84"=>"\xAA","\xD0\x8E"=>"\xA1","\xD0\xB0"=>"\xE0","\xD0\xB1"=>"\xE1","\xD0\xB2"=>"\xE2"
-	,"\xD0\xB3"=>"\xE3","\xD0\xB4"=>"\xE4","\xD0\xB5"=>"\xE5","\xD1\x91"=>"\xB8","\xD0\xB6"=>"\xE6"
-	,"\xD0\xB7"=>"\xE7","\xD0\xB8"=>"\xE8","\xD0\xB9"=>"\xE9","\xD0\xBA"=>"\xEA","\xD0\xBB"=>"\xEB"
-	,"\xD0\xBC"=>"\xEC","\xD0\xBD"=>"\xED","\xD0\xBE"=>"\xEE","\xD0\xBF"=>"\xEF","\xD1\x80"=>"\xF0"
-	,"\xD1\x81"=>"\xF1","\xD1\x82"=>"\xF2","\xD1\x83"=>"\xF3","\xD1\x84"=>"\xF4","\xD1\x85"=>"\xF5"
-	,"\xD1\x86"=>"\xF6","\xD1\x87"=>"\xF7","\xD1\x88"=>"\xF8","\xD1\x89"=>"\xF9","\xD1\x8A"=>"\xFA"
-	,"\xD1\x8B"=>"\xFB","\xD1\x8C"=>"\xFC","\xD1\x8D"=>"\xFD","\xD1\x8E"=>"\xFE","\xD1\x8F"=>"\xFF"
-	,"\xD1\x96"=>"\xB3","\xD1\x97"=>"\xBF","\xD1\x94"=>"\xBA","\xD1\x9E"=>"\xA2"
-	}
+,'itf8enc_ru' => sub{my $i; $_[0] =~s/([^\x00-\x7f])/$i=ord($1); ($i >=192) ||($i ==168) ||($i ==184) ? (($i ==184) || ($i >=240) ? "\xD1" : "\xD0") .chr(($i ==168) ||($i ==184) ? $i -39 : $i >=240 ? $i -112 : $i -48) : " "/ge}
+,'itf8dec_ru' => sub{my ($i,$j); $_[0] =~s/(\xD0[\x90-\xBF]|\xD1[\x80-\x8F]|\xD1\x91|\xD0\x81)/$i=substr($1,0,1); $j=ord(substr($1,1,1)); $i eq "\xD0" ? chr($j ==129 ? 168 : ($j +48)) : chr($j ==145 ? 184 : ($j +112))/ge}
 };
 
 
@@ -1663,9 +1642,9 @@ sub cptran {	# Translate strings between codepages
 		: $_
 		} $f, $t;
 	map {Encode::is_utf8($_)
-		? ($_ =Encode::encode($t, $_))
-		: Encode::from_to($_, $f, $t)
-		if defined($_)
+		? ($_ =Encode::encode($t, $_, 0))
+		: Encode::from_to($_, $f, $t, 0)
+		if defined($_) && ($_ ne '')
 		} @s;
  }
  else {
@@ -1881,41 +1860,34 @@ sub xmlsTag {	# Attribute list to xml strings list
 
 sub utf8enc {	# Encode to UTF8, see also cptran()
 	my $r =$_[1];
-	if ($] >=5.008) {
+	if (($] >=5.008) && eval("use Encode; 1")) {
+		# return($r) if Encode::is_utf8($r);
 		my $cp =eval('!${^ENCODING}') && $_[0]->charpage();
 		eval("use encoding '$cp', STDIN=>undef, STDOUT=>undef") if $cp;
-		eval("use Encode");
 		$r =Encode::encode_utf8($r);
-		eval('no encoding') if !$cp;
+		eval('no encoding') if $cp;
 		return($r);
 	}
-	my $t =$LNG->{'utf8' .($_[0]->{-lang}||'')};
+	my $t =$LNG->{'utf8enc_' .($_[0]->{-lang}||'')};
 	return($r) if !$t;
-	foreach my $k (keys %$t) { 
-		my $v =$t->{$k}; 
-		$r =~ s/$v/$k/ig
-	}
+	&$t($r);
 	$r;
 }
 
 
 sub utf8dec {	# Decode from UTF8, see also cptran()
 	my $r =$_[1];
-	if ($] >=5.008) {
+	if (($] >=5.008) && eval("use Encode; 1")) {
 		my $cp =eval('!${^ENCODING}') && $_[0]->charpage();
 		eval("use encoding '$cp', STDIN=>undef, STDOUT=>undef") if $cp;
-		eval("use Encode");
-		$r =Encode::decode_utf8($r);
+		$r =Encode::decode_utf8($r,0);
 		eval('no encoding')		if $cp;
-		$r =Encode::encode($cp,$r)	if $cp;
+		$r =Encode::encode($cp,$r,0)	if $cp;
 		return($r);
 	}
-	my $t =$LNG->{'utf8' .($_[0]->{-lang}||'')};
+	my $t =$LNG->{'utf8dec_' .($_[0]->{-lang}||'')};
 	return($r) if !$t;
-	foreach my $k (keys %$t) { 
-		my $v =$t->{$k}; 
-		$r =~ s/$k/$v/ig
-	}
+	&$t($r);
 	$r;
 }
 
@@ -4988,6 +4960,7 @@ sub recIns {    # Insert record into database
 	$r->{-editable} =1 if $r && $s->{-rac} && ($m->{-racWriter}||$s->{-racWriter});
 	$s->{-affected} =1;
 	do {	local $a->{-cmd}  ='recRead';
+		local $a->{-edit} =undef;
 		rmiTrigger($s, $a, $r, $r, qw(-recForm0R -recFlim0R -recRead0R -recIns1R -recRead1R))
 		}
 		if $r;
@@ -5258,6 +5231,7 @@ sub recUpd {    # Update record(s) in database
 	$r->{-editable} =$w ? $s->ugmember(map {$r->{$_}} @$w) : 1
 			if $s->{-rac};
 	{	local $a->{-cmd}  ='recRead';
+		local $a->{-edit} =undef;
 		rmiTrigger($s, $a, $r, $r, qw(-recForm0R -recFlim0R -recRead0R -recRead1R))
 	};
 	rmiTrigger($s, $a, $r, undef, qw(-recUpd1C -recRead1C -recForm1C));

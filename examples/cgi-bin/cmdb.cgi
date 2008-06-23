@@ -1757,10 +1757,6 @@ $w->set(
 				}
 			}
 		,-recFlim0R	=>sub{
-			$_[0]->logRec('recFlim0R',$_[1]->{-cmd}
-				, map {($_, $_[0]->recActor(@_[1..3],$_))
-					} qw(-racOwner -racReader -racWriter -racActor -racManager -racPrincipal));
-
 			return(0) if !$_[0]->{-a_cmdbh_vmrole};
 
 			$_[2]			# Types of weak record
@@ -1771,6 +1767,28 @@ $w->set(
 				,[grep {$_ !~/^(?:task|work)$/
 					} @{$_[1]->{-cmdt}->{-mdefld}->{record}->{-inp}->{-values}}]
 				,'record');
+
+			$_[2]->{mrole} =	# Manager auto assign
+				!ref($_[0]->{-a_cmdbh_vmrole}->{$_[2]->{record}})
+				? $_[0]->{-a_cmdbh_vmrole}->{$_[2]->{record}}
+				: (ref($_[0]->{-a_cmdbh_vmrole}->{$_[2]->{record}}) eq 'ARRAY')
+					&& $_[0]->{-cgi}
+					&& (($_[0]->{-cgi}->param('record__P') ||'') ne $_[2]->{record})
+					&& $_[1]->{-cmd}
+					&& ($_[1]->{-cmd} =~/^(?:recNew|recForm)$/)
+				? $_[0]->{-a_cmdbh_vmrole}->{$_[2]->{record}}->[0]
+				: $_[2]->{mrole}
+				if $_[1]->{-edit}
+				&& $_[2]->{-editable}
+				&& $_[2]->{record}
+				&& $_[0]->{-a_cmdbh_vmrole}
+				&& $_[0]->{-a_cmdbh_vmrole}->{$_[2]->{record}};
+
+			$_[0]->logRec('recFlim0R',$_[1]->{-cmd}
+				, '-edit', $_[1]->{-edit}
+				, '-editable', $_[2]->{-editable} && 1
+				, map {($_, $_[0]->recActor(@_[1..3],$_))
+					} qw(-racOwner -racReader -racWriter -racActor -racManager -racPrincipal));
 
 			if (!$_[0]->uadmin()	# Manager appears
 			&&  $_[2] && $_[3]
@@ -1788,22 +1806,38 @@ $w->set(
 					: $_[2]->{status};
 			}
 
-			$_[0]->uadmin()		# States of record
+			!$_[1]->{-edit}		# States of record 
+				|| !(!$_[2] || $_[2]->{-editable})
 			? 1
-			: !$_[1]->{-edit} || !($_[2] ? $_[2]->{-editable} : 1)
-			? 1
-			: (!$_[3] || (!$_[3]->{mrole} && $_[2]->{mrole})
-				? ($_[2]->{mrole} && !(exists($_[0]->{-a_cmdbh_vmrole}->{$_[2]->{record}}) && !$_[0]->{-a_cmdbh_vmrole}->{$_[2]->{record}}))
-				: ($_[3]->{mrole} && !(exists($_[0]->{-a_cmdbh_vmrole}->{$_[3]->{record}}) && !$_[0]->{-a_cmdbh_vmrole}->{$_[3]->{record}}))
+			: $_[0]->uadmin()
+			? ($_[2]->{mrole}
+				? 1
+				: $_[0]->recActLim(@_[1..3]
+					,[qw(do progress rollback delay edit ok no deleted)]
+					,'status'))
+			: (!$_[3] ||(!$_[3]->{mrole} && $_[2]->{mrole})
+				? ($_[2]->{mrole} && (!exists($_[0]->{-a_cmdbh_vmrole}->{$_[2]->{record}}) || $_[0]->{-a_cmdbh_vmrole}->{$_[2]->{record}}))
+				: ($_[3]->{mrole} && (!exists($_[0]->{-a_cmdbh_vmrole}->{$_[3]->{record}}) || $_[0]->{-a_cmdbh_vmrole}->{$_[3]->{record}}))
 				)
-			? $_[0]->recActLim(@_[1..3]
-				,[!$_[3]
-				|| ($_[3] && !$_[3]->{mrole})
-				? ( $_[0]->recActor($_[1], !$_[3]->{mrole} ? $_[2] : $_[3],'-racManager')
+			? $_[0]->recActLim(@_[1..3]	# on+role
+				,[&{sub{my %hv;		# filter
+					  $_[1] eq 'incident'
+					? (map { /^(?:new|draft|appr-do|scheduled|do)$/
+						? ($hv{do} ? () : (do{$hv{do}=1; 'do'}))
+						: ($_)
+						} @_[2..$#_])
+					: @_[2..$#_]}}($_[0], $_[2]->{record}||'',
+							# !role in db
+				  !$_[3]
+				  || ($_[3] && !$_[3]->{mrole})
+				? ( $_[0]->recActor($_[1]
+					, !$_[3] ||!$_[3]->{mrole} ? $_[2] : $_[3]
+					, '-racManager')
 				  ? qw(new draft appr-do scheduled do progress rollback delay edit appr-ok appr-no ok no)
 				  : $_[0]->recActor(@_[1..3],'-racActor')
 				  ? qw(new appr-do progress rollback delay edit appr-ok appr-no)
-				  : qw(new))
+				  : qw(new))		
+							# manager & actor in db
 				: $_[0]->recActor(@_[1..3],'-racManager')
 					&& $_[0]->recActor(@_[1..3],'-racActor')
 				? ( $_[3]->{status} =~/^(?:new|draft|appr-do)$/
@@ -1831,7 +1865,7 @@ $w->set(
 					? qw(draft scheduled do progress rollback delay edit appr-no no)
 					: qw(progress rollback delay edit appr-ok appr-no ok no))
 				: $_[3]->{status}
-					]
+					)]
 				,'status')
 			: $_[0]->recActLim(@_[1..3]
 				,[qw(do progress rollback delay edit ok no deleted)]
@@ -1853,12 +1887,12 @@ $w->set(
 				  ? $_[0]->recActLim(@_[1..3],'v', qw(-recDel))
 				  : $_[3]->{status} =~/^(?:progress|rollback|delay|edit|appr-ok|appr-no|ok|no)$/
 				  ? ($_[0]->recActLim(@_[1..3],'v', qw(-recDel))
-				    && $_[0]->recActLim(@_[1..3],'v!', qw(auser status etime cost status comment)))
+				    && $_[0]->recActLim(@_[1..3],'v!', qw(auser mailto status etime cost comment)))
 				  : $_[0]->recActLim(@_[1..3],'-recRead')
 				  )
 				: $_[3]->{status} =~/^(?:scheduled|do|progress|rollback|delay|edit|appr-ok|appr-no)$/
 				? $_[0]->recActLim(@_[1..3],'v', qw(-recDel))
-				  && $_[0]->recActLim(@_[1..3],'v!', qw(auser status cost comment))
+				  && $_[0]->recActLim(@_[1..3],'v!', qw(auser mailto status cost comment))
 				: $_[0]->recActLim(@_[1..3],'-recRead')
 				)
 			: $_[0]->recActor(@_[1..3],'-racOwner')
@@ -1869,23 +1903,10 @@ $w->set(
 			? $_[0]->recActLim(@_[1..3],'v',qw(-recDel idrm arole record))
 			: $_[3]->{record} eq 'task'
 			? $_[0]->recActLim(@_[1..3],'v', qw(-recDel))
-			&& $_[0]->recActLim(@_[1..3],'v!', qw(auser status cost comment))
+			&& $_[0]->recActLim(@_[1..3],'v!', qw(auser mailto status cost comment))
 			: $_[0]->recActLim(@_[1..3],'v', qw(-recDel));
 			}
 		,-recEdt0R	=> sub{
-			$_[2]->{mrole} =
-				!ref($_[0]->{-a_cmdbh_vmrole}->{$_[2]->{record}})
-				? $_[0]->{-a_cmdbh_vmrole}->{$_[2]->{record}}
-				: (ref($_[0]->{-a_cmdbh_vmrole}->{$_[2]->{record}}) eq 'ARRAY')
-					&& $_[0]->{-cgi}
-					&& (($_[0]->{-cgi}->param('record__P') ||'') ne $_[2]->{record})
-					&& $_[1]->{-cmd}
-					&& ($_[1]->{-cmd} =~/^(?:recNew|recForm)$/)
-				? $_[0]->{-a_cmdbh_vmrole}->{$_[2]->{record}}->[0]
-				: $_[2]->{mrole}
-				if $_[2]->{record}
-				&& $_[0]->{-a_cmdbh_vmrole}
-				&& $_[0]->{-a_cmdbh_vmrole}->{$_[2]->{record}};
 			delete $_[2]->{rectype}
 				if $_[2]->{rectype} && $_[2]->{record}
 				&& !(grep {$_ eq $_[2]->{rectype}

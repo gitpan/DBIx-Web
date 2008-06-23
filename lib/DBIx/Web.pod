@@ -4120,6 +4120,13 @@ another options may be implemented within script itself.
 
 =over
 
+
+=head2 2008-06-23 - Version 0.75
+
+Minor corrections.
+
+
+
 =head2 2008-04-24 - Version 0.74
 
 New C<-search>.
