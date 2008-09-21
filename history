@@ -1,3 +1,8 @@
+# 2008-09-17 new '-w32xcacls' switch
+# 2008-09-05 corrected pthMk()
+# 2008-09-01 redesig of pthCp()/pthStamp() - osCmd(xcopy) replace
+# 2008-08-27 cgiRun() fix: if !defined($s->{-c}->{-search})
+# 2008-06-23 starting 0.76 version
 # 2008-06-04 recUpd(), recIns(): before rec read triggers: local $a->{-edit} =undef;
 # 2008-06-04 cmdb.cgi - 'incident' states reduced
 # 2008-06-04 cmdb.cgi - 'mrole' assign moved to -recFlim0R from -recEdt0R

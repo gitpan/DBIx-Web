@@ -29,6 +29,7 @@ my $w =DBIx::Web->new(
 #,-racAdmRdr	=>''		# record access control admin reader
 #,-racAdmWtr	=>''		# record access control admin writer
 #,-rfa		=>0		# record file attachments (0 - off, 1 - default)
+#,-w32xcacls	=>1		# use 'xcacls' instead of 'cacls'
 #,-httpheader	=>{}		# http header arguments
 #,-htmlstart	=>{}		# html start arguments
  ,-smtphost	=>'localhost'	# smtp mail server

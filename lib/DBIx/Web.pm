@@ -35,7 +35,7 @@
 #	# dbm not used at all, it seems
 #
 # ToDo:
-# - osCmd xcopy replace
+# - query functions: ftext(), urole(), via SQL-Statement?
 # - osCmd cacls may buzz sometimes somewhy
 # - w32umail() slow
 # CMDB / Service Desk:
@@ -46,7 +46,7 @@
 # - cmdb-s: update vtime/-rvcVerWhen, recprc in old records
 #
 # Done:
-# 2008-06-23 starting 0.76 version
+# 2008-09-21 starting 0.77 version
 
 
 package DBIx::Web;
@@ -58,7 +58,7 @@ use Fcntl qw(:DEFAULT :flock :seek :mode);
 
 use vars qw($VERSION @ISA @EXPORT @EXPORT_OK %EXPORT_TAGS $AUTOLOAD $SELF $CACHE $LNG $IMG);
 
-	$VERSION= '0.75';
+	$VERSION= '0.76';
 	$SELF   =undef;				# current object pointer
 	$CACHE	={};				# cache for pointers to subobjects
 	*isa    = \&UNIVERSAL::isa; isa('','');	# isa function
@@ -532,6 +532,7 @@ sub initialize {
  # ,-fswtr	=>undef		# File Store Writers, defaults in code
  # ,-fsrdr	=>undef		# File Store Readers
    ,-w32IISdpsn	=>($ENV{SERVER_SOFTWARE}||'') =~/IIS/ ? 1 : 0 # MsIIS deimpersonation
+ # ,-w32xcacls	=>undef		# Use WinNT 'xcacls' instead of 'cacls'
 
  # ,&recXXX			# DML command keywords
 					# -table -form || record form class
@@ -2151,12 +2152,12 @@ sub osCmd {     # OS Command
 		? $_[0] !~/^(?:xcopy)/	# !!! problematic programs
 		: 1)
 		) {
-	        my $c =join(' ', @_) .' 2>&1';
-	        @$o =`$c`;
+		my $c =join(' ', @_) .' 2>&1';
+		$o =[`$c`];
 	}
 	elsif (system(@_) ==-1) {
-		@$o =($!,$^E);
-		$r  =-1;
+		$o =[$!,$^E];
+		$r =-1;
 	}
      }
      else {			# !!! command's output will be lost
@@ -2179,11 +2180,11 @@ sub osCmd {     # OS Command
 		&$sub($s);
 		select($select);
 	}
-	@$o =<RDRFH>;
+	$o =[<RDRFH>];
 	waitpid($pid,0);
      }
      else {
-	@$o =($!,$^E);
+	$o =[$!,$^E];
 	$r =-1;
      }
   }
@@ -2438,7 +2439,7 @@ sub pthForm_{
 		if $_[1] ne 'rfa';
 	if ($ENV{OS} && $ENV{OS}=~/Windows_NT/i) {
 		$p =~s/\//\\/g;
-		$_[0]->osCmd('cacls'
+		$_[0]->osCmd($_[0]->{-w32xcacls} ? 'xcacls' : 'cacls'
 		,"\"$p\""
 		,'/T','/C'
 		,'/E'		# for 'rfa' or late $_[0]->{-w32IISdpsn}
@@ -2447,7 +2448,9 @@ sub pthForm_{
 			} ref($_[0]->{-fswtr}) 
 			? (@{$_[0]->{-fswtr}}) 
 			: ($_[0]->{-fswtr}||eval{Win32::LoginName}))
-		,sub{CORE::print "Y\n"})
+		,$_[0]->{-w32xcacls}
+		? '/Y'
+		: sub{CORE::print "Y\n"})
 	}
  }
  $_[0]->{-c}->{'-pth_' .$_[1]}
@@ -2456,14 +2459,15 @@ sub pthForm_{
 
 sub pthMk {    # Create directory if needed
   return(1) if -d $_[1];
-  my $a ='';
-  foreach my $e (split /\//, $_[1]) {
+  my $m =$_[1] =~/([\\\/])/ ? $1 : '/';
+  my ($a, $v) =$_[1] =~/^([\\\/]+[^\\\/]+[\\\/]|\w:[\\\/]+)(.+)/ ? ($1, $2) : ('', $_[1]);
+  foreach my $e (split /[\\\/]/, $v) {
      $a .=$e;
      if (!-d $a) {
 	$_[0]->logRec('mkdir', $a) if !$_[0]->{-log} ||ref($_[0]->{-log});
         mkdir($a, 0777) ||return(&{$_[0]->{-die}}($_[0]->lng(0,'pthMk') .": mkdir('$a') -> $!" .$_[0]->{-ermd})||0);
      }
-     $a .='/'
+     $a .=$m
   }
   2;
 }
@@ -2555,39 +2559,104 @@ sub pthCln {   # Clean unused (empty) directory
 }
 
 
-sub pthCp {    # Copy filesystem path
-               # -'d'irectory or 'f'ile hint; 'r'ecurse subdirectories, 'i'gnore errors
-  my $s   =shift;
-  my $opt =$_[0] =~/^-/i ? shift : '';
-  my ($src,$dst) =@_;
-  $opt =~s/-//g;
-  if ($^O eq 'MSWin32' 
-     && (eval{Win32::IsWinNT} ||(($ENV{OS}||'') =~/Windows_NT/i))) {
-     $src =~tr/\//\\/;
-     $dst =~tr/\//\\/;
-     $opt ="${opt}Z";
-     $opt ="${opt}Y" if (eval{(Win32::GetOSVersion())[1]} ||0) >=5
-  }
-  elsif ($^O eq 'MSWin32') {
-     $src =~tr/\//\\/;
-     $dst =~tr/\//\\/
-  }
-  if ($^O ne 'MSWin32' && $^O ne 'dos') {
-     $opt =~ tr/fd//;
-     $opt ="-${opt}p";
-     $opt =~ tr/ri/Rf/;
-     $s->osCmd('cp', $opt, @_)
-  }
-  else {
-     my $rsp =($opt =~/d/i ? 'D' : $opt =~/f/i ? 'F' : '');
-     $opt =~s/(r)/SE/i; $opt =~s/(i)/C/i; $opt =~s/[fd]//ig; $opt =~s/(.{1})/\/$1/gi;
-     my @cmd =('xcopy.exe',"/H/R/K/Q$opt","\"$src\"","\"$dst\"");
-     push @cmd, sub{CORE::print($rsp)} 
-	if $rsp 
-	&& ($ENV{OS} && ($ENV{OS}=~/Windows_NT/i) ? !-e $dst : !-d $dst);
-     $s->osCmd(@cmd)
-  }
+sub pthStamp {	# Stamp filesystem path with system ACL, once
+ return($_[1]) if $^O ne 'MSWin32';
+ my ($s, $p) =@_;
+ $p =~s/\//\\/g;
+ return($p) if lc($s->{-c}->{-pthStamp} ||'') eq lc($p);
+ if (1 || $s->{-c}->{-RevertToSelf}) {	# ownership
+	eval('use Win32::OLE; Win32::OLE->Option("Warn"=>0);');
+	$s->logRec('TakeOwnerShip', 'winmgmts:Win32_Directory.Name', $p);
+	my $ow =Win32::OLE->GetObject("winmgmts:{impersonationLevel=Impersonate}!root/CIMV2:Win32_Directory.Name='$p'");
+	$s->logRec("Error Win32::OLE::GetObject() -> " .Win32::OLE->LastError())
+		if !$ow;
+	$ow =$ow && $ow->TakeOwnerShip();
+	$s->logRec("Error TakeOwnerShip() -> $ow")
+		if $ow;
+ }
+ $s->osCmd($s->{-w32xcacls} ? 'xcacls' : 'cacls'
+	, "\"$p\"", '/T','/C','/G'
+	,(map { $_ =~/\s/ ? "\"$_\"" : $_
+		} map{(m/([^@]+)\@([^@]+)/ ? "$2\\$1" : $_) .':F'
+			} ref($s->{-fswtr}) ? (@{$s->{-fswtr}}) : ($s->{-fswtr} ||eval{Win32::LoginName}))
+	,$s->{-fsrdr}
+	?(map { $_ =~/\s/ ? "\"$_\"" : $_
+		} map{(m/([^@]+)\@([^@]+)/ ? "$2\\$1" : $_) .':R'
+			} ref($s->{-fsrdr}) ? (@{$s->{-fsrdr}}) : ($s->{-fsrdr}))
+	:()
+	,$s->{-w32xcacls}
+	? '/Y'
+	: sub{CORE::print "Y\n"});
+ $s->{-c}->{-pthStamp} =lc($p);
+ $p
 }
+
+
+sub pthCp {	# Copy filesystem path
+		# -'d'irectory or '*' glob hint; 'r'ecurse subdirectories, 
+		# 'i'gnore errors, 'p'ermission stamp
+		# file -> file # file -> dir/file # dir -> dir/dir # dir/*  -> dir
+ my ($s, $opt, $src, $dst) =defined($_[1]) && ($_[1] =~/^-/) ? @_ : ($_[0], '', @_[1..$#_]);
+ my $mc =($src =~/([\\\/])/) || ($dst =~/([\\\/])/) ? $1 : '/';
+ my $r  =1;
+ $s->logRec('pthCp',$opt,$src,$dst);
+ if ($opt !~/d/i) {}
+ elsif ($opt !~/i/i) {
+	$s->pthMk($dst)
+ }
+ elsif (!eval{$s->pthMk($dst)}) {
+	$s->logRec('Warn',$s->lng(0, 'pthCp') .": $@");
+	return(0)
+ }
+ if (-f $src) {
+	my $d1 =($opt =~/d/i) || (-d $dst)
+		? $dst .$mc .($src =~/[\\\/]([^\\\/]+)$/ ? $1 : $src)
+		: $dst;
+	unlink($d1) if (-e $d1);
+	if ($^O eq 'MSWin32'
+		? Win32::CopyFile($src, $d1, 1)
+		: (eval('use File::Copy (); 1') && File::Copy::syscopy($src, $d1))
+		) {}
+	elsif ($opt =~/i/) {
+		$r =0;
+		$s->logRec('Warn', $s->lng(0, 'pthCp') .": FileCopy('$src', '$d1') -> $!")
+	}
+	else {
+		return(&{$s->{-die}}($s->lng(0, 'pthCp') .": FileCopy('$src', '$d1') -> $!" .$s->{-ermd})||0)
+	}
+	return($r);
+ }
+ if (($opt =~/p/i) && ($opt =~/d/i)) {
+	$s->pthStamp($dst);
+ }
+ foreach my $s1 ($s->pthGlob(($opt =~/\*/)
+			&& !(($src =~/([^\\\/]+)$/) && ($1 =~/\*/))
+		? $src .$mc .'*' 
+		: $src)) {
+	my $d1 =$dst .$mc .($s1 =~/[\\\/]([^\\\/]+)$/ ? $1 : $s1);
+	if (-d $s1) {
+		next if $opt !~/r/i;
+		$r =0 if !$s->pthCp('-rd*' .($opt =~/i/i ? 'i' : ''), $s1, $d1);
+	}
+	else {
+		# $s->logRec('copy',$s1,$d1);
+		unlink($d1) if -e $d1;
+		if ($^O eq 'MSWin32'
+			? Win32::CopyFile($s1, $d1, 1)
+			: (eval('use File::Copy (); 1') && File::Copy::syscopy($s1, $d1))) {
+		}
+		elsif ($opt =~/i/) {
+			$r =0;
+			$s->logRec('Warn',$s->lng(0, 'pthCp') .": FileCopy('$src', '$d1') -> $!")
+		}
+		else {
+			return(&{$s->{-die}}($s->lng(0, 'pthCp') .": FileCopy('$src', '$d1') -> $!" .$s->{-ermd})||0)
+		}
+	}
+ }
+ $r
+}
+
 
 
 #########################################################
@@ -4549,45 +4618,35 @@ sub rfdStamp {	# Stamp record with files directory name, create if needed
 		# objLocator.ConnectServer.Get("Win32_SecurityDescriptor").Spawninstance_
 		#
 		$p =~s/\//\\/g;
-		if (1 || $s->{-c}->{-RevertToSelf}) {	# ownership
-			$s->logRec('TakeOwnerShip', 'winmgmts:Win32_Directory.Name', $r->{-file});
-			eval('use Win32::OLE; Win32::OLE->Option("Warn"=>0);');
-			my $ow =Win32::OLE->GetObject("winmgmts:Win32_Directory.Name='$p'");
-			$s->logRec("Error Win32::OLE::GetObject() -> " .Win32::OLE->LastError())
-				if !$ow;
-			$ow =$ow && $ow->TakeOwnerShip();
-			$s->logRec("Error TakeOwnerShip() -> $ow")
-				if $ow;
-		}
-							# access control
-		$s->osCmd('cacls', "\"$p\"", '/T','/C','/G'
-		,(map { $_ =~/\s/ ? "\"$_\"" : $_
-			} map{(m/([^@]+)\@([^@]+)/ ? "$2\\$1" : $_) .':F'
-				} ref($s->{-fswtr}) ? (@{$s->{-fswtr}}) : ($s->{-fswtr} ||eval{Win32::LoginName}))
-		,$s->{-fsrdr}
-		?(map { $_ =~/\s/ ? "\"$_\"" : $_
-			} map{(m/([^@]+)\@([^@]+)/ ? "$2\\$1" : $_) .':R'
-				} ref($s->{-fsrdr}) ? (@{$s->{-fsrdr}}) : ($s->{-fsrdr}))
-		:()
-		,sub{CORE::print "Y\n"});
+		$s->pthStamp($p);			# access control
+		delete $s->{-c}->{-pthStamp};
 		if ($e && $ww) {
 			foreach my $u (map {m/([^@]+)\@([^@]+)/ ? "$2\\$1" : $_} @$ww) {
-				$s->osCmd('-i','cacls', "\"$p\""
+				$s->osCmd('-i'
+				, $s->{-w32xcacls} ? 'xcacls' : 'cacls'
+				, "\"$p\""
 				, '/E','/T','/C','/G'
-				, ($u =~/\s/ ? "\"$u\"" : $u) .':F')
+				, ($u =~/\s/ ? "\"$u\"" : $u) .':F'
+				, $s->{-w32xcacls} ? '/Y' : ())
 			}
 			foreach my $u (map {m/([^@]+)\@([^@]+)/ ? "$2\\$1" : $_} $wr ? @$wr : ()) {
-				$s->osCmd('-i','cacls', "\"$p\""
+				$s->osCmd('-i'
+				, $s->{-w32xcacls} ? 'xcacls' : 'cacls'
+				, "\"$p\""
 				, '/E','/T','/C','/G'
-				, ($u =~/\s/ ? "\"$u\"" : $u) .':R')
+				, ($u =~/\s/ ? "\"$u\"" : $u) .':R'
+				, $s->{-w32xcacls} ? '/Y' : ())
 			}
 		}
 		else {
 			foreach my $u (map {m/([^@]+)\@([^@]+)/ ? "$2\\$1" : $_
 					} map {$_ ? @$_ : ()} $ww, $wr) {
-				$s->osCmd('-i','cacls', "\"$p\""
+				$s->osCmd('-i'
+				, $s->{-w32xcacls} ? 'xcacls' : 'cacls'
+				, "\"$p\""
 				, '/E','/T','/C','/G'
-				, ($u =~/\s/ ? "\"$u\"" : $u) .':R')
+				, ($u =~/\s/ ? "\"$u\"" : $u) .':R'
+				, $s->{-w32xcacls} ? '/Y' : ())
 			}
 		}
 	}
@@ -4611,7 +4670,7 @@ sub rfdCp {	# Copy record's files directory to another record
     return(0) if ! -d $fp;
  my $td =rfdName($_[0], @_[2..$#_]);
  my $tp =rfdPath($_[0],-path=>$td);
- $_[0]->pthMk($tp) && $_[0]->pthCp('-r',$fp,$tp)
+ $_[0]->pthCp('-rdp*',$fp,$tp)
  && ($_[3]->{-file} =$td);
 }
 
@@ -6681,9 +6740,10 @@ sub cgiRun {	# Execute CGI query
  elsif ($s->{-search}) {
 	$s->{-c}->{-search} =ref($s->{-search}) ? &{$s->{-search}}($s,$s->{-pcmd}) : $s->{-search};
 	delete $s->{-c}->{-search}
-		if ($s->{-c}->{-search} =~/\b_frame=RIGHT\b/)
-		&& !$s->{-pcmd}->{-search}
-		&& ($on !~/^(?:default|start|index)$/);
+		if !defined($s->{-c}->{-search})
+		|| (($s->{-c}->{-search} =~/\b_frame=RIGHT\b/)
+			&& !$s->{-pcmd}->{-search}
+			&& ($on !~/^(?:default|start|index)$/));
  }
  if ($s->{-pcmd}->{-search} && ($s->{-c}->{-search} =~/\b_frame=RIGHT\b/)) {
 	my $sch =$s->{-c}->{-search};

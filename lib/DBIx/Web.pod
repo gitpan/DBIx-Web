@@ -294,6 +294,7 @@ C<-user>, C<-unames>, C<-ugroups>;
 C<-AuthUserFile>, C<-AuthGroupFile>, C<-ldap>, C<-w32ldap>;
 C<-userln>, C<-usernt>, C<-udisp>;
 C<-udflt>, C<-unflt>, C<-ugflt>, C<-ugflt1>, C<-ugadd>;
+C<-w32IISdpsn>, C<-w32xcacls>
 
 C<user>, C<userln>, C<unames>, C<ugroups>, C<ugnames>, C<udisp>. C<udispq>, C<uglist>, C<ldapLst>;
 C<ugrexp>, C<ugmember>, C<uguest>, C<uadmrdr>, C<uadmwtr>, C<uadmin>;
@@ -2520,6 +2521,15 @@ LDAP path is a string for 'LDAP://' Windows ADSI provider,
 i.e. 'cn=myUser,dc=myComapany,dc=com'.
 
 
+=item -w32xcacls
+
+	=> not exists | true
+
+C<User Identification>.
+Use 'xcacls' command (Windows NT Resource Kit should be installed) 
+instead of 'cacls' Windows 2000 command.
+
+
 =item -warn
 
        => \&carp, see source code
@@ -3060,13 +3070,13 @@ Recourses bottom-up.
 Empty path may contain '.htaccess' files.
 
 
-=item pthCp (source, target) -> success
+=item pthCp (-opt, source, target) -> success
 
 C<File Store>.
 Copies source path to target using operating system copy command via C<osCmd>.
 Options:
 '-d'irectory target hint,
-'-f'ile target hint,
+'*'glob source hint,
 '-r'ecurse subdirectories,
 '-i'gnore errors.
 
@@ -4121,6 +4131,16 @@ another options may be implemented within script itself.
 =over
 
 
+=head2 2008-09-21 - Version 0.76
+
+Minor corrections (C<pthMk>, C<cgiRun>).
+
+Redesigned C<pthCp> - external copy command not used now.
+
+New C<-w32xcacls>.
+
+
+
 =head2 2008-06-23 - Version 0.75
 
 Minor corrections.
@@ -4762,7 +4782,9 @@ for impairing nature industries
 in Archangel region (wood and timber, geological and mining, space and war);
 Russian procrastination structures and kgbists.
 
-A help in the revival of Pomor'e will be good: L<http://www.pomor-rus.org>
+A help in the revival of Pomor'e will be good: 
+L<http://www.pomor-rus.org>,
+L<http://pomorland.narod.ru>
 
 
 =head1 AUTHOR
