@@ -244,12 +244,12 @@ C<lng>, C<lnghash>
 
 =item Misc Data methods
 
-C<max>, C<min>, C<dwnext>, C<orarg>, C<grep1>, C<shiftkeys>, C<splicekeys>;
+C<max>, C<min>, C<dwnext>, C<orarg>, C<grep1>, C<shiftkeys>, C<splicekeys>, C<hreverse>;
 C<strpad>, C<strquot>; C<strdata>, C<strdatah>, C<datastr>;
 C<dsdClone>, C<dsdMk>, C<dsdQuot>, C<dsdParse>;
 C<strtime>, C<timestr>, C<timeadd>;
 C<cptran>;
-C<dbiLikesc>, C<dbiQuote>;
+C<dbiLikesc>, C<dbiQuote>, C<dbiUnquote>;
 C<ishtml>, C<htmlEscape>, C<htmlUnescape>, C<urlEscape>, C<urlUnescape>, C<urlCat>, C<urlCmd>, C<htlsTag>;
 C<xmlEscape>, C<xmlAttrEscape>, C<xmlTagEscape>, C<xmlUnescape>, C<xmlsTag>;
 
@@ -296,17 +296,17 @@ C<-userln>, C<-usernt>, C<-udisp>;
 C<-udflt>, C<-unflt>, C<-ugflt>, C<-ugflt1>, C<-ugadd>;
 C<-w32IISdpsn>, C<-w32xcacls>
 
-C<user>, C<userln>, C<unames>, C<ugroups>, C<ugnames>, C<udisp>. C<udispq>, C<uglist>, C<ldapLst>;
+C<user>, C<userln>, C<unames>, C<ugroups>, C<ugnames>, C<udisp>, C<udispq>, C<umail>, C<uglist>, C<ldapLst>;
 C<ugrexp>, C<ugmember>, C<uguest>, C<uadmrdr>, C<uadmwtr>, C<uadmin>;
 C<ugfile>;
-C<w32IISdpsn>, C<w32adhi>, C<w32user>, C<w32umail>;
+C<w32IISdpsn>, C<w32adhi>, C<w32user>, C<w32ufswtr>;
 
 
 =item Database Options
 
 C<-serial>, C<-autocommit>, 
 C<-limit>, C<-affect>, C<-affected>, C<-fetched>, C<-limited>,
-C<-host>, C<-recInsID>, C<-idsplit>, C<-wikn>
+C<-host>, C<-recInsID>, C<-idsplit>, C<-wikn>, C<-wikq>
 
 
 =item Database Description
@@ -766,7 +766,8 @@ DBI connection startup to be executed by C<dbi> when connecting.
 
 (C<Field Description>)
 Drop-down list box with editable input and produced on button press selection list.
-C<cgiQuery> or C<cgiQueryFv> calls may be used inside sub{} providing cursor.
+C<recSel>, C<recUnion>, C<cgiQuery>, C<cgiQueryFv>, C<hreverse>
+results may be returned by sub{}.
 See also C<-ddlbmult>, C<-ddlbtgt>
 
 
@@ -2502,7 +2503,7 @@ Variables hash ref, handled via C<varLoad> and C<varStore> calls.
 
 C<User Identification>.
 Deimpersonation place for Microsoft IIS authenticated user session,
-using C<w32IISdpsn>.
+using C<w32IISdpsn> with 'RevertToSelf' Windows call.
 
 	0 - never
 	1 - when required, i.e. for file store operation
@@ -2554,6 +2555,18 @@ Fields one of may be used to search for record by its wiki name.
 Default candidates are defined at database level.
 Table may be excluded from search using false value.
 See also C<-opt> for '-hrefs' and 'wikn://'.
+
+
+=item -wikq
+
+	=> not exists || sub{}($self, -wikn value, -wikq value) -> {-table=>name, -qkey=>{field=>value,...}}
+
+C<Database Options>
+
+Processor for requests for C<-wikn> and C<-wikq>.
+Should convert C<-wikn>/C<-wikq> parameters to C<-table>/C<-qkey>, may use database.
+Else C<-wikn> will be porcessed.
+C<-wikq> request parameter may be any value to be processed by C<-wikq> sub{}.
 
 
 =item -wkey
@@ -2698,6 +2711,10 @@ form and html footers.
 Also implements '-reindex' (run C<recReindex>(1)) and '-setup' (run C<setup>)
 service command line options, see also C<Command Line>.
 
+Depending on particular environment configuration
+C<cgiRun> may return DBIx::Web object, C<DESTROY>, false, C<die>.
+It is recommended to use C<cgiRun> as the last call in the CGI script.
+
 
 =item cgiSel ({name => value,...} || name => value,...) ->  -> cursor
 
@@ -2738,7 +2755,9 @@ C<Misc Data methods>.
 Escapes value to use within SQL LIKE '' ESCAPE '\'.
 
 
-=item dbiQuote (text) -> escaped
+=item dbiQuote (text) -> quoted
+
+=item dbiUnquote (quoted) -> unquoted
 
 C<Misc Data methods>.
 Quotes value to use within SQL statements.
@@ -2826,6 +2845,21 @@ Alike L<grep|perlfunc>, but differs.
 C<SubObjects>. Creates and returns new file handle object
 (C<DBIx::Web::FileHandle>).
 File will be opened if file name given.
+
+
+=item hreverse ([data] ||cursor, ? split char ||'/', ? join char ||'\\') -> {value => reversed,..}
+
+=item hreverse (string, ? split char ||'/'||'\\', ? join char ||'\\'||'/') -> reversed string
+
+C<Misc Data methods>.
+Reverses hierarchical source data values.
+Source array ref or cursor will be reversed to a hash ref,
+string will be reversed to a string.
+Hierarchy may be marked inside values with a split char, i.e. 'value/subvalue/...'.
+Original source data values are used for keys of the result.
+Values of the result are L<join|perlfunc> L<reverse|perlfunc> L<split|perlfunc> of the source values.
+
+May be used for C<-ddlb>.
 
 
 =item htlsTag (name, attribute=>value,..., ''=>[content]) -> list
@@ -3008,8 +3042,11 @@ Minimum of two numbers given.
 
 =item new ('class', -option=>value,...) -> new DBIx::Web object
 
+=item new ('class', DBIx::Web object to reuse,...) -> DBIx::Web object reused
+
 C<Creation and Setup>.
 Creates new DBIx::Web object. Calls C<initialize>(-option=>value,...).
+Existed DBIx::Web object may be reused.
 
 
 =item orarg (L<-X|perlfunc>, argument,...) -> first succeeded argument
@@ -3319,8 +3356,9 @@ See also C<recCommit>.
 
 
 =item recSel (
--table => 'FROM clause' || [table name, [table, alias], [table, alias, join],...],
+-table => table name || 'FROM clause' || [table name, [table, alias], [table, alias, join],...],
 ? -join[01] => 'left or right addition to FROM clause'
+? -select => 'ALL' || 'DISTINCT' || 'DISTINCTROW' || 'STRAIGHT_JOIN'...,
 ? -data => [field, [field => alias], {-fld => alias, -expr => formula,..},...],
 ? -key => {field name => value,...},
 ? -where => 'WHERE clause' || ['WHERE clause',...],
@@ -3336,6 +3374,8 @@ See also C<recCommit>.
 
 C<Database Operation>.
 Retrieves records from database.
+Some substitutions may be available in SQL WHERE in addition to options above: 
+'#urole(role)', '#urole(role, name)', '#ftext(string)'.
 Cursor's slot C<-rec> with hash ref {field alias || name => value,...} is bound as field variables.
 Cursor's slot C<-rfr> contains array ref with references to values in C<-rec> in order of C<-data> list.
 At least C<fetch>, C<fetchrow_arrayref>, C<fetchrow_hashref>, C<finish>, C<close> 
@@ -3763,7 +3803,7 @@ See source code for specifications.
 
 Using C<ugfile>(), C<-AuthGroupFile> and C<-AuthUserFile> should not be set.
 This slots should be set only to externally controlled files.
-I.e. to files produced via "$0 -call ugfile ugf_w32 0 q" C<Command Line>.
+I.e. to files produced via "$0 -call ugfile ugf_w32 0 s" C<Command Line>.
 
 
 
@@ -3817,6 +3857,14 @@ Default is using C<-AuthGroupFile> or C<ugfile> generated files.
 
 C<User Identification>.
 Returns true if current user is not logged in.
+
+
+=item umail (names string) -> emails string
+
+C<User Identification>.
+Returns string of e-mail addresses for string of user names given.
+Short names will not be supplied with C<-smtpdomain>, it will be used by C<smtpSend>().
+See also C<uglist>('-@c') and C<ugfile>() for limitations and details.
 
 
 =item unames () -> [current user name variants]
@@ -3916,6 +3964,13 @@ See C<-w32IISdpsn>.
 See source for details and warnings.
 
 
+=item w32ufswtr () -> system user?
+
+C<User Identification>.
+Returns true if current user is an C<-fswtr> or 'system'.
+This may be due to C<w32IISdpsn> or L<PerlEx|PerlEx> 'DisableImpersonate'.
+
+
 =item w32user (name) -> Win32 AD user Win32::OLE object
 
 C<User Identification>.
@@ -3925,8 +3980,7 @@ Returns L<Win32::OLE|Win32/OLE> AD object for user name given.
 =item w32umail (name(s) string) -> email(s)
 
 C<User Identification>.
-Returns string of e-mail addresses for string of user names given.
-See source code for limitations and details.
+Deprecated, see C<umail>.
 
 
 =item warn (message string) -> warning raise
@@ -4031,7 +4085,7 @@ So, new or previous values may be not available is C<-recForm0R>, C<-recFlim0R>,
 
 Special additional parameters of command may be: 
 
--cmd	=> command or method name,
+-cmd	=> command or method name (i.e. C<recNew>, C<recRead>, C<recIns>, C<recUpd>, C<recDel>, C<recForm>, C<recList>, C<recQBF>, C<frmCall>, C<frmHelp>),
 
 -table	=> table name,
 
@@ -4041,7 +4095,7 @@ Special additional parameters of command may be:
 
 -cmdt	=> table metadata,
 
-and see also below C<User Interface Command Parameters>:
+and see also below C<User Interface Command Parameters>.
 
 
 =back
@@ -4078,6 +4132,10 @@ Also, some of parameters may be used within URLs replacing leading '-' with '_'.
 -frame	=> target frame to use ('set' special value produces 'TOP'/'BOTTOM' frameset),
 
 -search	=> open search browser pane with URL given or C<-search>,
+
+-wikn   => wiki name to find record by,
+
+-wikq   => wiki query specificator to find record with,
 
 -htmlMQH=> C<htmlMQH> call matched
 
@@ -4126,9 +4184,81 @@ another options may be implemented within script itself.
 =back
 
 
+=head1 Web Server Configuration
+
+=over
+
+
+=item CGI Script Configuration sample
+
+('#' - default value)
+
+C<-path>	=>'-ServerRoot' # datastore path
+
+#C<-cgibus>	=>undef		# legacy mode
+
+#C<-url>	=>'/dbix-web'	# filestore URL (/dbix-web or /cgi-bus)
+
+C<-urf>		=>'-path'	# filestore filesystem URL
+
+#C<-fswtr>	=>'System'	# filesystem writers (default is process account)
+
+#C<-login>	=>/cgi-bin/ntlm/# login URL
+
+
+=item Apache Configuration sample
+
+Run 'perl cgi-script C<-setup>' C<Command Line>.
+See 'C<-path>/.htaccess-*' file.
+
+
+=item Microsoft IIS Configuration sample
+
+'RevertToSelf' Windows call controlled with C<-w32IISdpsn>.
+
+ Default Web Site Properties: Home Directory = Read; Scrpts Only; Low (IIS process);
+ cgi-bin directory: C:\Inetpub\wwwroot\cgi-bin; Scripts and Executables; 
+ cgi-bin\dbix-web directory: C:\Inetpub\wwwroot\cgi-bin\dbix-web; Scripts and Executables; 
+ cgi-bin\ntlm virt directory: C:\Inetpub\wwwroot\cgi-bin; Scripts and Executables; Anonymous off
+ cgi-bin\guest virt directory: C:\Inetpub\wwwroot\cgi-bin; Scripts and Executables; Anonymous only
+ dbix-web\rfa directory and 'dbix-web\rfa' url: Read, Browse, Index;
+
+
+=back
+
+
 =head1 VERSION
 
 =over
+
+
+=head2 2008-12-04 - Version 0.77
+
+New #ftext() and #urole() substitutions for SQL WHERE.
+
+Extended C<cgiHelp>().
+
+New C<hreverse>()
+
+Corrected C<cgiRun>(), C<cgiDDLB>().
+
+CMDB and Service Desk example corrections and improvements.
+
+
+=head2 2008-11-09
+
+
+New C<w32ufswtr>, C<-wikq>, C<umail>; deprecated C<w32umail>.
+
+C<new> extended to reuse existed object.
+
+C<cgiDDLB> corrected to comply with its specification.
+
+Corrrections in 
+C<osCmd>, C<cgiDDLB>, C<recWikn>, C<htmlStart>, C<htmlMenu>, C<tfvReferences>,
+C<ugfile>, C<initialize>, C<end>, C<DESTROY>.
+
+CMDB and Service Desk example corrections and improvements.
 
 
 =head2 2008-09-21 - Version 0.76

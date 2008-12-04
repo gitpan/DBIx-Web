@@ -1,9 +1,5 @@
 #!perl -w
-#http://localhost/cgi-bin/cgi-bus/webus.cgi
-BEGIN {
-#push @INC, $1 .'sitel/lib' if !(grep /sitel/i, @INC) && ($INC[0] =~/(.+?[\\\/])lib$/i);
-}
-#$ENV{HTTP_ACCEPT_LANGUAGE} ='';
+
 my $wsdir =$^O eq 'MSWin32' ? Win32::GetFullPathName($0) : $0;
    $wsdir =~s/\\/\//g;
    $wsdir =	  $wsdir =~/^(\w:\/inetpub)\//i
@@ -16,8 +12,10 @@ my $wsdir =$^O eq 'MSWin32' ? Win32::GetFullPathName($0) : $0;
    $wsdir =	  $wsdir =~/^(\w:\/inetpub)\//i ? "$wsdir/wwwroot" : "$wsdir/htdocs";
 
 use DBIx::Web;
-my $w =DBIx::Web->new(
-  -title	=>'DBIx-WeBus'	# title of application
+use vars qw($w);
+#my $w;
+$w =DBIx::Web->new($w
+ ,-title	=>'DBIx-WeBus'	# title of application
 #,-logo		=>'<img src="/icons/p.gif" border="0" />'
  ,-debug	=>2		# debug level
 #,-log          =>0             # logging

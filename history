@@ -1,3 +1,39 @@
+# 2008-12-03 mistake: key:// hyperlinks valid only when -cgibus or table//key syntax
+# 2008-12-01 cgiDDLB() changed: added 'option ... selected' for arrays and hashes
+# 2008-12-01 cgiDDLB() changed: l.options.item(i).innerText !='' ? l.options.item(i).innerText.toLowerCase().indexOf(k)
+# 2008-12-01 cmdb: reversed 'application' choice list
+# 2008-12-01 new hreverse()
+# 2008-11-28 cgiHelp(): added 'urlh',.. '#ftext'...
+# 2008-11-26 cmdb-s: soft translation of 'object' and 'application' choices
+# 2008-11-26 cmdb-s: update 'vtime/-rvcVerWhen', 'recprc' in old records
+#		not useful because of old cgi available
+# 2008-11-25 'sub{' -> 'sub {'
+# 2008-11-18 cgiRun() changing, new -diero eval{} option for plex to DESTROY()
+# 2008-11-18 #urole(role,name) substitution to SQL WHERE
+# 2008-11-16 new dbiWsubst()/dbiWSft(): #ftext('str') substitution to SQL WHERE
+# 2008-11-10 new diags() inspector - destructor count check and some data
+# 2008-11-09 new htmlSubmitSpl(): '&hellip;'
+# 2008-11-09 not needed '&mdash;', '&Chi;'
+# 2008-11-09 PLEX 'DisableImpersonate': w32ufswtr() for tvdFTQuery() # w32IISdpsn()
+# 2008-11-09 w32umail() slow - replace with umail()
+# 2008-11-07 code inspection - recurse refs in 'sub{'/'sub {'
+# 2008-11-05 constructor changed reusing object: new(class, self,-opt=>val)
+# 2008-11-02 end() and DESTROY() edited
+# 2008-11-02 ugfile() changed using Win32::Process::Create()
+# 2008-10-30 cmdb: solutions association within tfvReferences()
+# 2008-10-27 tfvReferences() changed: splicekeys() used; opts considered in hyperlink
+# 2008-10-06 htmlMenu(): 'recNew'  excluded when record editing
+# 2008-10-05 htmlStart(): -target=>'_blank' for $s->cgiHook('recFormRWQ') && $s->{-pcmd}->{-edit}
+# 2008-10-04 recWikn(): new '-wikq'
+# 2008-10-04 cgiDDLB($self,{field},'eqp' mode,{record}) became as documented, was cgiDDLB($s, $f, $em, $qm, $d)
+# 2008-10-04 new w32ufswtr()
+# 2008-10-03 cmdb: corrected '*subject' hyperlink
+# 2008-10-03 cmdb: rename 'Process' -> 'Operation'; does not filled by default
+# 2008-10-03 cmdb: classifier 'cmdbm'+'definition' options commented for 'Application', 'Location', 'Operation'
+# 2008-10-03 cmdb: new 'definition' record type
+# 2008-09-30 osCmd() corrections for 'xcacls','cacls', !win32
+# 2008-09-30 osCmd('cacls') may buzz sometimes somewhy - 'xcacls' may be used
+# 2008-09-21 starting 0.77 version
 # 2008-09-17 new '-w32xcacls' switch
 # 2008-09-05 corrected pthMk()
 # 2008-09-01 redesig of pthCp()/pthStamp() - osCmd(xcopy) replace
