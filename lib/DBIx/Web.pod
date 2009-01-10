@@ -4232,6 +4232,13 @@ See 'C<-path>/.htaccess-*' file.
 =over
 
 
+=head2 2009-01-10 - Version 0.78
+
+C<ugroups> cached in memory shared between DBIx::Web objects, this is alike C<udispq>.
+
+CMDB and Service Desk example corrections and improvements.
+
+
 =head2 2008-12-04 - Version 0.77
 
 New #ftext() and #urole() substitutions for SQL WHERE.

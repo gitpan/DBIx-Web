@@ -46,7 +46,7 @@
 # - cmdb: status classification graphs: object, application, location, personal
 #
 # Done:
-# 2008-12-04 starting 0.78 version
+# 2009-01-10 starting 0.79 version
 #
 
 package DBIx::Web;
@@ -58,7 +58,7 @@ use Fcntl qw(:DEFAULT :flock :seek :mode);
 
 use vars qw($VERSION @ISA @EXPORT @EXPORT_OK %EXPORT_TAGS $AUTOLOAD $SELF $CACHE $LNG $IMG);
 
-	$VERSION= '0.77';
+	$VERSION= '0.78';
 	$SELF   =undef;				# current object pointer, use 'local $SELF'
 	$CACHE	={};				# cache for pointers to subobjects
 	*isa    = \&UNIVERSAL::isa; isa('','');	# isa function
@@ -3050,16 +3050,20 @@ sub unames {	# current user names
 
 sub ugroups {	# user groups
 		# (self, ?user) -> [user's groups]
- return($_[0]->{-c}->{-ugroups})        if !$_[1] && $_[0]->{-c}->{-ugroups};
- if ($_[0]->{-ugroups}) {
-	return($_[0]->{-c}->{-ugroups} =ref($_[0]->{-ugroups}) eq 'CODE'
+ return($_[0]->{-c}->{-ugroups})
+	if !$_[1] && $_[0]->{-c}->{-ugroups};
+ return($_[0]->{-c}->{-ugroups} =ref($_[0]->{-ugroups}) eq 'CODE'
 		? &{$_[0]->{-ugroups}}(@_)
 		: $_[0]->{-ugroups})
- }
+	if $_[0]->{-ugroups};
  my $s =$_[0];
  my $un=$_[1] ||$s->user();
  my $ul=$_[1] ||$s->userln();
- my $ug=undef;
+ my $ug=$CACHE->{-ugroups}->{$un};
+    if ($ug) {
+	$s->logRec('ugroups', $un, 'cache', $ug);
+	return($ug);
+    }
  my $fn=undef;
  my $rs='';
  my $rl='';
@@ -3128,6 +3132,11 @@ sub ugroups {	# user groups
  }
  $s->logRec('ugroups', $un, $rl, $ug) if $rl;
  $s->{-c}->{-ugroups} =$ug if !$_[1];
+ if (1 || ($ENV{MOD_PERL} || (($ENV{GATEWAY_INTERFACE}||'') =~/PerlEx/))) {
+	$CACHE->{-ugroups} ={} if !$CACHE->{-ugroups};
+	$CACHE->{-ugroups} ={} if %{$CACHE->{-ugroups}} >200;
+	$CACHE->{-ugroups}->{$un} =$ug;
+ }
  $ug
 }
 
@@ -7679,8 +7688,8 @@ sub psEval {	# Evaluate perl script file
  my $h =$s->hfNew($f); $h->read($c, -s $f); $h->close();
  $s->output($s->{-c}->{-httpheader} =$s->cgi->header(
 		  -charset => $s->charset()
-		, -expires => 'now'
-	#	, uc($ENV{REQUEST_METHOD}||'') ne 'POST' ? (-expires=>'now') : ()
+	#	, -expires => 'now'
+		, uc($ENV{REQUEST_METHOD}||'') ne 'POST' ? (-expires=>'now') : ()
 		, ref($s->{-httpheader})
 		? %{$s->{-httpheader}}
 		: ()))

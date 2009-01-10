@@ -164,8 +164,8 @@ $w->set(
     'notes'=>{		### notes table
 	 -lbl		=>'Notes'
 	,-cmt		=>'Notes'
-	,-lbl_ru	=>'‡ ¬¥âª¨'
-	,-cmt_ru	=>'‡ ¬¥âª¨'
+	,-lbl_ru	=>'Çàìåòêè'
+	,-cmt_ru	=>'Çàìåòêè'
 	,-expr		=>'cgibus.notes'
 	,-null		=>''
 	,-field		=>[
@@ -210,7 +210,7 @@ $w->set(
 				."IF(status IN('edit','progress','do'), '', ' ')"
 				.", utime)"
 			,-lbl=>'Execution', -cmt=>'Fulfilment ordering of records'
-			,-lbl_ru=>'‚ë¯-¥', -cmt_ru=>'“¯®àï¤®ç¥­¨¥ § ¯¨á¥© ¯® ¢ë¯®«­¥­¨î'
+			,-lbl_ru=>'Âûï-å', -cmt_ru=>'Óïîðÿäî÷åíèå çàïèñåé ïî âûïîëíåíèþ'
 			,-lhstyle=>'width: 20ex'
 			,-ldprop=>'nowrap=true'
 			,-lsthtml=>sub{/(?::\d\d)$/ ? $` : $_}
@@ -238,7 +238,7 @@ $w->set(
 			 }
 		,{-fld=>$w->tn('-rvcState')
 			,-inp=>{ -values=>['ok','edit','chk-out','deleted']
-				,-labels_ru=>{'ok'=>'§ ¢¥àè¥­®','edit'=>'à¥¤ ªâ-¥','deleted'=>'ã¤ «¥­®'}
+				,-labels_ru=>{'ok'=>'çàâåðøåíî','edit'=>'ðåäàêò-å','deleted'=>'óäàëåíî'}
 				}
 			,-flg=>'euql', -null=>undef
 			,-lhstyle=>'width: 14ex'
@@ -302,8 +302,8 @@ $w->set(
    ,'cmdbm'=>{		### cmdbm table
 	 -lbl		=>'CMDB'
 	,-cmt		=>'CMDB - Configuration management database'
-	,-lbl_ru	=>'Š„'
-	,-cmt_ru	=>'Š„ - Š®­ä¨£ãà æ¨®­­ ï ¡ §  ¤ ­­ëå'
+	,-lbl_ru	=>'ÊÁÄ'
+	,-cmt_ru	=>'ÊÁÄ - Êîíôèãóðàöèîííàÿ áàçà äàííûõ'
 	,-expr		=>'cgibus.cmdbm'
 	,-null		=>''
 	,-field		=>[
@@ -340,7 +340,7 @@ $w->set(
 			}
 		,{-fld=>$w->tn('-rvcState')
 			,-inp=>{-values=>['new','change','delete','edit','chk-out','ok','deleted']
-				,-labels_ru=>{'new'=>'¢¢¥áâ¨','change'=>'¨§¬¥­¨âì','delete'=>'¨áª«îç¨âì','edit'=>'à¥¤ ªâ-¥','ok'=>'ok','deleted'=>'ã¤ «¥­®'}
+				,-labels_ru=>{'new'=>'ââåñòè','change'=>'èçìåíèòü','delete'=>'èñêëþ÷èòü','edit'=>'ðåäàêò-å','ok'=>'ok','deleted'=>'óäàëåíî'}
 				}
 			,-flg=>'euq', -null=>undef
 			,-lhstyle=>'width: 5ex'
@@ -370,25 +370,25 @@ $w->set(
 				."'device';\n"
 				."named 'connector' or unnamed 'connection' or cabling of devices;\n"
 				."'usage' of service by computer and/or user, usage of computer by user;\n"
-			,-cmt_ru=>"'®¯¨á ­¨¥' ¨«¨ ¤®ªã¬¥­â æ¨ï;\n"
-				."'á¥à¢¨á', ¯à¨«®¦¥­¨¥ ¨«¨ á¨áâ¥¬ ;\n"
-				."'¯®«ì§®¢ â¥«ì' ¨«¨ £àã¯¯ ,\n"
-				."'£àã¯¯¨à®¢ ­¨¥' ¯®«ì§®¢ â¥«¥©;\n"
-				."'ª®¬¯ìîâ¥à' ¨«¨ ¢ëç¨á«¨â¥«ì­ ï ãáâ ­®¢ª ,\n"
-				."'¨­â¥àä¥©á' ª®¬¯ìîâ¥à  ¢ á¥âì;\n"
-				."'¨­â¥àä¥©á á¥â¨' ¤«ï ¯®¤ª«îç¥­¨ï ª®¬¯ìîâ¥à /¨­â¥àä¥©á ;\n"
-				."'ãáâà®©áâ¢®';\n"
-				."¨¬¥­®¢ ­­ë© 'á®¥¤¨­¨â¥«ì' ¨ ­¥¨¬¥­®¢ ­­®¥ 'á®¥¤¨­¥­¨¥' ãáâà®©áâ¢;\n"
-				."'¯à¨¬¥­¥­¨¥' á¥à¢¨á  ª®¬¯ìîâ¥à®¬ ¨/¨«¨ ¯®«ì§®¢ â¥«¥¬, «¨¡® ª®¬¯ìîâ¥à  ¯®«ì§®¢ â¥«¥¬;\n"
+			,-cmt_ru=>"'îïèñàíèå' èëè äîêóìåíòàöèÿ;\n"
+				."'ñåðâèñ', ïðèëîæåíèå èëè ñèñòåìà;\n"
+				."'ïîëüçîâàòåëü' èëè ãðóïïà,\n"
+				."'ãðóïïèðîâàíèå' ïîëüçîâàòåëåé;\n"
+				."'êîìïüþòåð' èëè âû÷èñëèòåëüíàÿ óñòàíîâêà,\n"
+				."'èíòåðôåéñ' êîìïüþòåðà â ñåòü;\n"
+				."'èíòåðôåéñ ñåòè' äëÿ ïîäêëþ÷åíèÿ êîìïüþòåðà/èíòåðôåéñà;\n"
+				."'óñòðîéñòâî';\n"
+				."èìåíîâàííûé 'ñîåäèíèòåëü' è íåèìåíîâàííîå 'ñîåäèíåíèå' óñòðîéñòâ;\n"
+				."'ïðèìåíåíèå' ñåðâèñà êîìïüþòåðîì è/èëè ïîëüçîâàòåëåì, ëèáî êîìïüþòåðà ïîëüçîâàòåëåì;\n"
 			,-inp=>{-values=>['description','service','user','grouping','computer','interface','device','netint','connector','connection','usage']
-				,-labels_ru=>{'description'=>'®¯¨á ­¨¥','service'=>'á¥à¢¨á'
-						,'user'=>'¯®«ì§®¢ â¥«ì','grouping'=>'£àã¯¯¨à®¢ ­¨¥'
-						,'computer'=>'ª®¬¯ìîâ¥à','interface'=>'¨­â¥àä¥©á'
-						,'device'=>'ãáâà®©áâ¢®'
-						,'connector'=>'á®¥¤¨­¨â¥«ì'
-						,'connection'=>'á®¥¤¨­¥­¨¥'
-						,'usage'=>'¯à¨¬¥­¥­¨¥'
-						,'netint'=>'¨­â.á¥â¨'}
+				,-labels_ru=>{'description'=>'îïèñàíèå','service'=>'ñåðâèñ'
+						,'user'=>'ïîëüçîâàòåëü','grouping'=>'ãðóïïèðîâàíèå'
+						,'computer'=>'êîìïüþòåð','interface'=>'èíòåðôåéñ'
+						,'device'=>'óñòðîéñòâî'
+						,'connector'=>'ñîåäèíèòåëü'
+						,'connection'=>'ñîåäèíåíèå'
+						,'usage'=>'ïðèìåíåíèå'
+						,'netint'=>'èíò.ñåòè'}
 				,-loop=>1
 				}
 			,-flg=>'euq', -null=>undef
@@ -397,7 +397,7 @@ $w->set(
 			} # , ''
 		,{-fld=>'name'
 			,-lbl=>'Name', -cmt=>'Configuration item name'
-			,-lbl_ru=>'ˆ¬ï', -cmt_ru=>'ˆ¬ï ª®­ä¨£ãà æ¨®­­®© ¥¤¨­¨æë'
+			,-lbl_ru=>'Èìÿ', -cmt_ru=>'Èìÿ êîíôèãóðàöèîííîé åäèíèöû'
 			,-flg=>'euq', -null=>undef
 			,-inp=>{-asize=>60}
 			,-hidel=>$w->{-a_cmdbm_fh}
@@ -413,7 +413,7 @@ $w->set(
 			}
 		,{-fld=>'vsubject'
 			,-lbl=>'Subject'
-			,-lbl_ru=>'’¥¬ '
+			,-lbl_ru=>'Òåìà'
 			,-flg=>'-', -hidel=>1
 			,-expr=>"IF(name IS NOT NULL AND name !='',"
 				."CONCAT_WS(' - ', name, definition),"
@@ -446,19 +446,19 @@ $w->set(
 			}
 		,{-fld=>'vorder'
 			,-lbl=>'Sorting'
-			,-lbl_ru=>'‘®àâ¨à®¢ª '
+			,-lbl_ru=>'Ñîðòèðîâêà'
 			,-flg=>'-', -hidel=>1
 			,-expr=>"IF(record='description',0,IF(record='service',1,IF(record='device',2,IF(record='computer' OR record='interface',3,IF(record='netint',4,IF(record='connection' OR record='connector',5,IF(record='user',6,IF(record='usage' AND action='supplier',7,IF(record='usage' AND role !='user',8,9)))))))))"
 			}
 		,{-fld=>'vordh'
 			,-lbl=>'Sorting'
-			,-lbl_ru=>'‘®àâ¨à®¢ª '
+			,-lbl_ru=>'Ñîðòèðîâêà'
 			,-flg=>'f', -hidel=>1
 			,-expr=>"IF(system IS NULL OR system='',0,IF(record='description',1,IF(record='service',2,IF(record='device',3,IF(record='computer' OR record='interface',4,IF(record='netint',4,IF(record='connection' OR record='connector',5,IF(record='user',6,IF(record='usage' AND action='supplier',7,IF(record='usage' AND role !='user',8,9))))))))))"
 			}
 		,{-fld=>'system'
 			,-lbl=>'System', -cmt=>'System including descriptions, services, users, computers/interfaces, devices'
-			,-lbl_ru=>'‘¨áâ¥¬ ', -cmt_ru=>'‘¨áâ¥¬ , ¢ª«îç îé ï ®¯¨á ­¨ï, á¥à¢¨áë, ¯®«ì§®¢ â¥«¥©, ª®¬¯ìîâ¥àë/¨­â¥àä¥©áë, ãáâà®©áâ¢ '
+			,-lbl_ru=>'Ñèñòåìà', -cmt_ru=>'Ñèñòåìà, âêëþ÷àþùàÿ îïèñàíèÿ, ñåðâèñû, ïîëüçîâàòåëåé, êîìïüþòåðû/èíòåðôåéñû, óñòðîéñòâà'
 			,-flg=>'euq'
 			#,-inp=>{-asize=>60}
 			,-hidel=>$w->{-a_cmdbm_fho}
@@ -472,7 +472,7 @@ $w->set(
 			}
 		,{-fld=>'slot'
 			,-lbl=>'Slot', -cmt=>'Slot of the system/computer/device where device installed'
-			,-lbl_ru=>'‘«®â', -cmt_ru=>'‘«®â ãáâ ­®¢ª¨ ãáâà®©áâ¢  ¢ á¨áâ¥¬ã/ª®¬¯ìîâ¥à/ãáâà®©áâ¢®'
+			,-lbl_ru=>'Ñëîò', -cmt_ru=>'Ñëîò óñòàíîâêè óñòðîéñòâà â ñèñòåìó/êîìïüþòåð/óñòðîéñòâî'
 			,-flg=>'euq'
 			,-hidel=>$w->{-a_cmdbm_fho} 
 			,-ddlb =>sub{$_[0]->cgiQueryFv('','slot')}, -form=>'cmdbm'
@@ -480,12 +480,12 @@ $w->set(
 			}
 		,{-fld=>'type'
 			,-lbl=>'Type', -cmt=>'Type of computer, description or typisation service, may be in \'Types\' container'
-			,-lbl_ru=>'’¨¯', -cmt_ru=>'’¨¯ ª®¬¯ìîâ¥à , ®¯¨á ­¨¥ ¨«¨ â¨¯¨§¨àãîé¨© á¥à¢¨á, ¬®¦¥â ­ å®¤¨âìáï ¢ ª®­â¥©­¥à¥ \'’¨¯ë\''
+			,-lbl_ru=>'Òèï', -cmt_ru=>'Òèï êîìïüþòåðà, îïèñàíèå èëè òèïèçèðóþùèé ñåðâèñ, ìîæåò íàõîäèòüñÿ â êîíòåéíåðå \'Òèïû\''
 			,-flg=>'euq'
 			,-hidel=>$w->{-a_cmdbm_fho}
 			,-ddlb=> sub{$_[0]->cgiQuery('cmdbmn',undef
 					,{-qkey=>{'record'=>['service','description']
-					 ,$_ ? ('system'=>$_) : ('system'=>['','Types','’¨¯ë'])}
+					 ,$_ ? ('system'=>$_) : ('system'=>['','Types','Òèïû'])}
 					,$_ ? () : (-qorder=>['vordh','name'])
 					})}
 			,-ddlbloop=>1
@@ -494,12 +494,12 @@ $w->set(
 			},''
 		,{-fld=>'os'
 			,-lbl=>'OS', -cmt=>'Operation System, description, may be in \'OS\' container'
-			,-lbl_ru=>'Ž‘', -cmt_ru=>'Ž¯¥à æ¨®­­ ï á¨áâ¥¬  / á¥â¥¢®¥ ¯à®£à ¬¬­®¥ ®¡¥á¯¥ç¥­¨¥, ®¯¨á ­¨¥, ¬®¦¥â ­ å®¤¨âìáï ¢ ª®­â¥©­¥à¥ \'Ž‘\''
+			,-lbl_ru=>'ÎÑ', -cmt_ru=>'Îïåðàöèîííàÿ ñèñòåìà / ñåòåâîå ïðîãðàììíîå îáåñïå÷åíèå, îïèñàíèå, ìîæåò íàõîäèòüñÿ â êîíòåéíåðå \'ÎÑ\''
 			,-flg=>'euq'
 			,-hidel=>$w->{-a_cmdbm_fho}
 			,-ddlb=> sub{$_[0]->cgiQuery('cmdbmn',undef
 					,{-qkey=>{'record'=>['service','description']
-					 ,$_ ? ('system'=>$_) : ('system'=>['','OS','Ž‘'])}
+					 ,$_ ? ('system'=>$_) : ('system'=>['','OS','ÎÑ'])}
 					,$_ ? () : (-qorder=>['vordh','name'])
 					})}
 			,-ddlbloop=>1
@@ -507,18 +507,18 @@ $w->set(
 			},
 		,{-fld=>'invno'
 			,-lbl=>'Inv#', -cmt=>'Inventory number of computer'
-			,-lbl_ru=>'ˆ­¢ü', -cmt_ru=>'ˆ­¢¥­â à­ë© ¨«¨ § ¢®¤áª®© ­®¬¥à'
+			,-lbl_ru=>'Èíâ¹', -cmt_ru=>'Èíâåíòàðíûé èëè çàâîäñêîé íîìåð'
 			,-flg=>'euq'
 			,-hidel=>$w->{-a_cmdbm_fho}
 			},''
 		,{-fld=>'office'
 			,-lbl=>'Office', -cmt=>'Office or subdivision, description or organisation structure service, may be in \'Offices\' container'
-			,-lbl_ru=>'®¤à §¤.', -cmt_ru=>'®¤à §¤¥«¥­¨¥, ®â¤¥«, á«ã¦¡ , ®¯¨á ­¨¥ ¨«¨ ®à£áâàãªâãà­ë© á¥à¢¨á, ¬®¦¥â ­ å®¤¨âìáï ¢ ª®­â¥©­¥à¥ \'®¤à §¤¥«¥­¨ï\''
+			,-lbl_ru=>'Ïîäðàçä.', -cmt_ru=>'Ïîäðàçäåëåíèå, îòäåë, ñëóæáà, îïèñàíèå èëè îðãñòðóêòóðíûé ñåðâèñ, ìîæåò íàõîäèòüñÿ â êîíòåéíåðå \'Ïîäðàçäåëåíèÿ\''
 			,-flg=>'euq'
 			,-hidel=>$w->{-a_cmdbm_fho}
 			,-ddlb=> sub{$_[0]->cgiQuery('cmdbmn',undef
 					,{-qwhere=>"record IN('description','service','user')"
-						.($_ ? '' : " AND (system IS NULL OR system='' OR system IN('Offices','®¤à §¤¥«¥­¨ï') OR record='user')")
+						.($_ ? '' : " AND (system IS NULL OR system='' OR system IN('Offices','Ïîäðàçäåëåíèÿ') OR record='user')")
 					, -qkey=>{$_ ? ('system'=>$_) : ()}
 					, $_ ? () : (-qorder=>['vordh','name'])
 					})}
@@ -527,12 +527,12 @@ $w->set(
 			},''
 		,{-fld=>'location'
 			,-lbl=>'Location', -cmt=>'Location of computer or device, description or apartment service, may be in \'Locations\' container'
-			,-lbl_ru=>'Œ¥áâ®', -cmt_ru=>'Œ¥áâ®­ å®¦¤¥­¨¥ ª®¬¯ìîâ¥à  ¨«¨ ãáâà®©áâ¢ , ®¯¨á ­¨¥ ¨«¨ á¥à¢¨á à §¬¥é¥­¨ï, ¬®¦¥â ­ å®¤¨âìáï ¢ ª®­â¥©­¥à¥ \'Œ¥áâ®­ å®¦¤¥­¨ï\''
+			,-lbl_ru=>'Ìåñòî', -cmt_ru=>'Ìåñòîíàõîæäåíèå êîìïüþòåðà èëè óñòðîéñòâà, îïèñàíèå èëè ñåðâèñ ðàçìåùåíèÿ, ìîæåò íàõîäèòüñÿ â êîíòåéíåðå \'Ìåñòîíàõîæäåíèÿ\''
 			,-flg=>'euq'
 			,-hidel=>$w->{-a_cmdbm_fho}
 			,-ddlb=> sub{$_[0]->cgiQuery('cmdbmn',undef
 					,{-qkey=>{'record'=>['service','description']
-					 ,$_ ? ('system'=>$_) : ('system'=>['','Locations','Apartments','Œ¥áâ®­ å®¦¤¥­¨ï','®¬¥é¥­¨ï'])}
+					 ,$_ ? ('system'=>$_) : ('system'=>['','Locations','Apartments','Ìåñòîíàõîæäåíèÿ','Ïîìåùåíèÿ'])}
 					,$_ ? () : (-qorder=>['vordh','name'])
 					})}
 			,-ddlbloop=>1
@@ -540,12 +540,12 @@ $w->set(
 			}
 		,{-fld=>'model'
 			,-lbl=>'Model', -cmt=>'Model of computer or device, descriptio or typisation service, may be in \'Models\' container'
-			,-lbl_ru=>'Œ®¤¥«ì', -cmt_ru=>'Œ®¤¥«ì ª®¬¯ìîâ¥à  ¨«¨ ãáâà®©áâ¢ , ®¯¨á ­¨¥ ¨«¨ â¨¯¨§¨àãîé¨© á¥à¢¨á, ¬®¦¥â ­ å®¤¨âìáï ¢ ª®­â¥©­¥à¥ \'Œ®¤¥«¨\''
+			,-lbl_ru=>'Ìîäåëü', -cmt_ru=>'Ìîäåëü êîìïüþòåðà èëè óñòðîéñòâà, îïèñàíèå èëè òèïèçèðóþùèé ñåðâèñ, ìîæåò íàõîäèòüñÿ â êîíòåéíåðå \'Ìîäåëè\''
 			,-flg=>'euq'
 			,-hidel=>$w->{-a_cmdbm_fho}
 			,-ddlb=> sub{$_[0]->cgiQuery('cmdbmn',undef
 					,{-qkey=>{'record'=>['service','description']
-					 ,$_ ? ('system'=>$_) : ('system'=>['','Models','Œ®¤¥«¨'])}
+					 ,$_ ? ('system'=>$_) : ('system'=>['','Models','Ìîäåëè'])}
 					,$_ ? () : (-qorder=>['vordh','name'])
 					})}
 			,-ddlbloop=>1
@@ -553,7 +553,7 @@ $w->set(
 			},''
 		,{-fld=>'hardware'
 			,-lbl=>'Hardware', -cmt=>'Hardware description'
-			,-lbl_ru=>'• à ªâ.', -cmt_ru=>'Ž¯¨á ­¨¥  ¯¯ à â­®£® ®¡¥á¯¥ç¥­¨ï'
+			,-lbl_ru=>'Õàðàêò.', -cmt_ru=>'Îïèñàíèå àïïàðàòíîãî îáåñïå÷åíèÿ'
 			,-flg=>'euq'
 			,-hidel=>$w->{-a_cmdbm_fho}
 			,-inp=>{-asize=>60}
@@ -561,31 +561,31 @@ $w->set(
 			},
 		,{-fld=>'cpu'
 			,-lbl=>'CPU', -cmt=>'Central Processor Unit'
-			,-lbl_ru=>'CPU', -cmt_ru=>'à®æ¥áá®à'
+			,-lbl_ru=>'CPU', -cmt_ru=>'Ïðîöåññîð'
 			,-flg=>'euq'
 			,-hidel=>$w->{-a_cmdbm_fho}
 			,-ddlb =>sub{$_[0]->cgiQueryFv('','cpu')}, -form=>'cmdbm'
 			}, ''
 		,{-fld=>'ram'
 			,-lbl=>'RAM', -cmt=>'RAM capacity, Mb'
-			,-lbl_ru=>'RAM', -cmt_ru=>'Ž¡ê¥¬ ®¯¥à â¨¢­®© ¯ ¬ïâ¨, Mb'
+			,-lbl_ru=>'RAM', -cmt_ru=>'Îáúåì îïåðàòèâíîé ïàìÿòè, Mb'
 			,-flg=>'euq'
 			,-hidel=>$w->{-a_cmdbm_fho}
 			}, ''
 		,{-fld=>'hdd'
 			,-lbl=>'HDD', -cmt=>'Main HDD capacity, Gb'
-			,-lbl_ru=>'HDD', -cmt_ru=>'Ž¡ê¥¬ ®á­®¢­®© ¤¨áª®¢®© ¯ ¬ïâ¨, Gb'
+			,-lbl_ru=>'HDD', -cmt_ru=>'Îáúåì îñíîâíîé äèñêîâîé ïàìÿòè, Gb'
 			,-flg=>'euq'
 			,-hidel=>$w->{-a_cmdbm_fho}
 			}
 		,{-fld=>'application'
 			,-lbl=>'Application', -cmt=>'Application to use a service, description or service, may be in \'Applications\' container'
-			,-lbl_ru=>'à¨«®¦¥­¨¥', -cmt_ru=>'à¨«®¦¥­¨¥ ¤®áâã¯  ª á¥à¢¨áã, ®¯¨á ­¨¥ ¨«¨ á¥à¢¨á, ¬®¦¥â ­ å®¤¨âìáï ¢ ª®­â¥©­¥à¥ \'à¨«®¦¥­¨ï\''
+			,-lbl_ru=>'Ïðèëîæåíèå', -cmt_ru=>'Ïðèëîæåíèå äîñòóïà ê ñåðâèñó, îïèñàíèå èëè ñåðâèñ, ìîæåò íàõîäèòüñÿ â êîíòåéíåðå \'Ïðèëîæåíèÿ\''
 			,-flg=>'euq'
 			,-hidel=>$w->{-a_cmdbm_fho}
 			,-ddlb=> sub{$_[0]->cgiQuery('cmdbmn',undef
 					,{-qkey=>{'record'=>['service','description']
-					 ,$_ ? ('system'=>$_) : ('system'=>['','Applications','à¨«®¦¥­¨ï'])}
+					 ,$_ ? ('system'=>$_) : ('system'=>['','Applications','Ïðèëîæåíèÿ'])}
 					,$_ ? () : (-qorder=>['vordh','name'])
 					})}
 			,-ddlbloop=>1
@@ -594,7 +594,7 @@ $w->set(
 			}
 		,{-fld=>'service'
 			,-lbl=>'Service', -cmt=>'Service being used/supplied'
-			,-lbl_ru=>'‘¥à¢¨á', -cmt_ru=>'‘¥à¢¨á, ¯à¨¬¥­ï¥¬ë©/¯®áâ ¢«ï¥¬ë©'
+			,-lbl_ru=>'Ñåðâèñ', -cmt_ru=>'Ñåðâèñ, ïðèìåíÿåìûé/ïîñòàâëÿåìûé'
 			,-flg=>'euq'
 			,-hidel=>$w->{-a_cmdbm_fho}
 			,-ddlb=> sub{$_[0]->cgiQuery('cmdbmn',undef
@@ -606,12 +606,12 @@ $w->set(
 			}
 		,{-fld=>'device'
 			,-lbl=>'Device', -cmt=>'Device/computer connected'
-			,-lbl_ru=>'“áâà®©áâ¢®', -cmt_ru=>'®¤ª«îç ¥¬®¥ ãáâà®©áâ¢®/ª®¬¯ìîâ¥à'
+			,-lbl_ru=>'Óñòðîéñòâî', -cmt_ru=>'Ïîäêëþ÷àåìîå óñòðîéñòâî/êîìïüþòåð'
 			,-flg=>'euq'
 			,-hidel=>$w->{-a_cmdbm_fho}
 			,-ddlb=> sub{$_[0]->cgiQuery('cmdbmn',undef
 					,{-qwhere=>"record IN('description','service','computer','device','netint')"
-						.($_ ? '' : " AND (system IS NULL OR system='' OR system IN('Computers','Š®¬¯ìîâ¥àë') OR record='computer')")
+						.($_ ? '' : " AND (system IS NULL OR system='' OR system IN('Computers','Êîìïüþòåðû') OR record='computer')")
 					, -qkey=>{$_ ? ('system'=>$_) : ()}
 					, $_ ? () : (-qorder=>['vordh','name'])
 					})}
@@ -620,21 +620,21 @@ $w->set(
 			}
 		,{-fld=>'action'
 			,-lbl=>'Action', -cmt=>'Action of the computer delivering/accepting service'
-			,-lbl_ru=>'„¥©áâ¢¨¥', -cmt_ru=>'„¥©áâ¢¨¥ ¢ëç¨á«¨â¥«ì­®© ãáâ ­®¢ª¨ ¯® ¯à¥¤®áâ ¢«¥­¨î ¨«¨ ¯®âà¥¡«¥­¨î ãá«ã£¨'
+			,-lbl_ru=>'Äåéñòâèå', -cmt_ru=>'Äåéñòâèå âû÷èñëèòåëüíîé óñòàíîâêè ïî ïðåäîñòàâëåíèþ èëè ïîòðåáëåíèþ óñëóãè'
 			,-flg=>'euq'
 			,-hidel=>$w->{-a_cmdbm_fho}
 			,-inp=>{-values=>['','user','supplier']
-				,-labels_ru=>{''=>'','user'=>'¯®âà¥¡¨â¥«ì','supplier'=>'¯®áâ ¢é¨ª'}
+				,-labels_ru=>{''=>'','user'=>'ïîòðåáèòåëü','supplier'=>'ïîñòàâùèê'}
 				}
 			}, ''
 		,{-fld=>'computer'
 			,-lbl=>'Computer', -cmt=>'Computer installation (server, cluster, desktop, or another)'
-			,-lbl_ru=>'Š®¬¯ìîâ¥à', -cmt_ru=>'‚ëç¨á«¨â¥«ì­ ï ãáâ ­®¢ª  (á¥à¢¥à, ª« áâ¥à, ­ áâ®«ì­ ï á¨áâ¥¬ , ¨ â.¯.)'
+			,-lbl_ru=>'Êîìïüþòåð', -cmt_ru=>'Âû÷èñëèòåëüíàÿ óñòàíîâêà (ñåðâåð, êëàñòåð, íàñòîëüíàÿ ñèñòåìà, è ò.ï.)'
 			,-flg=>'euq'
 			,-hidel=>$w->{-a_cmdbm_fho}
 			,-ddlb=> sub{$_[0]->cgiQuery('cmdbmn',undef
 					,{-qwhere=>"record IN('description','service','computer')"
-						.($_ ? '' : " AND (system IS NULL OR system='' OR system IN('Computers','Š®¬¯ìîâ¥àë') OR record='computer')")
+						.($_ ? '' : " AND (system IS NULL OR system='' OR system IN('Computers','Êîìïüþòåðû') OR record='computer')")
 					, -qkey=>{$_ ? ('system'=>$_) : ()}
 					, $_ ? () : (-qorder=>['vordh','name'])
 					})}
@@ -643,7 +643,7 @@ $w->set(
 			},''
 		,{-fld=>'interface'
 			,-lbl=>'Interface', -cmt=>'Computer\'s network interface'
-			,-lbl_ru=>'ˆ­â¥àä¥©á', -cmt_ru=>'‘¥â¥¢®© ¨­â¥àä¥©á ¢ëç¨á«¨â¥«ì­®© ãáâ ­®¢ª¨'
+			,-lbl_ru=>'Èíòåðôåéñ', -cmt_ru=>'Ñåòåâîé èíòåðôåéñ âû÷èñëèòåëüíîé óñòàíîâêè'
 			,-flg=>'euq'
 			,-hidel=>$w->{-a_cmdbm_fho}
 			,-ddlb=> sub{$_[0]->cgiQuery('cmdbmn',undef
@@ -658,7 +658,7 @@ $w->set(
 			}
 		,{-fld=>'port'
 			,-lbl=>'Port', -cmt=>'Device\'s port connected'
-			,-lbl_ru=>'®àâ', -cmt_ru=>'®¤ª«îç ¥¬ë© ¯®àâ ãáâà®©áâ¢ '
+			,-lbl_ru=>'Ïîðò', -cmt_ru=>'Ïîäêëþ÷àåìûé ïîðò óñòðîéñòâà'
 			,-flg=>'euq'
 			,-hidel=>$w->{-a_cmdbm_fho}
 			,-ddlb =>sub{$_[0]->cgiQueryFv('','port')}, -form=>'cmdbm'
@@ -666,44 +666,44 @@ $w->set(
 			}
 		,{-fld=>'ipaddr'
 			,-lbl=>'IP addr', -cmt=>'TCP/IP address'
-			,-lbl_ru=>'€¤à¥á IP', -cmt_ru=>'€¤à¥á TCP/IP'
+			,-lbl_ru=>'Àäðåñ IP', -cmt_ru=>'Àäðåñ TCP/IP'
 			,-flg=>'euq'
 			,-hidel=>$w->{-a_cmdbm_fho}
 			}, ''
 		,{-fld=>'ipmask'
 			,-lbl=>'IP mask', -cmt=>'TCP/IP network mask'
-			,-lbl_ru=>'Œ áª  IP', -cmt_ru=>'Œ áª  á¥â¨ TCP/IP'
+			,-lbl_ru=>'Ìàñêà IP', -cmt_ru=>'Ìàñêà ñåòè TCP/IP'
 			,-flg=>'euq'
 			,-hidel=>$w->{-a_cmdbm_fho}
 			}, ''
 		,{-fld=>'macaddr'
 			,-lbl=>'MAC', -cmt=>'MAC address'
-			,-lbl_ru=>'MAC', -cmt_ru=>'€¤à¥á MAC'
+			,-lbl_ru=>'MAC', -cmt_ru=>'Àäðåñ MAC'
 			,-flg=>'euq'
 			,-hidel=>$w->{-a_cmdbm_fho}
 			}
 		,{-fld=>'speed'
 			,-lbl=>'Speed', -cmt=>'Network speed mbit/sec'
-			,-lbl_ru=>'‘ª®à®áâì', -cmt_ru=>'‘ª®à®áâì á¥â¨ mbit/sec'
+			,-lbl_ru=>'Ñêîðîñòü', -cmt_ru=>'Ñêîðîñòü ñåòè mbit/sec'
 			,-flg=>'euq'
 			,-hidel=>$w->{-a_cmdbm_fho}
 			,-inp=>{-values=>['',10,100,1000,10000]}
 			},''
 		,{-fld=>'duplex'
 			,-lbl=>'Duplex', -cmt=>'Network speed mbit/sec'
-			,-lbl_ru=>'„ã¯«¥ªá', -cmt_ru=>'¥¦¨¬ ¤ã¯«¥ªá  á¥â¨'
+			,-lbl_ru=>'Äóïëåêñ', -cmt_ru=>'Ðåæèì äóïëåêñà ñåòè'
 			,-flg=>'euq'
 			,-hidel=>$w->{-a_cmdbm_fho}
 			,-inp=>{-values=>['',0,1], -labels=>{0=>'Off', 1=>'On'}}
 			}
 		,{-fld=>'ugroup'
 			,-lbl=>'Group', -cmt=>'Group including user'
-			,-lbl_ru=>'ƒàã¯¯ ', -cmt_ru=>'ƒàã¯¯ , ¢ ª®â®àãî ¢ª«îç ¥âáï ¯®«ì§®¢ â¥«ì'
+			,-lbl_ru=>'Ãðóïïà', -cmt_ru=>'Ãðóïïà, â êîòîðóþ âêëþ÷àåòñÿ ïîëüçîâàòåëü'
 			,-flg=>'euq'
 			,-hidel=>$w->{-a_cmdbm_fho}
 			,-ddlb=> sub{$_[0]->cgiQuery('cmdbmn',undef
 					,{-qwhere=>"record IN('description','service','user')"
-						.($_ ? '' : " AND (system IS NULL OR system='' OR system IN('Users','®«ì§®¢ â¥«¨') OR record='user')")
+						.($_ ? '' : " AND (system IS NULL OR system='' OR system IN('Users','Ïîëüçîâàòåëè') OR record='user')")
 					, -qkey=>{$_ ? ('system'=>$_) : ()}
 					, $_ ? () : (-qorder=>['vordh','name'])
 					})}
@@ -713,29 +713,29 @@ $w->set(
 			}
 		,{-fld=>'role'
 			,-lbl=>'Role', -cmt=>'Role of the user'
-			,-lbl_ru=>'®«ì', -cmt_ru=>'®«ì ¯®«ì§®¢ â¥«ï'
+			,-lbl_ru=>'Ðîëü', -cmt_ru=>'Ðîëü ïîëüçîâàòåëÿ'
 			,-flg=>'euq'
 			,-hidel=>$w->{-a_cmdbm_fho}
 			,-inp=>{-values=>['','user','responsible','sysadmin','sysadmin double','appadmin','appadmin double','security','security double']
-				,-labels_ru=>{''=>'','user'=>'¯®«ì§®¢ â¥«ì'
-						,'responsible'=>'®â¢¥âáâ¢¥­­ë©'
-						,'sysadmin'=>'á¨áâ¥¬­ë©  ¤¬-à'
-						,'sysadmin double'=>'¤ã¡«¥à á¨áâ. ¤¬.'
-						,'appadmin'=>'¯à¨ª« ¤­®©  ¤¬-à'
-						,'appadmin double'=>'¤ã¡«¥à ¯à¨ª«. ¤¬.'
-						,'security'=>' ¤¬-à ¡¥§®¯ á­®áâ¨'
-						,'security double'=>'¤ã¡«¥à  ¤¬.¡¥§®¯.'
+				,-labels_ru=>{''=>'','user'=>'ïîëüçîâàòåëü'
+						,'responsible'=>'îòâåòñòâåííûé'
+						,'sysadmin'=>'ñèñòåìíûé àäì-ð'
+						,'sysadmin double'=>'äóáëåð ñèñò.àäì.'
+						,'appadmin'=>'ïðèêëàäíîé àäì-ð'
+						,'appadmin double'=>'äóáëåð ïðèêë.àäì.'
+						,'security'=>'àäì-ð áåçîïàñíîñòè'
+						,'security double'=>'äóáëåð àäì.áåçîï.'
 						}
 				}
 			}, ''
 		,{-fld=>'user'
 			,-lbl=>'User', -cmt=>'User name'
-			,-lbl_ru=>'®«ì§®¢ â¥«ì', -cmt_ru=>'ˆ¬ï ¯®«ì§®¢ â¥«ï'
+			,-lbl_ru=>'Ïîëüçîâàòåëü', -cmt_ru=>'Èìÿ ïîëüçîâàòåëÿ'
 			,-flg=>'euq'
 			,-hidel=>$w->{-a_cmdbm_fho}
 			,-ddlb=> sub{$_[0]->cgiQuery('cmdbmn',undef
 					,{-qwhere=>"record IN('description','service','user')"
-						.($_ ? '' : " AND (system IS NULL OR system='' OR system IN('Users','®«ì§®¢ â¥«¨') OR record='user')")
+						.($_ ? '' : " AND (system IS NULL OR system='' OR system IN('Users','Ïîëüçîâàòåëè') OR record='user')")
 					, -qkey=>{$_ ? ('system'=>$_) : ()}
 					, $_ ? () : (-qorder=>['vordh','name'])
 					})}
@@ -752,26 +752,26 @@ $w->set(
 			}
 		,{-fld=>'userdef'
 			,-lbl=>'UserDef', -cmt=>'User definition'
-			,-lbl_ru=>'Ž¯à®«ì§', -cmt_ru=>'Ž¯à¥¤¥«¥­¨¥ ¯®«ì§®¢ â¥«ï'
+			,-lbl_ru=>'ÎïðÏîëüç', -cmt_ru=>'Îïðåäåëåíèå ïîëüçîâàòåëÿ'
 			,-flg=>'', -hidel=>1
 			}
 		,{-fld=>'seclvl'
 			,-lbl=>'Permit', -cmt=>'Security level/clearance/classification'
-			,-lbl_ru=>'„®¯ãáª', -cmt_ru=>'“à®¢¥­ì ¡¥§®¯ á­®áâ¨/§ é¨âë/¤®áâã¯ '
+			,-lbl_ru=>'Äîïóñê', -cmt_ru=>'Óðîâåíü áåçîïàñíîñòè/çàùèòû/äîñòóïà'
 			,-flg=>'euq'
 			,-hidel=>$w->{-a_cmdbm_fho} 
 			,-inp=>{ -values=>['', qw(public corporate restricted confidentl secret)]
 				,-labels_ru=>{	''	=>''
-						,'public' => '¯ã¡«¨ç­ë©'
-						,'corporate' => 'ª®à¯®à â¨¢­ë©'
-						,'restricted' => '®£à ­¨ç¥­­ë©'
-						,'confidentl' => 'ª®­ä¨¤¥­æ¨ «ì­ë©'
-						,'secret' => 'â ©­ '
+						,'public' => 'ïóáëè÷íûé'
+						,'corporate' => 'êîðïîðàòèâíûé'
+						,'restricted' => 'îãðàíè÷åííûé'
+						,'confidentl' => 'êîíôèäåíöèàëüíûé'
+						,'secret' => 'òàéíà'
 						}}
 			},
 		#,{-fld=>'stmt'
 		#	,-lbl=>'Stmt *', -cmt=>'[obsolete/legacy/removal] Statement of work'
-		#	,-lbl_ru=>'Žá­®¢ ­¨¥ *', -cmt_ru=>'[ãáâ à¥«®/ã­ á«¥¤®¢ ­®/¨áª«îç¥­¨¥] Žá­®¢ ­¨¥ ¢ë¯®«­¥­¨ï à ¡®â'
+		#	,-lbl_ru=>'Îñíîâàíèå *', -cmt_ru=>'[óñòàðåëî/óíàñëåäîâàíî/èñêëþ÷åíèå] Îñíîâàíèå âûïîëíåíèÿ ðàáîò'
 		#	,-flg=>'euq'
 		#	,-hidel=>1
 		#	,-ddlb =>sub{$_[0]->cgiQueryFv('','stmt')}, -form=>'cmdbm'
@@ -784,7 +784,7 @@ $w->set(
 		#	}
 		,{-fld=>'definition'
 			,-lbl=>'Def', -cmt=>'Configuration item short definition'
-			,-lbl_ru=>'Ž¯à-¥', -cmt_ru=>'Ž¯à¥¤¥«¥­¨¥ (ªà âª®¥ ®¯¨á ­¨¥) ª®­ä¨£ãà æ¨®­­®© ¥¤¨­¨æë'
+			,-lbl_ru=>'Îïð-å', -cmt_ru=>'Îïðåäåëåíèå (êðàòêîå îïèñàíèå) êîíôèãóðàöèîííîé åäèíèöû'
 			,-flg=>'euq', -null=>undef
 			,-inp=>{-asize=>100}
 			,-hidel=>$w->{-a_cmdbm_fh}
@@ -1052,8 +1052,8 @@ $w->set(
    ,'hdesk'=>{		### hdesk table
 	 -lbl		=>'Service Desk'
 	,-cmt		=>'Service Desk for requests and incidents'
-	,-lbl_ru	=>'–¥­âà Ž¡á«ã¦.'
-	,-cmt_ru	=>'–¥­âà ®¡á«ã¦¨¢ ­¨ï § ¯à®á®¢ ¨ ¨­æ¨¤¥­â®¢'
+	,-lbl_ru	=>'Öåíòð Îáñëóæ.'
+	,-cmt_ru	=>'Öåíòð îáñëóæèâàíèÿ çàïðîñîâ è èíöèäåíòîâ'
 	,-expr		=>'cgibus.hdesk'
 	,-null		=>''
 	,-field		=>[
@@ -1103,7 +1103,7 @@ $w->set(
 			,-flg=>'f', -hidel=>1
 			,-expr=>'COALESCE(hdesk.etime, hdesk.utime)'
 			,-lbl=>'Finish', -cmt=>'Finish time of record described by'
-			,-lbl_ru=>'‡ ¢¥àè', -cmt_ru=>'„ â  ¨ ¢à¥¬ï § ¢¥àè¥­¨ï á®¡ëâ¨ï ¨«¨ ®¡­®¢«¥­¨ï § ¯¨á¨'
+			,-lbl_ru=>'Çàâåðø', -cmt_ru=>'Äàòà è âðåìÿ çàâåðøåíèÿ ñîáûòèÿ èëè îáíîâëåíèÿ çàïèñè'
 			,-ldstyle=>$w->{-a_cmdbh_fsvrlds}
 			,-ldprop=>'nowrap=true'
 			,-lsthtml=>sub{/(?::00|\s00:00:00|:\d\d)$/ ? $` : $_}
@@ -1114,7 +1114,7 @@ $w->set(
 				."IF(hdesk.status IN('new','draft','appr-do','scheduled','do','progress','rollback','delay','appr-ok','appr-no','edit'), '', ' ')"
 				.", COALESCE(hdesk.etime, hdesk.utime))"
 			,-lbl=>'Execution', -cmt=>'Fulfilment records order'
-			,-lbl_ru=>'‚ë¯-¥', -cmt_ru=>'“¯®àï¤®ç¥­¨¥ ¯® ¢ë¯®«­¥­¨î § ¯¨á¥©'
+			,-lbl_ru=>'Âûï-å', -cmt_ru=>'Óïîðÿäî÷åíèå ïî âûïîëíåíèþ çàïèñåé'
 			,-ldstyle=>$w->{-a_cmdbh_fsvrlds}
 			,-ldprop=>'nowrap=true'
 			,-lsthtml=>sub{/(?::00|\s00:00:00|:\d\d)$/ ? $` : $_}
@@ -1125,7 +1125,7 @@ $w->set(
 				."IF(hdesk.status IN('new','draft','appr-do','scheduled','do','progress','rollback','delay','appr-ok','appr-no','edit'), '', ' ')"
 				.", GREATEST(COALESCE(MAX(j.utime),hdesk.utime),hdesk.utime))"
 			,-lbl=>'Exec/below', -cmt=>'Record/subrecords update order'
-			,-lbl_ru=>'‚ë¯/¯®¤', -cmt_ru=>'“¯®àï¤®ç¥­¨¥ ¯® ¨§¬¥­¥­¨î § ¯¨á¨/¯®¤§ ¯¨á¥©'
+			,-lbl_ru=>'Âûï/ïîä', -cmt_ru=>'Óïîðÿäî÷åíèå ïî èçìåíåíèþ çàïèñè/ïîäçàïèñåé'
 			,-ldstyle=>$w->{-a_cmdbh_fsvrlds}
 			,-ldprop=>'nowrap=true'
 			,-lsthtml=>sub{/(?::00|\s00:00:00|:\d\d)$/ ? $` : $_}
@@ -1138,14 +1138,14 @@ $w->set(
 		,{-fld=>'idpr'
 			,-flg=>'euq'
 			,-lbl=>'PrevRec', -cmt=>'Causal/Previous Record ID' #'vqis"'
-			,-lbl_ru=>'à¥¤è', -cmt_ru=>'“­¨ª «ì­ë© ¨¤¥­â¨ä¨ª â®à ¯à¨ç¨­­®© ¨«¨ ¨«¨ §­ ç¨¬® ¯à¥¤è¥áâ¢ãîé¥© § ¯¨á¨, â¥¬ã ¨«¨ § ¤ çã ª®â®à®© ¯à®¤®«¦ ¥â ¤ ­­ ï § ¯¨áì'
+			,-lbl_ru=>'Ïðåäø', -cmt_ru=>'Óíèêàëüíûé èäåíòèôèêàòîð ïðè÷èííîé èëè èëè çíà÷èìî ïðåäøåñòâóþùåé çàïèñè, òåìó èëè çàäà÷ó êîòîðîé ïðîäîëæàåò äàííàÿ çàïèñü'
 			,-hide=>$w->tfoHide('id_')
 			,-hide=>sub{ !$_ && ($_[2] !~/e/)}
 			}
 		,{-fld=>'puser'
 			,-flg=>'euq'
 			,-lbl=>'User', -cmt=>'Principal User of Request'
-			,-lbl_ru=>'®«ì§.', -cmt_ru=>'Ž¡á«ã¦¨¢ ¥¬ë© ¯®«ì§®¢ â¥«ì ¨«¨ ¨­¨æ¨ â®à § ï¢ª¨; ®¡ëç­® ¨¬ï ¯®«ì§®¢ â¥«ï ¢ á¨áâ¥¬¥/á¥â¨; ¬®¦¥â ¯à®á¬ âà¨¢ âì § ¯¨áì'
+			,-lbl_ru=>'Ïîëüç.', -cmt_ru=>'Îáñëóæèâàåìûé ïîëüçîâàòåëü èëè èíèöèàòîð çàÿâêè; îáû÷íî èìÿ ïîëüçîâàòåëÿ â ñèñòåìå/ñåòè; ìîæåò ïðîñìàòðèâàòü çàïèñü'
 			,-ddlb=>sub{$_[0]->uglist('-u',{})}
 			,-ddlbtgt=>[undef,['auser'],['mailto',undef,',']]
 			,-inp=>{-maxlength=>60}
@@ -1154,7 +1154,7 @@ $w->set(
 		,{-fld=>'prole'
 			,-flg=>'euq'
 			,-lbl=>'UsrDev', -cmt=>'Division, Role or Group of User'
-			,-lbl_ru=>'®¤à.«§', -cmt_ru=>'Ž¡á«ã¦¨¢ ¥¬®¥ (¨«¨ ¨­¨æ¨¨à®¢ ¢è¥¥ § ï¢ªã) ¯®¤à §¤¥«¥­¨¥ (¢ ª®â®à®¥ ¢å®¤¨â ®¡á«ã¦¨¢ ¥¬ë© ¯®«ì§®¢ â¥«ì); ®¡ëç­® ¨¬ï £àã¯¯ë ¢ á¨áâ¥¬¥/á¥â¨; ¬®¦¥â ¯à®á¬ âà¨¢ âì § ¯¨áì'
+			,-lbl_ru=>'Ïîäð.Ïëç', -cmt_ru=>'Îáñëóæèâàåìîå (èëè èíèöèèðîâàâøåå çàÿâêó) ïîäðàçäåëåíèå (â êîòîðîå âõîäèò îáñëóæèâàåìûé ïîëüçîâàòåëü); îáû÷íî èìÿ ãðóïïû â ñèñòåìå/ñåòè; ìîæåò ïðîñìàòðèâàòü çàïèñü'
 			,-ddlb=>sub{$_[0]->uglist('-g',{})}
 			,-ddlb=>sub{$_[0]->uglist('-g', $_[0]->{-pdta}->{'puser'}, {})}
 			,-ddlbtgt=>[undef,['arole'],['rrole']]
@@ -1163,14 +1163,14 @@ $w->set(
 			}
 		,{-fld=>'auser'
 			,-flg=>'euq'
-			,-lbl_ru=>'ˆá¯-«ì', -cmt_ru=>'ˆá¯®«­¨â¥«ì à ¡®â (§ ¯¨á¨), ¨¬ï ¯®«ì§®¢ â¥«ï ¢ á¨áâ¥¬¥/á¥â¨; ¬®¦¥â ¨§¬¥­ïâì § ¯¨áì'
+			,-lbl_ru=>'Èñï-ëü', -cmt_ru=>'Èñïîëíèòåëü ðàáîò (çàïèñè), èìÿ ïîëüçîâàòåëÿ â ñèñòåìå/ñåòè; ìîæåò èçìåíÿòü çàïèñü'
 			,-ddlb=>sub{$_[0]->uglist('-u',{})}
 			,-ddlbtgt=>[undef,['puser'],['mailto',undef,',']]
 			,-fdprop=>'nowrap=true'
 			}, ''
 		,{-fld=>'arole'
 			,-flg=>'euq'
-			,-lbl_ru=>'®¤à.ˆá¯', -cmt_ru=>'ˆá¯®«­¨â¥«¨ à ¡®â (§ ¯¨á¨) - ®¤à §¤¥«¥­¨¥, à®«ì ¨«¨ £àã¯¯ ; ¨¬ï £«®¡ «ì­®© £àã¯¯ë ¢ á¨áâ¥¬¥/á¥â¨; ¬®¦¥â ¨§¬¥­ïâì § ¯¨áì'
+			,-lbl_ru=>'Ïîäð.Èñï', -cmt_ru=>'Èñïîëíèòåëè ðàáîò (çàïèñè) - Ïîäðàçäåëåíèå, ðîëü èëè ãðóïïà; èìÿ ãëîáàëüíîé ãðóïïû â ñèñòåìå/ñåòè; ìîæåò èçìåíÿòü çàïèñü'
 			,$w->{-a_cmdbh_larole}
 			? (-inp=>{-labels=>$w->{-a_cmdbh_larole}})
 			: (-ddlb=>sub{$_[0]->uglist('-g', $_[0]->{-pdta}->{'auser'}, {})})
@@ -1204,7 +1204,7 @@ $w->set(
 			,-flg=>'-', -hidel=>1
 			,-expr=>"CONCAT_WS('; ', hdesk.auser, hdesk.arole)"
 			,-lbl=>'Actors', -cmt=>'Actors of record - Actor and ARole'
-			,-lbl_ru=>'ˆá¯-«¨', -cmt_ru=>'ˆá¯®«­¨â¥«¨ § ¯¨á¨ - ¯®«ì§®¢ â¥«ì / ¯®¤à §¤¥«¥­¨¥; ¨á¯®«ì§ã¥âáï ¤«ï ¯à¥¤áâ ¢«¥­¨©'
+			,-lbl_ru=>'Èñï-ëè', -cmt_ru=>'Èñïîëíèòåëè çàïèñè - ïîëüçîâàòåëü / ïîäðàçäåëåíèå; èñïîëüçóåòñÿ äëÿ ïðåäñòàâëåíèé'
 			,-ldstyle=>'padding-left: 1em'
 			,-ldprop=>'nowrap=true'
 			,-lsthtml=>sub{	my ($u, $g) =(split /\s*;\s*/, $_);
@@ -1227,7 +1227,7 @@ $w->set(
 			}
 		,{-fld=>'rrole'
 			,-flg=>'euq'
-			,-lbl_ru=>'—¨â â¥«¨', -cmt_ru=>'Šàã£ ç¨â â¥«¥© § ¯¨á¨ - à®«ì ¨«¨ £àã¯¯ ; ¨¬ï £àã¯¯ë ¢ á¨áâ¥¬¥/á¥â¨; ¬®¦¥â ¯à®á¬ âà¨¢ âì § ¯¨áì'
+			,-lbl_ru=>'×èòàòåëè', -cmt_ru=>'Êðóã ÷èòàòåëåé çàïèñè - ðîëü èëè ãðóïïà; èìÿ ãðóïïû â ñèñòåìå/ñåòè; ìîæåò ïðîñìàòðèâàòü çàïèñü'
 			,$w->{-a_cmdbh_lrrole}
 			? (-inp=>{-labels=>$w->{-a_cmdbh_lrrole}})
 			: (-ddlb=>sub{$_[0]->uglist('-g',{})})
@@ -1251,15 +1251,15 @@ $w->set(
 				."Problem Management and Definitions: 'problem', 'solution', 'error';\n"
 				."Change Management: 'change', 'unavailability', 'schedule';\n"
 				."Asset Management: 'purchase'"
-			,-cmt_ru=>"’¨¯ § ¯¨á¨:\n"
-				."'§ ï¢ª ' - ®¡é¥£® å à ªâ¥à  - à¥£¨áâà æ¨ï/¢ë¯®«­¥­¨¥;\n"
-				."'à ¡®â ' - á¢®¡®¤­®¥ ­ §­ ç¥­¨¥ á ®£à ­¨ç¥­¨¥¬ ¨§¬¥­¥­¨ï 'ƒ« ¢­ ï' ¨ '®¤à.ˆá¯', ã¤ «¥­¨ï;\n"
-				."'§ ¤ ­¨¥' - áâà®£®¥ ­ §­ ç¥­¨¥ á ®£à ­¨ç¥­¨¥¬ ¨§¬¥­¥­¨ï ¡®«ìè¨­áâ¢  ¯®«¥© ¨ ã¤ «¥­¨ï;\n"
-				."'§ ¬¥âª ' - ®¡é¥£® å à ªâ¥à  ®¯¨á ­¨¥/¤®ªã¬¥­â æ¨ï;\n"
-				."“¯à ¢«¥­¨¥ ˆ­æ¨¤¥­â ¬¨: '¨­æ¨¤¥­â', '­¥¤®áâã¯­®áâì';\n"
-				."“¯à ¢«¥­¨¥ à®¡«¥¬ ¬¨ ¨ Ž¯à¥¤¥«¥­¨ï: '¯à®¡«¥¬ ', 'à¥è¥­¨¥', '®è¨¡ª ';\n"
-				."“¯à ¢«¥­¨¥ ˆ§¬¥­¥­¨ï¬¨: '¨§¬¥­¥­¨¥', '­¥¤®áâã¯­®áâì', 'à á¯¨á ­¨¥';\n"
-				."“¯à ¢«¥­¨¥ €ªâ¨¢ ¬¨: '¯à¨®¡à¥â¥­¨¥'"
+			,-cmt_ru=>"Òèï çàïèñè:\n"
+				."'çàÿâêà' - îáùåãî õàðàêòåðà - ðåãèñòðàöèÿ/âûïîëíåíèå;\n"
+				."'ðàáîòà' - ñâîáîäíîå íàçíà÷åíèå ñ îãðàíè÷åíèåì èçìåíåíèÿ 'Ãëàâíàÿ' è 'Ïîäð.Èñï', óäàëåíèÿ;\n"
+				."'çàäàíèå' - ñòðîãîå íàçíà÷åíèå ñ îãðàíè÷åíèåì èçìåíåíèÿ áîëüøèíñòâà ïîëåé è óäàëåíèÿ;\n"
+				."'çàìåòêà' - îáùåãî õàðàêòåðà îïèñàíèå/äîêóìåíòàöèÿ;\n"
+				."Óïðàâëåíèå Èíöèäåíòàìè: 'èíöèäåíò', 'íåäîñòóïíîñòü';\n"
+				."Óïðàâëåíèå Ïðîáëåìàìè è Îïðåäåëåíèÿ: 'ïðîáëåìà', 'ðåøåíèå', 'îøèáêà';\n"
+				."Óïðàâëåíèå Èçìåíåíèÿìè: 'èçìåíåíèå', 'íåäîñòóïíîñòü', 'ðàñïèñàíèå';\n"
+				."Óïðàâëåíèå Àêòèâàìè: 'ïðèîáðåòåíèå'"
 			,-inp=>{-values=>[qw(request work task incident problem solution error change unavlbl purchase schedule note)]
 				,-labels=>{	''=>''
 						,'request'	=>'request'
@@ -1276,18 +1276,18 @@ $w->set(
 						,'note'		=>'note'
 					}
 				,-labels_ru=>{	''=>''
-						,'request'	=>'§ ï¢ª '
-						,'work'		=>'à ¡®â '
-						,'task'		=>'§ ¤ ­¨¥'
-						,'incident'	=>'¨­æ¨¤¥­â'
-						,'problem'	=>'¯à®¡«¥¬ '
-						,'solution'	=>'à¥è¥­¨¥'
-						,'error'	=>'®è¨¡ª '
-						,'change'	=>'¨§¬¥­¥­¨¥'
-						,'unavlbl'	=>'­¥¤®áâã¯­'
-						,'purchase'	=>'¯à¨®¡à¥â¥­¨¥'
-						,'schedule'	=>'£à ä¨ª'
-						,'note'		=>'§ ¬¥âª '
+						,'request'	=>'çàÿâêà'
+						,'work'		=>'ðàáîòà'
+						,'task'		=>'çàäàíèå'
+						,'incident'	=>'èíöèäåíò'
+						,'problem'	=>'ïðîáëåìà'
+						,'solution'	=>'ðåøåíèå'
+						,'error'	=>'îøèáêà'
+						,'change'	=>'èçìåíåíèå'
+						,'unavlbl'	=>'íåäîñòóïí'
+						,'purchase'	=>'ïðèîáðåòåíèå'
+						,'schedule'	=>'ãðàôèê'
+						,'note'		=>'çàìåòêà'
 					}
 				,-loop=>1
 				}
@@ -1298,7 +1298,7 @@ $w->set(
 		,{-fld=>'rectype'
 			,-flg=>'euq'
 			,-lbl=>'Subtype', -cmt=>"Record subtype"
-			,-lbl=>'®¤â¨¯', -cmt_ru=>"®¤â¨¯ § ¯¨á¨"
+			,-lbl=>'Ïîäòèï', -cmt_ru=>"Ïîäòèï çàïèñè"
 			,-hidel=>sub{!$_[0]->{-pout}->{record} || !$_[0]->{-a_cmdbh_rectype}->{$_[0]->{-pout}->{record}}
 					|| (!$_ && ($_[2] !~/e/))}
 			,-inp=>{ -values =>sub{	$_[0]->{-pout}->{record}
@@ -1332,43 +1332,43 @@ $w->set(
 						,'doc'		=>'documentation'
 					}
 				,-labels_ru =>{	''=>''
-						,'svc-rst'	=>'¢®ááâ.ãá«ã£'
-						,'svc-req'	=>'®¡á«.¯®«ì§.'
-						,'sys-rst'	=>'¢®ááâ.á¨áâ¥¬'
-						,'sys-evt'	=>'á®¡ëâ¨¥ á¨áâ'
-						,'contact'	=>'ª®­â ªâ'
-						,'vendor'	=>'¯®áâ ¢é¨ª'
-						,'faq'		=>'ç ¢®'
-						,'howto'	=>'ª ª'
-						,'bug'		=>'¤¥ä¥ªâ'
-						,'enhancmnt'	=>'à áè¨à¥­¨¥'
-						,'part-schd'	=>'ç áâ/¯« ­'
-						,'full-schd'	=>'¯®«­/¯« ­'
-						,'part-uschd'	=>'ç áâ/­¥¯«'
-						,'full-uschd'	=>'¯®«­/­¥¯«'
-						,'implementn'	=>'¢®¯«®é¥­¨¥'
-						,'change'	=>'¨§¬¥­¥­¨¥'
-						,'project'	=>'¯à®¥ªâ'
-						,'release'	=>'à¥«¨§'
-						,'object'	=>'®¡ê¥ªâ'
-						,'component'	=>'ª®¬¯®­¥­â'
-						,'contact'	=>'ª®­â ªâ'
-						,'applicatn'	=>'à¥áãàá'
-						,'location'	=>'¬¥áâ®'
-						,'operation'	=>'¤¥ïâ¥«ì­®áâì'
-						,'doc'		=>'¤®ªã¬¥­â æ¨ï'
+						,'svc-rst'	=>'âîññò.óñëóã'
+						,'svc-req'	=>'îáñë.ïîëüç.'
+						,'sys-rst'	=>'âîññò.ñèñòåì'
+						,'sys-evt'	=>'ñîáûòèå ñèñò'
+						,'contact'	=>'êîíòàêò'
+						,'vendor'	=>'ïîñòàâùèê'
+						,'faq'		=>'÷àâî'
+						,'howto'	=>'êàê'
+						,'bug'		=>'äåôåêò'
+						,'enhancmnt'	=>'ðàñøèðåíèå'
+						,'part-schd'	=>'÷àñò/ïëàí'
+						,'full-schd'	=>'ïîëí/ïëàí'
+						,'part-uschd'	=>'÷àñò/íåïë'
+						,'full-uschd'	=>'ïîëí/íåïë'
+						,'implementn'	=>'âîïëîùåíèå'
+						,'change'	=>'èçìåíåíèå'
+						,'project'	=>'ïðîåêò'
+						,'release'	=>'ðåëèç'
+						,'object'	=>'îáúåêò'
+						,'component'	=>'êîìïîíåíò'
+						,'contact'	=>'êîíòàêò'
+						,'applicatn'	=>'ðåñóðñ'
+						,'location'	=>'ìåñòî'
+						,'operation'	=>'äåÿòåëüíîñòü'
+						,'doc'		=>'äîêóìåíòàöèÿ'
 					}
 				}
 			}, ''
 		,{-fld=>'recprc'
 			,-flg=>'f', -hidel=>1
 			,-lbl=>'OverType', -cmt=>"Master record type"
-			,-lbl=>' ¤â¨¯', -cmt_ru=>"’¨¯ ¢ëè¥áâ®ïé¥© § ¯¨á¨"
+			,-lbl=>'Íàäòèï', -cmt_ru=>"Òèï âûøåñòîÿùåé çàïèñè"
 			}, ''
 		,{-fld=>'vrecord'
 			,-flg=>'-', -hidel=>1
 			,-lbl=>'Type', -cmt=>"Record subtype/type, for lists"
-			,-lbl=>'’¨¯', -cmt_ru=>"®¤â¨¯/â¨¯ § ¯¨á¨, ¤«ï ¯à¥¤áâ ¢«¥­¨©"
+			,-lbl=>'Òèï', -cmt_ru=>"Ïîäòèï/òèï çàïèñè, äëÿ ïðåäñòàâëåíèé"
 			,-expr=>"IF(hdesk.rectype, hdesk.rectype, hdesk.record)"
 			,-lsthtml=>sub{	$_[3]->{-a_rr} =$_[0]->lngslot($_[0]->{-table}->{hdesk}->{-mdefld}->{record}->{-inp},'-labels')	  if !$_[3]->{-a_rr};
 					$_[3]->{-a_rt} =$_[0]->lngslot($_[0]->{-table}->{hdesk}->{-mdefld}->{rectype}->{-inp},'-labels')  if !$_[3]->{-a_rt};
@@ -1388,7 +1388,7 @@ $w->set(
 		,{-fld=>'severity'
 			,-flg=>'euq', -null=>undef
 			,-lbl=>'Severity', -cmt=>"Severity of Record, level of urgency/impact: 'critical/wide'(0), 'high/large'(1), 'medium/limited'(2), 'low/localised'(3), 'general/planning'(4)"
-			,-lbl_ru=>'“à®¢¥­ì', -cmt_ru=>"à¨®à¨â¥â § ¯¨á¨, ãà®¢¥­ì áà®ç­®áâ¨/¢®§¤¥©áâ¢¨ï: 'ªà¨â¨ç¥áª¨©/à áè¨à¥­­ë©'(0), '¢ëá®ª¨©/§­ ç¨â¥«ì­ë©'(1), 'áà¥¤­¨©/®£à ­¨ç¥­­ë©'(2), '­¨§ª¨©/«®ª «ì­ë©'(3), '®¡é¨©/¯« ­¨à®¢ ­¨¥'(4)"
+			,-lbl_ru=>'Óðîâåíü', -cmt_ru=>"Ïðèîðèòåò çàïèñè, óðîâåíü ñðî÷íîñòè/âîçäåéñòâèÿ: 'êðèòè÷åñêèé/ðàñøèðåííûé'(0), 'âûñîêèé/çíà÷èòåëüíûé'(1), 'ñðåäíèé/îãðàíè÷åííûé'(2), 'íèçêèé/ëîêàëüíûé'(3), 'îáùèé/ïëàíèðîâàíèå'(4)"
 			,-inp=>{-values=>[0,1,2,3,4]
 				,-labels=>{	''=>''
 						,0=>'critical (1h)'
@@ -1398,12 +1398,12 @@ $w->set(
 						,'3.5'=>'unavlbl'
 						,4=>'general'}		# normal
 				,-labels_ru=>{	''=>''
-						,0=>'ªà¨â¨ç¥áª¨© (1ç)'
-						,1=>'§­ ç¨â¥«ì­ë© (8ç)'
-						,2=>'áà¥¤­¨© (24ç)'	# ­¥§­ ç¨â¥«ì­ë©
-						,3=>'­¨§ª¨© (48ç)'	# ¯à¥¤ã¯à¥¦¤¥­¨¥
-						,'3.5'=>'­¥¤®áâã¯­'
-						,4=>'®¡é¨©'}		# ­®à¬ «ì­ë©
+						,0=>'êðèòè÷åñêèé (1÷)'
+						,1=>'çíà÷èòåëüíûé (8÷)'
+						,2=>'ñðåäíèé (24÷)'	# íåçíà÷èòåëüíûé
+						,3=>'íèçêèé (48÷)'	# ïðåäóïðåæäåíèå
+						,'3.5'=>'íåäîñòóïí'
+						,4=>'îáùèé'}		# íîðìàëüíûé
 				,-loop=>sub{!$_[0]->{-pdta}->{etime}
 					&& (($_[0]->{-pdta}->{record}||'') eq 'incident')
 					}
@@ -1414,25 +1414,25 @@ $w->set(
 			,-cmt=>"Status of the record or activity: planning ('new', 'draft', 'appr-do', 'scheduled', 'do') --> progress ('progress', 'rollback', 'delay', 'edit') --> approval ('appr-ok', 'appr-no') --> result ('ok', 'no').\n"
 				."'Managers' are responsible for acception ('new'; 'appr-do'), moderation, approvement ('appr-ok', 'appr-no').\n"
 				."'Actors' operates the record ('draft'; 'do', 'progress', 'delay', 'edit')."
-			,-cmt_ru=>"‘â âãá § ¯¨á¨/¤¥ïâ¥«ì­®áâ¨: ¯« ­¨à®¢ ­¨¥ ('§ ¯à®á', '¯à®¥ªâ', 'ãâ¢¥à¤¨âì', '¯« ­', '¢ë¯®«­¨âì') --> á®áâ®ï­¨¥ à ¡®â ('¢ë¯®«­¥­¨¥', '¢®§¢à â', '§ ¤¥à¦ª ', 'à¥¤ ªâ¨à®¢ ­¨¥') --> ®¤®¡à¥­¨¥ ('ãâ¢.§¢àè', 'ãâ¢.®âª«') --> à¥§ã«ìâ â ('§ ¢¥àè¥­®', '®âª«®­¥­®').\n"
-				."'Œ¥­¥¤¦¥àë' ¢ë¯®«­ïîâ ¯à¨¥¬ªã ('§ ¯à®á'; 'ãâ¢¥à¤¨âì') ¨ ®¤®¡à¥­¨¥ ('ãâ¢.§¢àè', 'ãâ¢.®âª«'), ¬®¤¥à¨àãîâ á®¯à®¢®¦¤¥­¨¥ § ¯¨á¨.\n"
-				."'ˆá¯®«­¨â¥«¨' á®¯à®¢®¦¤ îâ § ¯¨áì ('¯à®¥ªâ'; '¢ë¯®«­¨âì', '¢ë¯®«­¥­¨¥', '¢®§¢à â', '§ ¤¥à¦ª ', 'à¥¤ ªâ¨à®¢ ­¨¥')."
+			,-cmt_ru=>"Ñòàòóñ çàïèñè/äåÿòåëüíîñòè: ïëàíèðîâàíèå ('çàïðîñ', 'ïðîåêò', 'óòâåðäèòü', 'ïëàí', 'âûïîëíèòü') --> ñîñòîÿíèå ðàáîò ('âûïîëíåíèå', 'âîçâðàò', 'çàäåðæêà', 'ðåäàêòèðîâàíèå') --> îäîáðåíèå ('óòâ.çâðø', 'óòâ.îòêë') --> ðåçóëüòàò ('çàâåðøåíî', 'îòêëîíåíî').\n"
+				."'Ìåíåäæåðû' âûïîëíÿþò ïðèåìêó ('çàïðîñ'; 'óòâåðäèòü') è îäîáðåíèå ('óòâ.çâðø', 'óòâ.îòêë'), ìîäåðèðóþò ñîïðîâîæäåíèå çàïèñè.\n"
+				."'Èñïîëíèòåëè' ñîïðîâîæäàþò çàïèñü ('ïðîåêò'; 'âûïîëíèòü', 'âûïîëíåíèå', 'âîçâðàò', 'çàäåðæêà', 'ðåäàêòèðîâàíèå')."
 			,-inp=>{-values=>[qw(new draft appr-do scheduled do progress rollback delay edit appr-ok appr-no ok no deleted)]
 				,-labels_ru=>{	''=>''
-						,'new'=>'§ ¯à®á'
-						,'draft'=>'¯à®¥ªâ'
-						,'appr-do'=>'ãâ¢¥à¤¨âì'
-						,'scheduled'=>'¯« ­'
-						,'do'=>'¢ë¯®«­¨âì'
-						,'progress'=>'¢ë¯®«­-¥'
-						,'rollback'=>'¢®§¢à â'
-						,'delay'=>'§ ¤¥à¦ª '
-						,'edit'=>'à¥¤ ªâ-¥'
-						,'appr-ok'=>'ãâ¢.§¢àè'
-						,'appr-no'=>'ãâ¢.®âª«'
-						,'ok'=>'§ ¢¥àè¥­®'
-						,'no'=>'®âª«®­¥­®'
-						,'deleted'=>'ã¤ «¥­®'}
+						,'new'=>'çàïðîñ'
+						,'draft'=>'ïðîåêò'
+						,'appr-do'=>'óòâåðäèòü'
+						,'scheduled'=>'ïëàí'
+						,'do'=>'âûïîëíèòü'
+						,'progress'=>'âûïîëí-å'
+						,'rollback'=>'âîçâðàò'
+						,'delay'=>'çàäåðæêà'
+						,'edit'=>'ðåäàêò-å'
+						,'appr-ok'=>'óòâ.çâðø'
+						,'appr-no'=>'óòâ.îòêë'
+						,'ok'=>'çàâåðøåíî'
+						,'no'=>'îòêëîíåíî'
+						,'deleted'=>'óäàëåíî'}
 				}
 			,-lhstyle=>'width: 5ex'
 			,-ldprop=>'nowrap=true'
@@ -1474,7 +1474,7 @@ $w->set(
 		,{-fld=>'stime'
 			,-flg=>'euq'
 			,-lbl=>'Start', -cmt=>'Start time of record described by'
-			,-lbl_ru=>' ç «®', -cmt_ru=>'„ â  ¨ ¢à¥¬ï ­ ç «  ®¯¨áë¢ ¥¬®£® § ¯¨áìî'
+			,-lbl_ru=>'Íà÷àëî', -cmt_ru=>'Äàòà è âðåìÿ íà÷àëà îïèñûâàåìîãî çàïèñüþ'
 			,-inp=>{-maxlength=>20, -id=>'stime'}
 			,-fdprop=>'nowrap=true'
 			,-ldstyle=>$w->{-a_cmdbh_fsvrlds}
@@ -1488,7 +1488,7 @@ $w->set(
 		,{-fld=>'etime'
 			,-flg=>'euq'
 			,-lbl=>'End', -cmt=>'End time of record described by'
-			,-lbl_ru=>'‡ ¢¥àè', -cmt_ru=>'„ â  ¨ ¢à¥¬ï § ¢¥àè¥­¨ï ®¯¨áë¢ ¥¬®£® § ¯¨áìî'
+			,-lbl_ru=>'Çàâåðø', -cmt_ru=>'Äàòà è âðåìÿ çàâåðøåíèÿ îïèñûâàåìîãî çàïèñüþ'
 			,-inp=>{-maxlength=>20, -id=>'etime'}
 			,-fdprop=>'nowrap=true'
 			,-ldstyle=>$w->{-a_cmdbh_fsvrlds}
@@ -1522,7 +1522,7 @@ $w->set(
 		,{-fld=>'object'
 			,-flg=>'euq'
 			,-cmt=>'Object (computer, device) of record described by'
-			,-cmt_ru=>'“­¨ª «ì­®¥ ¨¬ï ®¡ê¥ªâ  § ¯¨á¨ - ª®¬¯ìîâ¥à  ¨«¨ ãáâà®©áâ¢ , á®£« á­® DNS'
+			,-cmt_ru=>'Óíèêàëüíîå èìÿ îáúåêòà çàïèñè - êîìïüþòåðà èëè óñòðîéñòâà, ñîãëàñíî DNS'
 			# ,-ddlb =>sub{$_[0]->cgiQueryFv('','object')}
 			,-ddlb =>sub{$_[0]->recUnion(
 					 $_[0]->cgiQueryFv('','object'
@@ -1552,7 +1552,7 @@ $w->set(
 		,{-fld=>'application'
 			,-flg=>'euq'
 			,-lbl=>'Application', -cmt=>'Application or Resource (system, service, application) related to Record/Object'
-			,-lbl_ru=>'à¨«®¦¥­¨¥', -cmt_ru=>'¥áãàá ¨«¨ ¯à¨«®¦¥­¨¥ (á¨áâ¥¬ , ª®¬¯®­¥­â, á¥à¢¨á, ¯à¨«®¦¥­¨¥), ª ª®â®à®¬ã ®â­®á¨âáï § ¯¨áì, ¢ ä®à¬ â¥ \'á¨áâ¥¬ /¯®¤á¨áâ¥¬ /...\''
+			,-lbl_ru=>'Ïðèëîæåíèå', -cmt_ru=>'Ðåñóðñ èëè ïðèëîæåíèå (ñèñòåìà, êîìïîíåíò, ñåðâèñ, ïðèëîæåíèå), ê êîòîðîìó îòíîñèòñÿ çàïèñü, â ôîðìàòå \'ñèñòåìà/ïîäñèñòåìà/...\''
 			# ,-ddlb =>sub{$_[0]->cgiQueryFv('','application')}
 			,-ddlb =>sub{$_[0]->hreverse($_[0]->recUnion(
 					 $_[0]->cgiQueryFv('','application'
@@ -1580,11 +1580,11 @@ $w->set(
 		,{-fld=>'location'
 			,-flg=>'euq', -hidel=>sub{!$_ && ($_[2] !~/e/)}
 			,-lbl=>'Loc.', -cmt=>'Location of Record/Object'
-			,-lbl_ru=>'Œ¥áâ®', -cmt_ru=>'Œ¥áâ®­ å®¦¤¥­¨¥/à §¬¥é¥­¨¥, ª ª®â®à®¬ã ®â­®á¨âáï § ¯¨áì, ¢ ä®à¬ â¥ \'®à£ ­¨§ æ¨ï/.../ª ¡¨­¥â\''
+			,-lbl_ru=>'Ìåñòî', -cmt_ru=>'Ìåñòîíàõîæäåíèå/ðàçìåùåíèå, ê êîòîðîìó îòíîñèòñÿ çàïèñü, â ôîðìàòå \'îðãàíèçàöèÿ/.../êàáèíåò\''
 			# ,-ddlb =>sub{$_[0]->cgiQueryFv('','location')}
 			,-ddlb =>sub{$_[0]->recUnion(
 					 $_[0]->cgiQueryFv('','location')
-					,$_[0]->recSel(-table=>'cmdbm',-data=>['name'],-key=>{'system'=>['Locations','Œ¥áâ®­ å®¦¤¥­¨ï']},-order=>'name')
+					,$_[0]->recSel(-table=>'cmdbm',-data=>['name'],-key=>{'system'=>['Locations','Ìåñòîíàõîæäåíèÿ']},-order=>'name')
 					)}
 			,-form=>'hdesk'
 			,-inp=>{-maxlength=>60}
@@ -1595,7 +1595,7 @@ $w->set(
 				? $_[0]->urlCmd('',-wikn=>$_,-wikq=>join('.', map {$_ ? $_ : ()} 'location',$_[3]->{record},$_[3]->{rectype}),-cmd=>'recRead')
 				: $_[2] =~/e/
 			#	? $_[0]->urlCmd('',-form=>'hdeskc',-cmd=>'recList', -frmLsc=>'location')
-				? $_[0]->urlCmd('',-form=>'cmdbmn',-key=>{'system'=>['Locations','Œ¥áâ®­ å®¦¤¥­¨ï']},-cmd=>'recList')
+				? $_[0]->urlCmd('',-form=>'cmdbmn',-key=>{'system'=>['Locations','Ìåñòîíàõîæäåíèÿ']},-cmd=>'recList')
 				: ''}
 			}
 		,"\n"
@@ -1604,7 +1604,7 @@ $w->set(
 					: !$_}
 			,-flg=>'euq'
 			,-lbl=>'Cause', -cmt=>'Cause of incident, root cause of problem ivestigation or known error'
-			,-lbl_ru=>'à¨ç¨­ ', -cmt_ru=>'à¨ç¨­  ¨­æ¨¤¥­â , ª®à­¥¢ ï ¯à¨ç¨­  ¯à®¡«¥¬ë ¨«¨ ®è¨¡ª¨'
+			,-lbl_ru=>'Ïðè÷èíà', -cmt_ru=>'Ïðè÷èíà èíöèäåíòà, êîðíåâàÿ ïðè÷èíà ïðîáëåìû èëè îøèáêè'
 			,-form=>'hdesk'
 			#,-ddlb =>sub{$_[0]->cgiQueryFv('','cause')}
 			#,-inp=>{-maxlength=>60}
@@ -1625,27 +1625,27 @@ $w->set(
 					,'organization'
 					,'personnel']
 				,-labels_ru =>{''	=>''
-					,'fail'	=>'á¡®©'
-					,'fail/software'	=>'á¡®© ¯à®£à'
-					,'fail/hardware'	=>'á¡®© ®¡®àã¤'
-					,'fail/network'	=>'á¡®© á¥â¨'
-					,'breakage'	=>'¯®«®¬ª '
-					,'breakage/software'	=>'¯®«®¬ª  ¯à®£à'
-					,'breakage/hardware'	=>'¯®«®¬ª  ®¡®àã¤'
-					,'breakage/network'	=>'¯®«®¬ª  á¥â¨'
-					,'improper'	=>'­¥ª®àà¥ªâ­®áâì'
-					,'improper/software'	=>'­¥¢¥à­  ¯à®£à'
-					,'improper/hardware'	=>'­¥¢¥à­® ®¡®àã¤'
-					,'improper/configuration'=>'­¥¢¥à­  ª®­ä¨£'
-					,'change'	=>'¨§¬¥­¥­¨¥'
-					,'organization'	=>'®à£ ­¨§ æ¨ï'
-					,'personnel'	=>'¯¥àá®­ «'}
+					,'fail'	=>'ñáîé'
+					,'fail/software'	=>'ñáîé ïðîãð'
+					,'fail/hardware'	=>'ñáîé îáîðóä'
+					,'fail/network'	=>'ñáîé ñåòè'
+					,'breakage'	=>'ïîëîìêà'
+					,'breakage/software'	=>'ïîëîìêà ïðîãð'
+					,'breakage/hardware'	=>'ïîëîìêà îáîðóä'
+					,'breakage/network'	=>'ïîëîìêà ñåòè'
+					,'improper'	=>'íåêîððåêòíîñòü'
+					,'improper/software'	=>'íåâåðíà ïðîãð'
+					,'improper/hardware'	=>'íåâåðíî îáîðóä'
+					,'improper/configuration'=>'íåâåðíà êîíôèã'
+					,'change'	=>'èçìåíåíèå'
+					,'organization'	=>'îðãàíèçàöèÿ'
+					,'personnel'	=>'ïåðñîíàë'}
 				}
 			},''
 		,{-fld=>'process'
 			,-flg=>'euq', -hide=>sub{!$_ && ($_[2] !~/e/)}
 			,-lbl=>'Operation', -cmt=>'Operation, process, item of expenses'
-			,-lbl_ru=>'„¥ïâ¥«ì­®áâì', -cmt_ru=>'„¥©áâ¢¨¥, ¯à®æ¥áá, áâ âìï à áå®¤®¢'
+			,-lbl_ru=>'Äåÿòåëüíîñòü', -cmt_ru=>'Äåéñòâèå, ïðîöåññ, ñòàòüÿ ðàñõîäîâ'
 			#,-ddlb =>sub{$_[0]->cgiQueryFv('','process')}
 			,-ddlb =>sub{$_[0]->cgiQueryFv('','process',{-qkey=>{
 				(map { $_[3]->{$_} ? ($_=>['', $_[3]->{$_}]) : ($_=>'')
@@ -1672,13 +1672,13 @@ $w->set(
 		,{-fld=>'cost'
 			,-flg=>'euq', -hide=>sub{!$_ && ($_[2] !~/e/)}
 			,-lbl=>'Cost', -cmt=>'Cost of the Record described by, man*hour'
-			,-lbl_ru=>'‡ âà âë', -cmt_ru=>'‡ âà âë ­  ¢ë¯®«­¥­¨¥ à ¡®â, ç¥«.*ç á'
+			,-lbl_ru=>'Çàòðàòû', -cmt_ru=>'Çàòðàòû íà âûïîëíåíèå ðàáîò, ÷åë.*÷àñ'
 			,-inp=>{-maxlength=>10}
 			}
 		,{-fld=>'subject'
 			,-flg=>'euqm', -null=>undef
 			,-lbl=>'Description', -cmt=>'A brief description, summary, subject or title'
-			,-lbl_ru=>'Ž¯¨á ­¨¥', -cmt_ru=>'Šà âª®¥ ®¯¨á ­¨¥ § ï¢ª¨, á®¡ëâ¨© ¨«¨ à ¡®â; â¥¬  ¨«¨ § £« ¢¨¥ § ¯¨á¨'
+			,-lbl_ru=>'Îïèñàíèå', -cmt_ru=>'Êðàòêîå îïèñàíèå çàÿâêè, ñîáûòèé èëè ðàáîò; òåìà èëè çàãëàâèå çàïèñè'
 			,-fnhref=>sub{
 			#	(($_[0]->{-pout}->{record} && ($_[0]->{-pout}->{record}  =~/^(?:incident|error|solution|change|request|task|work)/))
 			#	||($_[0]->{-pout}->{recprc} && ($_[0]->{-pout}->{recprc} =~/^(?:incident|error|solution|change)/)))
@@ -1704,14 +1704,14 @@ $w->set(
 			,-expr=>"CONCAT_WS('. ', hdesk.object, hdesk.application, hdesk.location, hdesk.subject)"
 			#,-expr=>"CONCAT_WS('. ', hdesk.object, hdesk.application, hdesk.location, hdesk.process, hdesk.subject)"
 			,-lbl=>'Description', -cmt=>'Description following Object and Resource, for lists'
-			,-lbl_ru=>'Ž¯¨á ­¨¥', -cmt_ru=>'Ž¡ê¥ªâ. ¥áãàá. Œ¥áâ®. Ž¯¨á ­¨¥. ˆá¯®«ì§ã¥âáï ¤«ï ¯à¥¤áâ ¢«¥­¨©'
+			,-lbl_ru=>'Îïèñàíèå', -cmt_ru=>'Îáúåêò. Ðåñóðñ. Ìåñòî. Îïèñàíèå. Èñïîëüçóåòñÿ äëÿ ïðåäñòàâëåíèé'
 			}
 		,{-fld=>'vsubjectx'
 			,-flg=>'-', -hidel=>1
 			,-expr=>"CONCAT_WS('. ', hdesk.object, hdesk.application, hdesk.location, hdesk.subject)"
 			#,-expr=>"CONCAT_WS('. ', hdesk.object, hdesk.application, hdesk.location, hdesk.process, hdesk.subject)"
 			,-lbl=>'Description', -cmt=>'Description following Object and Resource, for lists'
-			,-lbl_ru=>'Ž¯¨á ­¨¥', -cmt_ru=>'Ž¡ê¥ªâ. ¥áãàá. Œ¥áâ®. Ž¯¨á ­¨¥. ˆá¯®«ì§ã¥âáï ¤«ï ¯à¥¤áâ ¢«¥­¨©'
+			,-lbl_ru=>'Îïèñàíèå', -cmt_ru=>'Îáúåêò. Ðåñóðñ. Ìåñòî. Îïèñàíèå. Èñïîëüçóåòñÿ äëÿ ïðåäñòàâëåíèé'
 			,-lsthtml=>sub{	my $v =$_[3]->{-rec}->{'comment'};
 					my $a;
 					if (($_[3]->{-rec}->{'record'}||'') !~/^(?:work|task)$/) {
@@ -1754,20 +1754,20 @@ $w->set(
 			,-flg=>'-', -hidel=>1
 			,-expr=>"COUNT(*)"
 			,-lbl=>'Number', -cmt=>'Number of records, for lists'
-			,-lbl_ru=>'Š®«¨ç¥áâ¢®', -cmt_ru=>'—¨á«® § ¯¨á¥©, ¤«ï ¯à¥¤áâ ¢«¥­¨©'
+			,-lbl_ru=>'Êîëè÷åñòâî', -cmt_ru=>'×èñëî çàïèñåé, äëÿ ïðåäñòàâëåíèé'
 			}
 		,{-fld=>'vdefinition'
 			,-flg=>'-', -hidel=>1
 			,-expr=>"IF(cmdbm.name IS NULL, '', CONCAT_WS('','<a href=\"?_cmd=recRead;_form=cmdbm;_wikn=',cmdbm.name,'\">',IF(cmdbm.definition IS NULL OR cmdbm.definition='', '???', cmdbm.definition),'</a>'))"
 			,-lbl=>'Definition', -cmt=>'CMDB definition, for lists'
-			,-lbl_ru=>'Ž¯à¥¤¥«¥­¨¥', -cmt_ru=>'Ž¯à¥¤¥«¥­¨¥ ¨§ Š„, ¤«ï ¯à¥¤áâ ¢«¥­¨©'
+			,-lbl_ru=>'Îïðåäåëåíèå', -cmt_ru=>'Îïðåäåëåíèå èç ÊÁÄ, äëÿ ïðåäñòàâëåíèé'
 			,-lsthtml=>sub{$_}
 			}
 		,"\f"
 		,{-fld=>'comment'
 			,-flg=>'eu'
 			,-lbl=>'Notes', -cmt=>"Comment text or HTML. Special URL protocols: 'urlh://' (this host), 'urlr://' (this application), 'urlf://' (file attachments), 'key://' (record id or table//id), 'wikn://' (wikiname). Bracket URL notations: [[xxx://...]], [[xxx://...][label]], [[xxx://...|label]]"
-			,-lbl_ru=>'ˆ­ä®à¬ æ¨ï', -cmt_ru=>"®¤à®¡­®¥ ®¯¨á ­¨¥ § ï¢ª¨, á®¡ëâ¨© ¨«¨ à ¡®â, â¥ªáâ ª®¬¬¥­â à¨ï. ƒ¨¯¥àááë«ª¨ ¬®£ãâ ¡ëâì ­ ç âë á 'urlh://' (ª®¬¯ìîâ¥à), 'urlr://' (íâ® ¯à¨«®¦¥­¨¥), 'urlf://' (¯à¨á®¥¤¨­¥­­ë¥ ä ©«ë), 'key://' (ª«îç § ¯¨á¨ ¨«¨ â ¡«¨æ //ª«îç), 'wikn://' (¨¬ï § ¯¨á¨); ¬®£ãâ ¡ëâì ¢ áª®¡®ç­®© § ¯¨á¨ [[xxx://...]], [[xxx://...][label]], [[xxx://...|label]]"
+			,-lbl_ru=>'Èíôîðìàöèÿ', -cmt_ru=>"Ïîäðîáíîå îïèñàíèå çàÿâêè, ñîáûòèé èëè ðàáîò, òåêñò êîììåíòàðèÿ. Ãèïåðññûëêè ìîãóò áûòü íà÷àòû ñ 'urlh://' (êîìïüþòåð), 'urlr://' (ýòî ïðèëîæåíèå), 'urlf://' (ïðèñîåäèíåííûå ôàéëû), 'key://' (êëþ÷ çàïèñè èëè òàáëèöà//êëþ÷), 'wikn://' (èìÿ çàïèñè); ìîãóò áûòü â ñêîáî÷íîé çàïèñè [[xxx://...]], [[xxx://...][label]], [[xxx://...|label]]"
 			,-lblhtml=>''
 			,-inp=>{-htmlopt=>1,-hrefs=>1,-arows=>5,-cols=>70,-maxlength=>4*1024}
 			}
@@ -2123,8 +2123,8 @@ $w->set(
 		,-limit		=>256
 		,-frmLsoAdd	=>[{-lbl=>'Nowdays'
 					,-cmt=>'Current records and next 7 days'
-					,-lbl_ru=>'’¥¯¥àì'
-					,-cmt_ru=>'’¥ªãé¨¥ § ¯¨á¨ ¨ á«¥¤ãîé¨¥ 7 ¤­¥©'
+					,-lbl_ru=>'Òåïåðü'
+					,-cmt_ru=>'Òåêóùèå çàïèñè è ñëåäóþùèå 7 äíåé'
 					,-cmd=>{-qwhere=>"(TO_DAYS(hdesk.stime) <=TO_DAYS(NOW()) +6) OR hdesk.status NOT IN('scheduled','do')"}
 					}
 				,['hierarchy',undef,{-qkeyadd=>{'idrm'=>undef}}]
@@ -2132,7 +2132,7 @@ $w->set(
 		,-frmLsc	=>
 				[{-val=>'votime',-cmd=>{}}
 				,{-val=>'votimeje',-lbl=>'Exec/under'
-					,-lbl_ru=>'‚ë¯-¥/¯®¤', -cmd=>
+					,-lbl_ru=>'Âûï-å/ïîä', -cmd=>
 					sub {
 						$_[0]->{-pcmd}->{-qhref}=$_[0]->{-pcmd}->{-qhref}||$_[2]->{-qhref}||{};
 						$_[0]->{-pcmd}->{-qhref}->{-urm} =['votimej'];
@@ -2141,7 +2141,7 @@ $w->set(
 						$_[3]->{-join}  =' LEFT OUTER JOIN cgibus.hdesk AS j ON (j.idrm=hdesk.id)';
 						$_[3]->{-datainc}=[qw(votimej)]}}
 				,{-val=>'votimej',-lbl=>'Upd/under'
-					,-lbl_ru=>'ˆ§¬-¥/¯®¤', -cmd=>
+					,-lbl_ru=>'Èçì-å/ïîä', -cmd=>
 					sub {
 						$_[0]->{-pcmd}->{-qhref}=$_[0]->{-pcmd}->{-qhref}||$_[2]->{-qhref}||{};
 						$_[0]->{-pcmd}->{-qhref}->{-urm} =['votimej'];
@@ -2168,16 +2168,16 @@ $w->set(
 	,'start'=>{
 		 -lbl		=>'Start Page'
 		,-cmt		=>'Service Desk and Configuretion Management Database'
-		,-lbl_ru	=>'‘â àâ®¢ ï áâà ­¨æ '
-		,-cmt_ru	=>'–¥­âà ®¡á«ã¦¨¢ ­¨ï ¨ Š®­ä¨£ãà æ¨®­­ ï ¡ §  ¤ ­­ëå'
+		,-lbl_ru	=>'Ñòàðòîâàÿ ñòðàíèöà'
+		,-cmt_ru	=>'Öåíòð îáñëóæèâàíèÿ è Êîíôèãóðàöèîííàÿ áàçà äàííûõ'
 		,-cgcCall	=>'cmdb-start.psp'
 	}
 				### cmdbm views
 	,'cmdbmn' =>{
 		 -lbl		=>'CMDB - Names'
 		,-cmt		=>'CMDB - Named elements'
-		,-lbl_ru	=>'Š„ - ˆ¬¥­ '
-		,-cmt_ru	=>'Š„ - ˆ¬¥­®¢ ­­ë¥ í«¥¬¥­âë'
+		,-lbl_ru	=>'ÊÁÄ - Èìåíà'
+		,-cmt_ru	=>'ÊÁÄ - Èìåíîâàííûå ýëåìåíòû'
 		,-table		=>'cmdbm'
 		,-recQBF	=>'cmdbm'
 		,-query		=>{-display	=>['name','record', 'status', 'utime', 'definition']
@@ -2196,8 +2196,8 @@ $w->set(
 	,'cmdbmh' =>{
 		 -lbl		=>'CMDB - Hierarchy'
 		,-cmt		=>'CMDB - Hierarchy of records'
-		,-lbl_ru	=>'Š„ - ˆ¥à àå¨ï'
-		,-cmt_ru	=>'Š„ - ˆ¥à àå¨ï § ¯¨á¥©'
+		,-lbl_ru	=>'ÊÁÄ - Èåðàðõèÿ'
+		,-cmt_ru	=>'ÊÁÄ - Èåðàðõèÿ çàïèñåé'
 		,-table		=>'cmdbm'
 		,-recQBF	=>'cmdbm'
 		,-query		=>{-display	=>['name','record', 'status', 'utime', 'definition']
@@ -2217,8 +2217,8 @@ $w->set(
 	,'cmdbmv' =>{
 		 -lbl		=>'CMDB - Records'
 		,-cmt		=>'CMDB - Records of all elements and associations'
-		,-lbl_ru	=>'Š„ - ‡ ¯¨á¨'
-		,-cmt_ru	=>'Š„ - ‡ ¯¨á¨ ¢á¥å í«¥¬¥­â®¢ ¨  áá®æ¨ æ¨©'
+		,-lbl_ru	=>'ÊÁÄ - Çàïèñè'
+		,-cmt_ru	=>'ÊÁÄ - Çàïèñè âñåõ ýëåìåíòîâ è àññîöèàöèé'
 		,-hide		=>1
 		,-table		=>'cmdbm'
 		,-recQBF	=>'cmdbm'
@@ -2239,8 +2239,8 @@ $w->set(
 	,'cmdbmva' =>{
 		 -lbl		=>'CMDB - Association'
 		,-cmt		=>'CMDB - Association records'
-		,-lbl_ru	=>'Š„ - €áá®æ¨ æ¨¨'
-		,-cmt_ru	=>'Š„ - ‡ ¯¨á¨  áá®æ¨ æ¨©'
+		,-lbl_ru	=>'ÊÁÄ - Àññîöèàöèè'
+		,-cmt_ru	=>'ÊÁÄ - Çàïèñè àññîöèàöèé'
 		,-hide		=>1
 		,-table		=>'cmdbm'
 		,-recQBF	=>'cmdbm'
@@ -2257,8 +2257,8 @@ $w->set(
 	,'hdeskc'	=>{
 		 -lbl		=>'Service Classifications'
 		,-cmt		=>'Classifications of Service Desk records'
-		,-lbl_ru	=>'–Ž - Š« áá¨ä¨ª æ¨¨'
-		,-cmt_ru	=>'Š« áá¨ä¨ª æ¨¨ § ¯¨á¥© –¥­âà  ®¡á«ã¦¨¢ ­¨ï § ¯à®á®¢ ¨ ¨­æ¨¤¥­â®¢'
+		,-lbl_ru	=>'ÖÎ - Êëàññèôèêàöèè'
+		,-cmt_ru	=>'Êëàññèôèêàöèè çàïèñåé Öåíòðà îáñëóæèâàíèÿ çàïðîñîâ è èíöèäåíòîâ'
 		,-table		=>'hdesk'
 		,-recQBF	=>'hdesk'
 		,-query		=>{-data	=>['vrecord','vcount']
@@ -2278,53 +2278,53 @@ $w->set(
 				)}
 		,-frmLsc	=>
 				[{-val=>'vrecord',-cmd=>{}}
-				,{-val=>'vrd-u',-lbl=>'..news',-lbl_ru=>'..­®¢®áâ¨', -cmd=>{-order=>'utime',-keyord=>'-dall'}}
+				,{-val=>'vrd-u',-lbl=>'..news',-lbl_ru=>'..íîâîñòè', -cmd=>{-order=>'utime',-keyord=>'-dall'}}
 				,{-val=>'severity',-cmd=>{-data=>['severity','vcount'],-display=>['severity','vcount'],-group=>'severity',-order=>'severity',-keyord=>'-aall'}}
-				,{-val=>'svr-u',-lbl=>'..news',-lbl_ru=>'..­®¢®áâ¨',-cmd=>{-data=>['severity','vcount'],-display=>['severity','vcount'],-group=>'severity',-order=>'utime',-keyord=>'-dall'}}
+				,{-val=>'svr-u',-lbl=>'..news',-lbl_ru=>'..íîâîñòè',-cmd=>{-data=>['severity','vcount'],-display=>['severity','vcount'],-group=>'severity',-order=>'utime',-keyord=>'-dall'}}
 				,{-val=>'status',-cmd=>{-data=>['status','vcount'],-display=>['status','vcount'],-group=>'status',-order=>'status',-keyord=>'-aall'}}
-				,{-val=>'stt-u',-lbl=>'..news',-lbl_ru=>'..­®¢®áâ¨',-cmd=>{-data=>['status','vcount'],-display=>['status','vcount'],-group=>'status',-order=>'utime',-keyord=>'-dall'}}
+				,{-val=>'stt-u',-lbl=>'..news',-lbl_ru=>'..íîâîñòè',-cmd=>{-data=>['status','vcount'],-display=>['status','vcount'],-group=>'status',-order=>'utime',-keyord=>'-dall'}}
 				,{-val=>'object',-cmd=>{-data=>['object','vcount'],-display=>['object','vcount'],-group=>'object',-order=>'object',-keyord=>'-aall'}}
-				,{-val=>'obj-u',-lbl=>'..news',-lbl_ru=>'..­®¢®áâ¨',-cmd=>{-data=>['object','vcount'],-display=>['object','vcount'],-group=>'object',-order=>'utime',-keyord=>'-dall'}}
-				,{-val=>'obj-c',-lbl=>'..obj&CMDB',-lbl_ru=>'..®¡ê¥ªâ&Š„'
+				,{-val=>'obj-u',-lbl=>'..news',-lbl_ru=>'..íîâîñòè',-cmd=>{-data=>['object','vcount'],-display=>['object','vcount'],-group=>'object',-order=>'utime',-keyord=>'-dall'}}
+				,{-val=>'obj-c',-lbl=>'..obj&CMDB',-lbl_ru=>'..îáúåêò&ÊÁÄ'
 					,-cmd=>{-data=>['object','vcount','vdefinition'],-display=>['object','vcount','vdefinition']
 					,-join=>'LEFT OUTER JOIN cgibus.cmdbm AS cmdbm ON (cmdbm.name=hdesk.object)'
 					,-where=>'hdesk.object IS NOT NULL'
 					,-group=>'object',-order=>'object',-keyord=>'-aall'}}
 				,{-val=>'application',-cmd=>{-data=>['application','vcount'],-display=>['application','vcount'],-group=>'application',-order=>'application',-keyord=>'-aall'}}
-				,{-val=>'app-u',-lbl=>'..news',-lbl_ru=>'..­®¢®áâ¨',-cmd=>{-data=>['application','vcount'],-display=>['application','vcount'],-group=>'application',-order=>'utime',-keyord=>'-dall'}}
-				,{-val=>'app-c',-lbl=>'..app&CMDB',-lbl_ru=>'..à¥áãàá&Š„'
+				,{-val=>'app-u',-lbl=>'..news',-lbl_ru=>'..íîâîñòè',-cmd=>{-data=>['application','vcount'],-display=>['application','vcount'],-group=>'application',-order=>'utime',-keyord=>'-dall'}}
+				,{-val=>'app-c',-lbl=>'..app&CMDB',-lbl_ru=>'..ðåñóðñ&ÊÁÄ'
 					,-cmd=>{-data=>['application','vcount','vdefinition'],-display=>['application','vcount','vdefinition']
 					,-join=>'LEFT OUTER JOIN cgibus.cmdbm AS cmdbm ON (cmdbm.name=hdesk.application)'
 					,-where=>'hdesk.application IS NOT NULL'
 					,-group=>'application',-order=>'application',-keyord=>'-aall'}}
 				,{-val=>'location',-cmd=>{-data=>['location','vcount'],-display=>['location','vcount'],-group=>'location',-order=>'location',-keyord=>'-aall'}}
-				,{-val=>'loc-u',-lbl=>'..news',-lbl_ru=>'..­®¢®áâ¨',-cmd=>{-data=>['location','vcount'],-display=>['location','vcount'],-group=>'location',-order=>'utime',-keyord=>'-dall'}}
-				,{-val=>'loc-c',-lbl=>'..loc&CMDB',-lbl_ru=>'..¬¥áâ®&Š„'
+				,{-val=>'loc-u',-lbl=>'..news',-lbl_ru=>'..íîâîñòè',-cmd=>{-data=>['location','vcount'],-display=>['location','vcount'],-group=>'location',-order=>'utime',-keyord=>'-dall'}}
+				,{-val=>'loc-c',-lbl=>'..loc&CMDB',-lbl_ru=>'..ìåñòî&ÊÁÄ'
 					,-cmd=>{-data=>['location','vcount','vdefinition'],-display=>['location','vcount','vdefinition']
 					,-join=>'LEFT OUTER JOIN cgibus.cmdbm AS cmdbm ON (cmdbm.name=hdesk.location)'
 					,-where=>'hdesk.location IS NOT NULL'
 					,-group=>'location',-order=>'location',-keyord=>'-aall'}}
 				,{-val=>'cause',-cmd=>{-data=>['cause','vcount'],-display=>['cause','vcount'],-group=>'cause',-order=>'cause',-keyord=>'-aall'}}
-				,{-val=>'cas-u',-lbl=>'..news',-lbl_ru=>'..­®¢®áâ¨',-cmd=>{-data=>['cause','vcount'],-display=>['cause','vcount'],-group=>'cause',-order=>'utime',-keyord=>'-dall'}}
+				,{-val=>'cas-u',-lbl=>'..news',-lbl_ru=>'..íîâîñòè',-cmd=>{-data=>['cause','vcount'],-display=>['cause','vcount'],-group=>'cause',-order=>'utime',-keyord=>'-dall'}}
 				,{-val=>'process',-cmd=>{-data=>['process','vcount'],-display=>['process','vcount'],-group=>'process',-order=>'process',-keyord=>'-aall'}}
-				,{-val=>'prc-u',-lbl=>'..news',-lbl_ru=>'..­®¢®áâ¨',-cmd=>{-data=>['process','vcount'],-display=>['process','vcount'],-group=>'process',-order=>'utime',-keyord=>'-dall'}}
+				,{-val=>'prc-u',-lbl=>'..news',-lbl_ru=>'..íîâîñòè',-cmd=>{-data=>['process','vcount'],-display=>['process','vcount'],-group=>'process',-order=>'utime',-keyord=>'-dall'}}
 				,{-val=>'puser',-cmd=>{-data=>['puser','vcount'],-display=>['puser','vcount'],-group=>'puser',-order=>'puser',-keyord=>'-aall'}}
-				,{-val=>'pus-u',-lbl=>'..news',-lbl_ru=>'..­®¢®áâ¨',-cmd=>{-data=>['puser','vcount'],-display=>['puser','vcount'],-group=>'puser',-order=>'utime',-keyord=>'-dall'}}
+				,{-val=>'pus-u',-lbl=>'..news',-lbl_ru=>'..íîâîñòè',-cmd=>{-data=>['puser','vcount'],-display=>['puser','vcount'],-group=>'puser',-order=>'utime',-keyord=>'-dall'}}
 				,{-val=>'prole',-cmd=>{-data=>['prole','vcount'],-display=>['prole','vcount'],-group=>'prole',-order=>'prole',-keyord=>'-aall'}}
-				,{-val=>'prl-u',-lbl=>'..news',-lbl_ru=>'..­®¢®áâ¨',-cmd=>{-data=>['prole','vcount'],-display=>['prole','vcount'],-group=>'prole',-order=>'utime',-keyord=>'-dall'}}
+				,{-val=>'prl-u',-lbl=>'..news',-lbl_ru=>'..íîâîñòè',-cmd=>{-data=>['prole','vcount'],-display=>['prole','vcount'],-group=>'prole',-order=>'utime',-keyord=>'-dall'}}
 				,{-val=>'auser',-cmd=>{-data=>['auser','vcount'],-display=>['auser','vcount'],-group=>'auser',-order=>'auser',-keyord=>'-aall'}}
-				,{-val=>'aus-u',-lbl=>'..news',-lbl_ru=>'..­®¢®áâ¨',-cmd=>{-data=>['auser','vcount'],-display=>['auser','vcount'],-group=>'auser',-order=>'utime',-keyord=>'-dall'}}
+				,{-val=>'aus-u',-lbl=>'..news',-lbl_ru=>'..íîâîñòè',-cmd=>{-data=>['auser','vcount'],-display=>['auser','vcount'],-group=>'auser',-order=>'utime',-keyord=>'-dall'}}
 				,{-val=>'arole',-cmd=>{-data=>['arole','vcount'],-display=>['arole','vcount'],-group=>'arole',-order=>'arole',-keyord=>'-aall'}}
-				,{-val=>'arl-u',-lbl=>'..news',-lbl_ru=>'..­®¢®áâ¨',-cmd=>{-data=>['arole','vcount'],-display=>['arole','vcount'],-group=>'arole',-order=>'utime',-keyord=>'-dall'}}
+				,{-val=>'arl-u',-lbl=>'..news',-lbl_ru=>'..íîâîñòè',-cmd=>{-data=>['arole','vcount'],-display=>['arole','vcount'],-group=>'arole',-order=>'utime',-keyord=>'-dall'}}
 				,{-val=>'mrole',-cmd=>{-data=>['mrole','vcount'],-display=>['mrole','vcount'],-group=>'mrole',-order=>'mrole',-keyord=>'-aall'}}
-				,{-val=>'mrl-u',-lbl=>'..news',-lbl_ru=>'..­®¢®áâ¨',-cmd=>{-data=>['mrole','vcount'],-display=>['mrole','vcount'],-group=>'mrole',-order=>'utime',-keyord=>'-dall'}}
+				,{-val=>'mrl-u',-lbl=>'..news',-lbl_ru=>'..íîâîñòè',-cmd=>{-data=>['mrole','vcount'],-display=>['mrole','vcount'],-group=>'mrole',-order=>'utime',-keyord=>'-dall'}}
 				]
 		}
 	,'hdeskg'=>{
 		 -lbl		=>'Service Graph'
 		,-cmt		=>'Service Desk State Matrix'
-		,-lbl_ru	=>'–Ž - ƒà ä'
-		,-cmt_ru	=>'‘¥à¢¨á­ë© £à ä ¯® § ¯¨áï¬ –¥­âà  ®¡á«ã¦¨¢ ­¨ï § ¯à®á®¢ ¨ ¨­æ¨¤¥­â®¢'
+		,-lbl_ru	=>'ÖÎ - Ãðàô'
+		,-cmt_ru	=>'Ñåðâèñíûé ãðàô ïî çàïèñÿì Öåíòðà îáñëóæèâàíèÿ çàïðîñîâ è èíöèäåíòîâ'
 		,-cgcCall	=>'cmdb-svcgrph.pl'
 	}
 	});
@@ -2370,10 +2370,31 @@ sub a_hdesk_stbar {
  my $avc={};	# group current
  my $avu={};	# group current users
  my $avx='';	# exclusion due to query
- my $qh =$s->recSel(-table=>'hdesk'
+
+ local $s->{-rac} =undef;
+ my $qu =1 && ($ENV{MOD_PERL} || (($ENV{GATEWAY_INTERFACE}||'') =~/PerlEx/))
+	&& do{	my $v = $s->dbi->selectrow_arrayref("SELECT max(utime) FROM cgibus.hdesk");
+	#	$s->dbiSel({-table=>'hdesk',-data=>[['max(utime)','mutime']]});
+	#	$v =$v->fetch();
+	#	$s->logRec('a_hdesk_stbar','max(utime)',$v->[0]);
+		$v->[0];
+	};
+ my $qc =$DBIx::Web::CACHE->{a_hdesk_stbar};
+    $qc =$DBIx::Web::CACHE->{a_hdesk_stbar} ={} if !$qc && $qu;
+ my $qh =!$qu || !$qc->{-u} || ($qc->{-u} lt $qu)
+	? $s->recSel(-table=>'hdesk'
 		,-data=>[qw(arole auser prole puser mrole severity utime status record rectype)]
 		,-where=>"status IN('new','draft','appr-do','scheduled','do','progress','rollback','delay','edit','appr-ok','appr-no') OR (TO_DAYS(etime)=TO_DAYS(CURRENT_DATE()))"
-		);
+		)
+	: undef;
+ if ($qu && $qh) {
+	$qc->{-u} =$qu;
+	$qc->{-q} =$qh->fetchall_arrayref({});
+	$qh =undef;
+	$s->logRec('a_hdesk_stbar','cache', $#{$qc->{-q}});
+ }
+ $qu =0;
+
  my $qpk   =!$c ||!ref($c->{-qkey})
  		? undef
  		: $c->{-qkey}->{record} || $c->{-qkey}->{rectype}
@@ -2427,7 +2448,10 @@ sub a_hdesk_stbar {
 		last;
 	}
  }
- while (my $qv =$qh->fetch() && $qh->{-rec}) { # $qh->fetchrow_hashref()
+ while (my $qv =$qh
+		? $qh->fetch() && $qh->{-rec} # $qh->fetchrow_hashref()
+		: $qc->{-q}->[$qu++]
+		) {
 	$qv->{severity} =3.5
 		if (!defined($qv->{severity}) ||($qv->{severity} eq '4') ||($qv->{severity} eq ''))
 		&& ($qv->{record} && ($qv->{record} eq 'unavlbl'));

@@ -1,3 +1,5 @@
+# 2008-12-10 ugroups() - $CACHE->{-ugroups}
+# 2008-12-10 cmdb: cache a_hdesk_stbar()
 # 2008-12-03 mistake: key:// hyperlinks valid only when -cgibus or table//key syntax
 # 2008-12-01 cgiDDLB() changed: added 'option ... selected' for arrays and hashes
 # 2008-12-01 cgiDDLB() changed: l.options.item(i).innerText !='' ? l.options.item(i).innerText.toLowerCase().indexOf(k)

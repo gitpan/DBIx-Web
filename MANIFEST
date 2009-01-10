@@ -16,4 +16,3 @@ examples/cgi-bin/cmdb-nav.psp
 
 lib/DBIx/Web.pm
 lib/DBIx/Web.pod
-META.yml                                 Module meta-data (added by MakeMaker)
