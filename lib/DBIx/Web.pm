@@ -46,7 +46,8 @@
 # - cmdb: status classification graphs: object, application, location, personal
 #
 # Done:
-# 2009-01-10 starting 0.79 version
+#
+# 2009-05-25 starting 0.80 version
 #
 
 package DBIx::Web;
@@ -58,7 +59,7 @@ use Fcntl qw(:DEFAULT :flock :seek :mode);
 
 use vars qw($VERSION @ISA @EXPORT @EXPORT_OK %EXPORT_TAGS $AUTOLOAD $SELF $CACHE $LNG $IMG);
 
-	$VERSION= '0.78';
+	$VERSION= '0.79';
 	$SELF   =undef;				# current object pointer, use 'local $SELF'
 	$CACHE	={};				# cache for pointers to subobjects
 	*isa    = \&UNIVERSAL::isa; isa('','');	# isa function
@@ -6293,6 +6294,7 @@ sub recRead {   # Read one record from database
 		# -key=>{field=>value}, see 'dbiSel'
 		# -wikn=>value, instead of -key
 		# -optrec=>boolean, -test=>boolean
+		# -version=>'+'
  my	$s =$_[0];
  my	$a =@_< 3 && ref($_[1]) ? dsdClone($s, $_[1]) : {map {ref($_) ? dsdClone($s, $_) : $_} @_[1..$#_]};
  my	$d ={};
@@ -6303,6 +6305,10 @@ sub recRead {   # Read one record from database
 	$a->{-data} =ref($a->{-data}) ne 'ARRAY' ? undef : $a->{-data};
  my	$m =mdeTable($s,$a->{-table});
  my	$r =undef;
+ $a->{-version}= [ ($m->{-rvcActPtr}   ||$s->{-rvcActPtr}   ||())
+		 ,@{$m->{-rvcDelState} ||$s->{-rvcDelState} ||[]}]
+		if defined($a->{-version}) && !ref($a->{-version})
+		&& $m && (!$a->{-version} || ($a->{-version} eq '-'));
  rmiTrigger($s, $a, $d, undef, qw(-recForm0C -recRead0C));
  $r =$s->recRead_($m, $a);
  rmiTrigger($s, $a, $r, $r, qw(-recForm0R -recFlim0R -recRead0R -recRead1R -recRead1C -recForm1C))
@@ -6349,12 +6355,15 @@ sub recWikn {	# Find record by name
  my	$rk;
  my	$rl=0;
  my	$ru='';
- $s->logRec('recWikn',$val);
- if ($qry && $s->{-wikq}) {
+ $qry ='' if $qry && ($qry eq 'default');
+
+ $s->logRec('recWikn',$val, $qry);
+ if ($qry && $s->{-wikq} && !$s->{-table}->{$qry}) {
 	$rk =&{$s->{-wikq}}($s, $val, $qry);
 	return($rk) if $rk;
  }
  foreach my $tn (keys %{$s->{-table}}) {
+	next if $qry && ($tn ne $qry);
 	my $tm =$s->mdeTable($tn);
 	next if defined($tm->{-wikn}) && !$tm->{-wikn};
 	next if !$tm->{-wikn} && !$s->{-wikn};
@@ -6368,7 +6377,7 @@ sub recWikn {	# Find record by name
 	}
 	next if !$fn;
 	my $fv =$tm->{-rvcActPtr}	||$s->{-rvcActPtr};
-	my $fu =$tm->{-rvcUpdBy}	||$s->{-rvcUpdBy};
+	my $fu =$tm->{-rvcUpdWhen}	||$s->{-rvcUpdWhen};
 	my $ti =$s->recSel(-table=>$tn
 			, -version=>'+'
 			, -key=>{$fn=>$val}
@@ -6384,8 +6393,12 @@ sub recWikn {	# Find record by name
 			$rl =1;
 		}
 		else {
+			next if $fu
+				? $ru gt ($rr->{$fu}||'')
+				: $rl >1;
 			$rk ={-table=>$tn, -key=>$s->recKey($tn,$rr)};
-			$rl =2; last
+			$ru =$rr->{$fu}||'';
+			$rl =2; # last
 		}
 	}
 	last if $rl==2;
@@ -7209,7 +7222,7 @@ sub cgiRun {	# Execute CGI query
 
 		# Wikiname
  if ($s->{-pcmd}->{-wikn}) {
-	my $v =$s->recWikn($s->{-pcmd}->{-wikn},$s->{-pcmd}->{-wikq});
+	my $v =$s->recWikn($s->{-pcmd}->{-wikn},$s->{-pcmd}->{-wikq} ||$s->{-pcmd}->{-form} ||$s->{-pcmd}->{-table});
 	if ($v) {
 		foreach my $k (keys %$v) {
 			$s->{-pcmd}->{$k} =$v->{$k}
@@ -7378,7 +7391,7 @@ sub cgiParse {	# Parse CGI call parameters
 	elsif($k =~/^_(new|file)$/) {		# record attribute
 		$s->{-pdta}->{"-$k"} =$d->{$k}
 	}
-	elsif ($k =~/^_(cmd|cmg|frmCall|frmName\d*|frmLso|frmLsc|frmHelp|recNew|recRead|recPrint|recXML|recHist|recEdit|recIns|recUpd|recDel|recForm|recList|recQBF|submit.*|app.*|form|key|wikn|wikq|proto|urm|qjoin|qkey|qwhere|qurole|quname|qftext|qversion|qorder|qkeyord|qlist|qlimit|qdisplay|qftwhere|qftord|qftlimit|edit|backc|login|print|xml|hist|refresh|style|frame|search)(?:\.[xXyY]){0,1}$/i) {
+	elsif ($k =~/^_(cmd|cmg|frmCall|frmName\d*|frmLso|frmLsc|frmHelp|recNew|recRead|recPrint|recXML|recHist|recEdit|recIns|recUpd|recDel|recForm|recList|recQBF|submit.*|app.*|form|key|wikn|wikq|proto|urm|qjoin|qkey|qwhere|qurole|quname|qftext|qversion|version|qorder|qkeyord|qlist|qlimit|qdisplay|qftwhere|qftord|qftlimit|edit|backc|login|print|xml|hist|refresh|style|frame|search)(?:\.[xXyY]){0,1}$/i) {
 		my ($c, $v) =($1, $d->{$k});	# command
 		$v =$1	if ($k !~/^_(key|proto|qkey|qftext)/i)
 			&& ($v =~/^\s*(.+?)\s*$/);
@@ -7721,11 +7734,26 @@ sub cgiAction {	# cgiRun Action Executor encapsulated
 	}
 	elsif	($oa =~/^rec(?:Read)/) {
 		$s->rmiTrigger($oc, $od, undef, qw(-recTrim0A -recForm0A));
+		if (ref($oc->{-key})) {
+			my $m =$s->{-table}->{$oc->{-table}} ||$s->{-form}->{$oc->{-table}};
+			if ($m && $m->{-key}) {
+				my ($f, %v) =(1);
+				foreach my $e (@{$m->{-key}}) {
+					if (exists($oc->{-key}->{$e})) {
+						$v{$e} =$oc->{-key}->{$e}
+					}
+					else {
+						$f =undef;
+					}
+				}
+				%{$oc->{-key}} =%v if $f
+			}
+		}
 		$s->{-pout} =$s->recRead(
 				(map {($_=>$oc->{$_})
 				  } grep {defined($oc->{$_}) 
 					&& $oc->{$_} ne ''
-					}  qw(-table -key -wikn -wikq -form -edit -ui))
+					}  qw(-table -key -wikn -wikq -form -edit -ui -version))
 				, ref($om->{-recRead}) eq 'HASH' 
 				? %{$om->{-recRead}} 
 				: ());
@@ -7800,7 +7828,9 @@ sub htmlStart {	# HTTP/HTML/Form headers
 	, $s->{-c}->{-httpheader}
 	? ()
 	: do{$s->{-c}->{-httpheader} =$s->cgi->header(
-		-charset => $s->charset(), -expires => 'now'
+		-charset => $s->charset()
+	#	, -expires => 'now'
+		, uc($ENV{REQUEST_METHOD}||'') ne 'POST' ? (-expires=>'now') : ()
 		, ref($s->{-httpheader}) 
 		? %{$s->{-httpheader}} 
 		: ()
@@ -8294,9 +8324,11 @@ sub htmlMB {	# CGI menu bar button
 				? ('', '_form'=>$_[0]->{-pcmd}->{-form},'_cmd'=>$_[1]) 
 				: ref($_[2]) ? @{$_[2]} : $_[2]);
 	my $jc =' onclick="{'
-		.($hl && ($_[1] =~/^(?:recRead|recPrint|recXML|recHist|recEdit|recNew|frmHelp)$/)
+		.(!$hl
+		? ''
+		: $_[1] =~/^(?:recRead|recPrint|recXML|recHist|recEdit|recNew|frmHelp)$/
 		? "if((self.name=='BOTTOM') || (self.name=='TOP') ||document.getElementsByName('_frame').length){window.document.open('"
-                        .(($_[1] =~/^(?:recNew)$/ && ($hl =~/_proto=/))
+			.(($_[1] =~/^(?:recNew)$/ && ($hl =~/_proto=/))
 			? (do {my $v=$hl; $v =~s/([?&;])_proto=/${1}_key=/; $v})
 			: $hl)
 			."','_blank','',false); return(false)}\n"
@@ -8754,11 +8786,18 @@ sub cgiForm {	# Print CGI screen form
 			? &{$f->{-form}}($s,$f,$fm,$d) 
 			: ref($f->{-form})
 			? $s->urlCmd(''
-				, -form=> $f->{-form}->[0] || $m->{-table} || $n
 				, !defined($_) || ($_ eq '')
-				?(-cmd => 'recList')
-				:(-cmd => $f->{-form}->[1] || '' # 'recList'
-				 ,-key =>{$f->{-form}->[2] || $f->{-fld} => $_}))
+				? (-form=> $f->{-form}->[0] || $m->{-table} || $n
+				  ,-cmd => 'recList')
+				: ($f->{-form}->[2] || '') eq '-wikn'
+				? ($f->{-form}->[0] ? (-form=>$f->{-form}->[0]) : ()
+				  , -cmd=>'recRead'
+				  ,-wikn => $_)
+				: (-form=> $f->{-form}->[0] || $m->{-table} || $n
+				  ,-cmd => $f->{-form}->[1] || '' # 'recList'
+				  ,-key =>{$f->{-form}->[2] || $f->{-fld} => $_}
+				  ,-version=>'-')
+				)
 			: $f->{-form};
 			$v =$s->urlCmd(@$v) if ref($v);
 			$v
@@ -9539,12 +9578,13 @@ sub htmlRFD {	# RFD widget html
 	}
 	my $v= eval{join('; ',
 		map {	my $f =$_; $f=~s/([%])/uc sprintf("%%%02x",ord($1))/ge;
-			$s->cgi->a({-href=>"$url/$f", -target=>'_blank'}
-			, $s->cgi->checkbox(-name=>$fnl
-				,($cs ? (-class=>$cs) : ())
-				, -value=>$_
-				, -label=>$_
-				, -title=>$s->lng(1,'rfadelm')))
+			'<input type="checkbox" name="' .$fnl .'" value="' 
+			.$s->htmlEscape($_) .'" title="' .$s->htmlEscape($s->lng(1,'rfadelm'))
+			.'"' .($cs ? ' class="' .$cs .'"' : '') .'/>'
+			.'<a href="' .$s->htmlEscape("$url/$f") .'" target="_blank"'
+			.' title="' .$s->htmlEscape($_) .'"'
+			.($cs ? ' class="' .$cs .'"' : '') .'>'
+			.$s->htmlEscape($_) .'</a>'
 		} $s->pthGlobns($pth .'/*'))};
 	$r .=(defined($v)
 		? $v
@@ -10217,13 +10257,22 @@ sub cgiQuery {	# Query records
  if (exists($m->{-frmLsc}) ? $m->{-frmLsc} : ($m->{-frmLsc} ||$t->{-frmLsc})) {
 	my $lsc =$m->{-frmLsc} ||$t->{-frmLsc};
 	my $lsq =$c->{-frmLsc} ||(ref($lsc->[0]) eq 'HASH' ? $lsc->[0]->{-val} : $lsc->[0]->[0]);
-	foreach my $e (@$lsc) {
-		next if $lsq ne (ref($e) eq 'HASH' ? $e->{-val} : $e->[0]);
-		my $x =ref($e) eq 'HASH' ? $e->{-cmd} : $e->[2];
-		if (ref($x) eq 'CODE') {
-			&$x($s, $n, $m, \%a, $lsq);
-			last;
+	my $e;
+	foreach my $v (@$lsc) {
+		if ($lsq eq (ref($v) eq 'HASH' ? $v->{-val} : $v->[0])) {
+			$e =$v;
+			last
 		}
+	}
+	if (!$e && $t->{-mdefld}->{$lsq}) {
+		push @$lsc, [$lsq];
+		$e =$lsc->[$#$lsc];
+	}
+	my $x =$e && (ref($e) eq 'HASH' ? $e->{-cmd} : $e->[2]);
+	if (ref($x) eq 'CODE') {
+		&$x($s, $n, $m, \%a, $lsq);
+	}
+	elsif ($e) {
 		if (!$x) {
 			my $v =(ref($e) eq 'HASH' ? $e->{-val} : $e->[0]);
 			$a{-display}->[0] =$v	if ref($a{-display});
@@ -10232,19 +10281,20 @@ sub cgiQuery {	# Query records
 			$a{-order} =$v		if !ref($a{-order});
 			$a{-order}->[0] =$v	if ref($a{-order});
 		}
-		@a{keys %$x} =values %$x;
-		if ($x->{-keyadd}) {
-			$a{-key} ={}	if !$a{-key};
-			@{$a{-key}}{keys %{$x->{-keyadd}}}
-					=values %{$x->{-keyadd}};
-			delete $a{-keyadd}
+		else {
+			@a{keys %$x} =values %$x;
+			if ($x->{-keyadd}) {
+				$a{-key} ={}	if !$a{-key};
+				@{$a{-key}}{keys %{$x->{-keyadd}}}
+						=values %{$x->{-keyadd}};
+				delete $a{-keyadd}
+			}
 		}
 		foreach my $k (qw(-qhref -qhrcol)) {
 			next if !$a{$k};
 			$c->{$k} =$a{$k};
 			delete $a{$k}
 		}
-		last;
 	}
  }
 
@@ -10472,6 +10522,7 @@ sub htmlMQH {	# Menu Query Hyperlink
  # -qwhere, -qkey, -qurole, -quname, -qorder, -qkeyord
  # -xpar=>0 | 1 | 2 | name | [list]
  # -xkey=>name | [list]
+ # -ovw=>sub{}($s, match?, htmlMQH args, query inbound, query formed)
  my $s =$_[0];
  my $a =$#_ ==1 ? $_[1] : {@_[1..$#_]};
  my $qf=	# full inbound query to match required
@@ -10578,7 +10629,8 @@ sub htmlMQH {	# Menu Query Hyperlink
 		: $vq;
 	$qw->{$k} =$vq if length($s->urlCmd('', %$qw)) >$ql;
  }
- $s->{-pcmd}->{-htmlMQH} = $a	if $qm;
+ $s->{-pcmd}->{-htmlMQH} = $a		if $qm;
+ &{$a->{-ovw}}($s,$qm,$a,$qf,$qw)	if $a->{-ovw};
  local $a->{-href}  = $s->urlCmd('', %$qw);
  local $a->{-OnClick}=$s->urlCmd('', %$qw
 			, $s->{-pcmd}->{-frame}
@@ -10605,6 +10657,7 @@ sub htmlMQH {	# Menu Query Hyperlink
 		,($s->{-uistyle} ? ' ' .$s->{-uistyle} : ())
 		,($a->{-style} ? $a->{-style} : ())
 		);
+
  $s->cgi->a({(map {$a->{$_} ? ($_ => $a->{$_}) : ()
 		} qw (-class -style -target -href -title))
 		, $a->{-OnClick}
@@ -10698,6 +10751,9 @@ sub cgiList {	# List queried records
 		.'value="', '',	'">', '', '', ' - ', '', "</option>\n", "</select>"]
 	: ["<span $hstl>", ' ', ' ', " <a $hstl href=\"",'">', '</a> ', '', ' ', "$b\n", "</span>\n"]
 	if !ref($b);
+ my $fmt =((ref($b) ? $b->[0] : $b) ||'') =~/<select/
+	? sub{length($_[0]) >60 ? substr($_[0],0,60) .'...' : $_[0]}
+	: undef;
 
  if (ref($href) eq 'HASH') {
 	if	(!$href->{-key}) {		# Hyperlink key
@@ -10981,8 +11037,9 @@ sub cgiList {	# List queried records
 	my $ft	=$fetch;
 	my $hrc1=$hrcol+1; # $b->[4] || $#colf ? $hrcol+1 : $hrcol;
 	my $cargo;
-	$fetch	=sub{
-		my $r;
+	$fetch  =
+	  $xml
+	? sub {	my $r;
 		while($r =$i->fetch()) {
 			last	if !$m->{-qfilter} 
 				|| &{$m->{-qfilter}}($s, $n, $m, $c, $i->{-rec})
@@ -10994,8 +11051,7 @@ sub cgiList {	# List queried records
 			$qflgh =undef
 		}
 		my $h =&$href($s, $r);
-		$xml
-		? $s->output(''
+		output($s, ''
 		, xmlsTag($s, 'tr', 'href'=>$s->url .'/' .$h, '0')
 		, "\n"
 		, (map {	ref($_->[1])
@@ -11011,7 +11067,49 @@ sub cgiList {	# List queried records
 				, "\n")
 			} @colf)
 		,$b->[8])					# </tr>
-		: $s->output($b->[1]				# <tr>||<opt"
+		}
+	: $fmt
+	? sub {	my $r;
+		while($r =$i->fetch()) {
+			last	if !$m->{-qfilter} 
+				|| &{$m->{-qfilter}}($s, $n, $m, $c, $i->{-rec})
+		}
+		return(undef)	if !$r;
+		if ($qflgh) {
+			$s->output((ref($qflgh) eq 'CODE' ? &$qflgh($s) : $qflgh));
+			&$tstrt();
+			$qflgh =undef
+		}
+		my $h =&$href($s, $r);
+		output($s, $b->[1]				# <option value="
+		, (map {(	  (ref($_->[3]) ? &{$_->[3]}($s, $cargo, $h, $i, $r) : $_->[3])
+					||htmlEscape($s, ref($r) ? $r->[$_->[1]] : $r)
+				, $b->[3]			# ">
+				)} @colf[0..$hrcol])
+		, &$fmt(join($b->[6]				# ' - '
+			,map {(
+			( ref($_->[3])
+			? &{$_->[3]}($s, $cargo, undef, $i, $r)
+			: $_->[3])
+			.(ref($_->[1])
+			? &{$_->[1]}($s, $cargo, undef, $i, $r)
+			: htmlEscape($s, ref($r) ? $r->[$_->[1]] : $r))
+			)} @colf[0..$#colf]))
+		,$b->[8])					# </option>
+		}
+	: sub {	my $r;
+		while($r =$i->fetch()) {
+			last	if !$m->{-qfilter} 
+				|| &{$m->{-qfilter}}($s, $n, $m, $c, $i->{-rec})
+		}
+		return(undef)	if !$r;
+		if ($qflgh) {
+			$s->output((ref($qflgh) eq 'CODE' ? &$qflgh($s) : $qflgh));
+			&$tstrt();
+			$qflgh =undef
+		}
+		my $h =&$href($s, $r);
+		output($s, $b->[1]				# <tr>||<opt"
 		, (map {(	  (ref($_->[3]) ? &{$_->[3]}($s, $cargo, $h, $i, $r) : $_->[3])
 					||htmlEscBlnk($s, ref($r) ? $r->[$_->[1]] : $r)
 				, $b->[3]			# <a" || ">
@@ -11031,7 +11129,7 @@ sub cgiList {	# List queried records
 			, $b->[7]				# </td>
 			)} @colf[$hrc1..$#colf])
 		,$b->[8])					# </tr>
-	}
+		};
  }
 
  &$tstrt() if !$qflgh;				# Table start

@@ -1,3 +1,16 @@
+# 2009-05-03 htmlStart() changed, conditional -expires=>'now'
+# 2009-04-30 corrected cgiAction() switching to recKey() for 'recRead' and '-edit'
+# 2009-04-02 changed -frmLsc in cgiQuery() to accept unmentioned fieldnames
+# 2009-04-02 new -ovw option of htmlMQH()
+# 2009-03-03 recWikn() may get table name as '-wikq'
+# 2009-03-03 recWikn() corrected for deleted records
+# 2009-03-02 cgiForm() corrected field hyperlink -form array with -version =>'-'
+# 2009-03-02 cgiForm() extended  field hyperlink -form array with -wikn field name
+# 2009-02-25 cgiList() corrected limiting ddlb width
+# 2009-02-20 cmdb: -wikq corrected - used recRead(-version=>'-')
+# 2009-02-20 recRead() corrected, -version=>'-' implemented
+# 2009-02-03 htmlRFD() changed - checkbox moved from hyperlink
+# 2009-01-10 starting 0.79 version
 # 2008-12-10 ugroups() - $CACHE->{-ugroups}
 # 2008-12-10 cmdb: cache a_hdesk_stbar()
 # 2008-12-03 mistake: key:// hyperlinks valid only when -cgibus or table//key syntax

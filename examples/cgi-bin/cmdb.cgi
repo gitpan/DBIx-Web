@@ -90,7 +90,7 @@ $w->{-a_cmdbm_fh} =			# CMDBm field hide conditions
 $w->{-a_cmdbm_fho} =			# CMDBm field optional hide condition
 	sub{	(!$_ && ($_[2] !~/e/)) ||&{$_[0]->{-a_cmdbm_fh}}(@_)};
 $w->{-a_cmdbm_fl} =			# CMDBm field link description
-	['','recRead','name'];
+	['','recRead','name'];		# ['','recRead','name']|['cmdbm','','-wikn']
 
 					### HelpDesk Predefinitions
 $w->{-a_cmdbh_rectype} ={		# record subtypes
@@ -126,7 +126,7 @@ $w->logRec('set') if $w->{-debug};
 $w->set(
     -menuchs	=>[	 'start'
 			,'notes'
-			,'hdesk', 'hdeskc', 'hdeskg'
+			,'hdesk', 'hdesko', 'hdeskc', 'hdeskg'
 			,'cmdbm', 'cmdbmn', 'cmdbmh'
 			,'fulltext']
    ,-menuchs1	=>[	'','notes+','hdesk+','cmdbm+']
@@ -143,16 +143,19 @@ $w->set(
 			while ($n1) {
 				$f ='hdesk';
 				$r = !$k && $s->recRead(-test=>1,-table=>$f
+				,-version=>'-'
 				,-key=>{$q=>$n1
 					, $q eq 'application'
 					? ('rectype'=>'applicatn')
 					: $q eq 'object'
-					? ('rectype'=>['object','component','contact'])
+					? ('rectype'=>['object','component']) #,'contact'])
 					: ('rectype'=>$q)});
 				$r && return({-table=>$f,-key=>$s->recKey($f,$r)});
 				$f ='cmdbm';
 				$r =($q ne 'process')
-					&& $s->recRead(-test=>1,-table=>$f,-key=>{'name'=>$n1});
+					&& $s->recRead(-test=>1,-table=>$f
+						,-version=>'-'
+						,-key=>{'name'=>$n1});
 				$r && return({-table=>$f,-key=>$s->recKey($f,$r)});
 				last	if ($n1 !~/(.+)\/[^\\\/]+$/)
 					&& ($n1 !~/^[^\.\@]+[\.\@](.*)/);
@@ -1774,10 +1777,11 @@ $w->set(
 		, $w->tfdRFD(), "\f"
 		, $w->tfvVersions()
 		, $w->tfvReferences(undef
-			, sub{	1
-				? (-datainc=>[qw(comment)],-display=>[qw(votime vrecord status vsubjectx vauser)]
-					, $_[0]->{-pout}->{rectype}
-					&& ($_[0]->{-pout}->{rectype} =~/^(?:object|component|applicatn|operation)/)
+			, sub{(	   (($_[0]->{-pout}->{record}||'') =~/^(?:incident)/)
+				|| (($_[0]->{-pout}->{rectype}||'') =~/^(?:implementn|change)/)
+				? (-datainc=>[qw(comment)],-display=>[qw(votime vrecord status vsubjectx vauser)])
+				: ()
+				, ($_[0]->{-pout}->{rectype}||'') =~/^(?:object|component|applicatn|operation)/
 					? (-where=>join(' OR '
 						,'hdesk.idrm=' .$_[0]->strquot($_[0]->{-pout}->{id})
 						,'hdesk.idpr=' .$_[0]->strquot($_[0]->{-pout}->{id})
@@ -1787,9 +1791,7 @@ $w->set(
 							} qw(object application operation))
 						))
 					: ()
-					)
-				: ()
-				})
+				)})
 		]
 		,$w->ttoRVC()
 		,-dbd		=>'dbi'
@@ -2254,6 +2256,15 @@ $w->set(
 		#,-qhref		=>{-key=>['id'], -form=>'cmdbm', -cmd=>'recRead'}
 		,-frmLsc	=>undef
 		}
+	,'hdesko'=>{
+		-lbl		=>'Service Desk Objects'
+		,-lbl_ru	=>'ÖÎ - Îáúåêòû'
+		,-table		=>'hdesk'
+		,-recQBF	=>'hdesk'
+		,-query		=>{-qkey	=>{'record' => 'solution', 'rectype' => 'object'}
+				  ,-frmLsc	=>'object'
+					}
+		}
 	,'hdeskc'	=>{
 		 -lbl		=>'Service Classifications'
 		,-cmt		=>'Classifications of Service Desk records'
@@ -2403,8 +2414,31 @@ sub a_hdesk_stbar {
  			} qw(record rectype)}}
  		: undef;
 
- my %xpar  =(-xpar=>['-qurole','-quname','-frmLso']
-		,-xkey=>[qw(record rectype severity auser)]);
+ my %xpar  =(-xpar=>['-qurole', '-quname', '-frmLso']
+    ,-xkey=>[qw(record rectype severity auser)]
+    ,ref($c->{-qkey}) && $c->{-qkey}->{record} && ($c->{-qkey}->{record} eq 'solution')
+      && $c->{-form} && ($c->{-form} =~/^(:?hdesk|hdesko)$/)
+    ? (-ovw=>sub{
+      if ($_[4]->{-qkey} && $_[4]->{-qkey}->{rectype}
+      && ($_[4]->{-qkey}->{rectype} =~/(:?object|component|applicatn|contact|location|operation)/)) {
+        $_[4]->{-frmLsc} =
+            $_[4]->{-qkey}->{rectype} eq 'component'
+          ? 'object'
+          : $_[4]->{-qkey}->{rectype} eq 'applicatn'
+          ? 'application'
+          : $_[4]->{-qkey}->{rectype} eq 'contact'
+          ? 'subject'
+          : $_[4]->{-qkey}->{rectype} eq 'operation'
+          ? 'process'
+          : $_[4]->{-qkey}->{rectype};
+        $_[4]->{-qkeyord}='aall';
+      }
+      else {
+        delete $_[4]->{-frmLsc};
+        delete $_[4]->{-qkeyord};
+      }})
+    : ()
+  );
 
  my $vinit =sub{ # val init (record, key, store) -> store elem
  		return($_[1]) if !defined($_[1]);

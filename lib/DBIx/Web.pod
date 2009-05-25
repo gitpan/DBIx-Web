@@ -1032,8 +1032,9 @@ Form footnote URL or HTML to append to display of field.
 
 	=> not exists || {form name => {form description} }
 
-	=> not exists	|| form name to display records 
-			|| [?form, ?command, ?key field] 
+	=> not exists	|| form name to display records
+			|| [?form, ?command, ?key field]
+			|| [?form, ?command, '-wikn']
 			|| sub{$_}() -> url string || ['urlCmd' args]
 			|| false
 
@@ -2564,9 +2565,10 @@ See also C<-opt> for '-hrefs' and 'wikn://'.
 C<Database Options>
 
 Processor for requests for C<-wikn> and C<-wikq>.
-Should convert C<-wikn>/C<-wikq> parameters to C<-table>/C<-qkey>, may use database.
-Else C<-wikn> will be porcessed.
-C<-wikq> request parameter may be any value to be processed by C<-wikq> sub{}.
+Should convert C<-wikn>/C<-wikq> request parameters to C<-table>/C<-qkey>, may use database.
+C<-wikq> request parameter may be table name to be used to search for C<-wikn>
+or any value to be processed by C<-wikq> sub{}.
+Else C<-wikn> will be processed.
 
 
 =item -wkey
@@ -2956,6 +2958,8 @@ Query exclusion options: -xpar => 0 - excluding none
 | 1 - excluding some | 2 - excluding all (default)
 | -option name | [-option names];
 -xkey => -qkey key | [-qkey keys].
+
+Overview option: -ovw => sub{}(self, match?, {C<htmlMQH> args}, {query active}, {query formed}).
 
 
 =item htmlStart () -> http and html headers string
@@ -4135,7 +4139,7 @@ Also, some of parameters may be used within URLs replacing leading '-' with '_'.
 
 -wikn   => wiki name to find record by,
 
--wikq   => wiki query specificator to find record with,
+-wikq   => wiki query specificator or table name to find record with,
 
 -htmlMQH=> C<htmlMQH> call matched
 
@@ -4232,6 +4236,17 @@ See 'C<-path>/.htaccess-*' file.
 =over
 
 
+=head2 2009-05-25 - Version 0.79
+
+Corrections in C<htmlRFD>, C<recRead>, C<cgiList>, C<cgiForm>, C<recWikn>, C<cgiAction>.
+
+Extended C<cgiForm> processing C<-form> field hyperlink array with '-wikn', C<htmlMQH> with C<-ovw> option, C<cgiQuery> for C<-frmLsc> undescribed values, C<recWikn> for table name as C<-wikq> query parameter.
+
+Changed C<htmlStart> using C<-expires>=>'now' conditionally.
+
+CMDB and Service Desk example corrections and improvements.
+
+
 =head2 2009-01-10 - Version 0.78
 
 C<ugroups> cached in memory shared between DBIx::Web objects, this is alike C<udispq>.
@@ -4241,7 +4256,7 @@ CMDB and Service Desk example corrections and improvements.
 
 =head2 2008-12-04 - Version 0.77
 
-New #ftext() and #urole() substitutions for SQL WHERE.
+New #ftext() and #urole() substitutions for SQL WHERE in C<recSel>.
 
 Extended C<cgiHelp>().
 
