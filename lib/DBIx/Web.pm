@@ -42,12 +42,10 @@
 #
 # ToDo:
 # CMDB / Service Desk:
-# - cmdb: association records, invisible when not needed?
-# - cmdb: status classification graphs: object, application, location, personal
+# - hdesk: association records, invisible when not needed?
+# - cmdb/hdesk: status classification graphs: object, application, location, personal
 #
 # Done:
-#
-# 2009-05-25 starting 0.80 version
 #
 
 package DBIx::Web;
@@ -59,7 +57,7 @@ use Fcntl qw(:DEFAULT :flock :seek :mode);
 
 use vars qw($VERSION @ISA @EXPORT @EXPORT_OK %EXPORT_TAGS $AUTOLOAD $SELF $CACHE $LNG $IMG);
 
-	$VERSION= '0.79';
+	$VERSION= '0.80';
 	$SELF   =undef;				# current object pointer, use 'local $SELF'
 	$CACHE	={};				# cache for pointers to subobjects
 	*isa    = \&UNIVERSAL::isa; isa('','');	# isa function
@@ -75,8 +73,14 @@ my	$KSORD	='-aall';	# default key sequental order
 my	$HS	=';';		# hyperlink parameters separation style '&'
 my	$TW32	=($^O eq 'MSWin32') && (*Win32::GetTickCount{CODE}) && eval{Win32::GetTickCount()};
 
-eval('use Apache qw(exit)')	if $ENV{MOD_PERL};
-
+if ($ENV{MOD_PERL_API_VERSION}
+&& ($ENV{MOD_PERL_API_VERSION} >=2)) {
+	# eval('use Apache2; use Apache2::compat;')
+	# eval('use Apache2; use Apache2::Const; use Apache2::ServerUtil;');
+}
+elsif ($ENV{MOD_PERL}) {
+	eval('use Apache qw(exit)')
+}
 
 $LNG ={				# Language constants
 ''	=>undef			# see also '-tn' definitions; htmlSubmitSpl()
@@ -540,6 +544,7 @@ sub initialize {
    ,-userln	=>1		# User local  short names switch
  # ,-usernt	=>undef		# User syntax alike WinNT
  # ,-udisp	=>undef		# User display group comments '-ug<>dc' or boolean
+ # ,-udispq	=>undef		# User display quick always
  # ,-unames	=>[]		# User Names  sub{} or value
  # ,-ugroups	=>[]		# User Groups sub{} or value
  # ,-udflt	=>sub{}		# User Domains	filter
@@ -780,7 +785,12 @@ sub initialize {
 		$_[0]->varStore();
 		$_[2]->{'id'}})
 	if !$s->{-recInsID};
- if ($ENV{MOD_PERL}) {
+ if ($ENV{MOD_PERL_API_VERSION}
+ && ($ENV{MOD_PERL_API_VERSION} >=2)) {
+	# Apache2::ServerUtil->server->push_handlers("PerlCleanupHandler"
+	#	,sub{eval{$s->end}; eval('Apache2::Const::DECLINED;')});
+ }
+ elsif ($ENV{MOD_PERL}) {
 	Apache->push_handlers("PerlCleanupHandler"
 		,sub{eval{$s->end}; eval('Apache::DECLINED;')});
  }
@@ -988,7 +998,7 @@ sub ineval {	# is inside eval{}?
 	my ($i, @a) =(1);
 	while (@a =caller($i)) {
 		# $_[0] && $_[0]->logRec('ineval',$i,$a[0],$a[1],$a[2],$a[3]);
-		return(0) if $a[0] =~/^(?:PerlEx::|Apache::Perl|Apache::Registry|Apache::ROOT)/i;
+		return(0) if $a[0] =~/^(?:PerlEx::|Apache::Perl|Apache::Registry|Apache::ROOT|ModPerl::ROOT|ModPerl::RegistryCoker)/i;
 		return(1) if $a[3] eq '(eval)';
 		$i +=1;
 	}
@@ -2641,7 +2651,7 @@ sub pthForm_{
 		,(map{(m/([^@]+)\@([^@]+)/ ? "$2\\$1" : $_) .':F'
 			} ref($_[0]->{-fswtr}) 
 			? (@{$_[0]->{-fswtr}}) 
-			: ($_[0]->{-fswtr}||eval{Win32::LoginName}))
+			: ($_[0]->{-fswtr}||eval{Win32::LoginName()}))
 		,$_[0]->{-w32xcacls}
 		? '/Y'
 		: sub{CORE::print "Y\n"})
@@ -2672,7 +2682,7 @@ sub pthMk {    # Create directory if needed
 sub pthGlob {  # Glob directory
   my $s =shift;
   my @ret;
-  if    ($^O ne 'MSWin32') {
+  if    (0 && ($^O ne 'MSWin32')) {
      CORE::glob(@_)
   }
   elsif (-e $_[0]) {
@@ -2774,7 +2784,7 @@ sub pthStamp {	# Stamp filesystem path with system ACL, once
 	, "\"$p\"", '/T','/C','/G'
 	,(map { $_ =~/\s/ ? "\"$_\"" : $_
 		} map{(m/([^@]+)\@([^@]+)/ ? "$2\\$1" : $_) .':F'
-			} ref($s->{-fswtr}) ? (@{$s->{-fswtr}}) : ($s->{-fswtr} ||eval{Win32::LoginName}))
+			} ref($s->{-fswtr}) ? (@{$s->{-fswtr}}) : ($s->{-fswtr} ||eval{Win32::LoginName()}))
 	,$s->{-fsrdr}
 	?(map { $_ =~/\s/ ? "\"$_\"" : $_
 		} map{(m/([^@]+)\@([^@]+)/ ? "$2\\$1" : $_) .':R'
@@ -3069,6 +3079,7 @@ sub ugroups {	# user groups
  my $rs='';
  my $rl='';
  if	(($fn =$s->{-AuthGroupFile}
+		|| $s->{-PlainGroupFile}
 		|| ((	   ($s->{-ldap} && $s->ugfile('ugf_ldap'))
 			|| ($s->{-w32ldap} && $s->ugfile('ugf_w32ldap'))
 			|| (($^O eq 'MSWin32') && $s->ugfile('ugf_w32'))
@@ -3265,16 +3276,17 @@ sub uglist {	# User & Group List
 		: [@r]
  }
  elsif	((
-	  ($s->{-ldap} && $s->ugfile('ugf_ldap'))
+	$s->{-PlainUserFile}
+	||($s->{-ldap} && $s->ugfile('ugf_ldap'))
 	||($s->{-w32ldap} && $s->ugfile('ugf_w32ldap'))
 	||($^O eq 'MSWin32' && $s->ugfile('ugf_w32'))
 	)
-	&& ($fn =$s->pthForm('var','ualist')) && -f $fn) {
+	&& ($fn =$s->{-PlainUserFile} ||$s->pthForm('var','ualist')) && -f $fn) {
 	my $dn=!$s->{-userln}
 		&& (!($s->{-ldap}) && ($^O eq 'MSWin32') && $s->w32domain());
 		# see ugfile() for domain name qualifications
 	if ($fm && !ref($fm)) {
-		my $fn=$s->pthForm('var','uagroup');
+		my $fn=$s->{-PlainGroupFile} ||$s->pthForm('var','uagroup');
 		my $vn=!$dn
 			? $fm
 			: $fm =~/^\Q$dn\E\\/i
@@ -3297,7 +3309,7 @@ sub uglist {	# User & Group List
 	my $fh=$s->hfNew('<', $fn)->lock(LOCK_SH);
 	while(my $rr =$fh->readline()) {
 		my ($en, $ef, $ep, $ec, $ed, $em, $ei)
-			=(split /:\t/, $rr); #[0,1,2,3,4,5,6];
+			=(split /\t*:\t+/, $rr); #[0,1,2,3,4,5,6];
 		# name, fullname, path, class, display, email, description
 		if	($fc) {next if !&$fc($s, $en, $ef, $ep, $ed, $em, $ei)}
 		elsif	($fm) {
@@ -3415,22 +3427,30 @@ sub udisp {	# display user name
  ? $_[1]
  : $_[0]->{-c}->{-udisp}
  ? $_[0]->{-c}->{-udisp}->{lc($_[1])}
-	||(($^O eq 'MSWin32') && w32udisp(@_)) 
+	||(!$_[0]->{-udispq} && ($^O eq 'MSWin32') && w32udisp(@_))
 	||$_[1]
+ : $_[0]->{-udispq} && ref($CACHE) && $CACHE->{-udisp}
+ ? do {	$_[0]->{-c}->{-udisp} =$CACHE->{-udisp};
+	$_[0]->{-c}->{-udisp}->{lc($_[1])} ||$_[1];
+	}
  : ref($_[0]->{-udisp})
  ? do {	my $v =&{$_[0]->{-udisp}}(@_);
 	if (ref($v)) {
 		$_[0]->{-c}->{-udisp} =$v;
-		$v =$_[0]->{-c}->{-udisp}->{lc($_[1])}
+		$CACHE->{-udisp} =$_[0]->{-c}->{-udisp}
+			if $_[0]->{-udispq} && ref($CACHE);
+		$v =$_[0]->{-c}->{-udisp}->{lc($_[1])};
 	}
-	$v 	||(($^O eq 'MSWin32') && w32udisp(@_))
+	$v 	||(!$_[0]->{-udispq} && ($^O eq 'MSWin32') && w32udisp(@_))
 		||$_[1]
    }
  : do {	$_[0]->{-c}->{-udisp} =$_[0]->uglist(
 			 (!$_[0]->{-udisp} ? '-ud' : $_[0]->{-udisp} =~/\w/ ? '-ud' .$_[0]->{-udisp} : '-ugdc')
 			, {});
+	$CACHE->{-udisp} =$_[0]->{-c}->{-udisp}
+		if $_[0]->{-udispq} && ref($CACHE);
 	$_[0]->{-c}->{-udisp}->{lc($_[1])}
-		||(($^O eq 'MSWin32') && w32udisp(@_, !$_[0]->{-udisp} ? () : $_[0]->{-udisp} =~/\w/ ? '-ud' .$_[0]->{-udisp} : '-ugdc')) 
+		||(!$_[0]->{-udispq} && ($^O eq 'MSWin32') && w32udisp(@_, !$_[0]->{-udisp} ? () : $_[0]->{-udisp} =~/\w/ ? '-ud' .$_[0]->{-udisp} : '-ugdc')) 
 		||$_[1]
    }
 }
@@ -3594,6 +3614,7 @@ sub ugfile {	# Users/groups caching, 'AuthGroupFile' file write/refresh
 sub ugf_w32 {	# ugfile() module using Win32 ADSI WinNT://
  my ($s, $FG, $FL, $tm, $df) =@_;
  eval('use Win32::OLE'); Win32::OLE->Option('Warn'=>0);
+ eval('use Win32::OLE::Enum');
  my $od =Win32::OLE->GetObject('WinNT://' .(Win32::NodeName()) .',computer');
  my $hdu=$od	&& $od->{Name}		|| ''; 		# host domain name
  my $hdn=$od	&& lc($od->{Name})	|| ''; 		# host domain name
@@ -3610,36 +3631,51 @@ sub ugf_w32 {	# ugfile() module using Win32 ADSI WinNT://
  my %dnl=(!$hdn ||$lds ?() :($hdn=>1), !$ldn ?() :($ldn=>1));	# domains to list
  my @dnl=(!$hdu ||$lds ?() :$hdu, !$ldu ?() :$ldu);		# domains to list
  my $fgm;						# group lister/unfolder
-    $fgm=sub{	my $om =$_[1]->{Members};
-		join("\t"
-		,(map {!$_ || !$_->{Class} || !$_->{Name}
-				|| substr($_->{Name},-1,1) eq '$'
-				|| substr($_->{Name},-1,1) eq '&'
-		? ()
-		: do {	my $dn =$_->{Parent} =~/([^\\\/]+)$/ ? $1 : $_->{Parent};
-			map {$_ # $_ ne lc($_) ? ($_, lc($_)) : $_
-				} lc($_->{Parent}) ne ($ldn ? $ldc : $hdc)
-				? ($dn . '\\' .$_->{Name})
-				: ($_->{Name}, ($dn . '\\' .$_->{Name}))
-				, $_->{Name} .'@' .$dn
-			}} do {$om->{Filter} =['User']; Win32::OLE::in($om)})
-		,(map {!$_ || !$_->{Class} || !$_->{Name} || !$_->{groupType}
-				|| substr($_->{Name},-1,1) eq '$' 
-				|| substr($_->{Name},-1,1) eq '&'
-		? ()
-		: do {	if ($_->{groupType} eq '2') {	# 2 -global; 8 -universal
-				my $du =$_->{Parent} =~/([^\\\/]+)$/ 
-					? $1 
-					: $_->{Parent};
-				my $dn =lc($du);
-				if (!$dnl{$dn} && $dn !~/^(?:nt authority|builtin)$/) {
-					$dnl{$dn} =1;
-					push @dnl, $du;
-				}
+    $fgm=sub{	return('') if !$_[1];
+		my $om =$_[1]->{Members};
+		return('') if !$om;
+		my @rv;
+		my $oi;
+		$om->{Filter} =['User'];
+		$oi =Win32::OLE::Enum->new($om);
+		while (defined($oi) && defined(my $oe =$oi->Next())) {
+			if (!$oe || !$oe->{Class} || !$oe->{Name}
+				|| substr($oe->{Name},-1,1) eq '$'
+				|| substr($oe->{Name},-1,1) eq '&') {
 			}
-			(&$fgm($_[0], $_))
-			}} do {$om->{Filter} =['Group']; Win32::OLE::in($om)})
-		)};
+			else {
+				my $dn =$oe->{Parent} =~/([^\\\/]+)$/ ? $1 : $oe->{Parent};
+				push @rv
+				, map {$_ # $_ ne lc($_) ? ($_, lc($_)) : $_
+					} lc($oe->{Parent}) ne ($ldn ? $ldc : $hdc)
+					? ($dn . '\\' .$oe->{Name})
+					: ($oe->{Name}, ($dn . '\\' .$oe->{Name}))
+					, $oe->{Name} .'@' .$dn;
+			}
+		}
+		$om->{Filter} =['Group'];
+		$oi =Win32::OLE::Enum->new($om);
+		while (defined($oi) && defined(my $oe=$oi->Next())) {
+			if (!$oe || !$oe->{Class} || !$oe->{Name} || !$oe->{groupType}
+				|| substr($oe->{Name},-1,1) eq '$' 
+				|| substr($oe->{Name},-1,1) eq '&') {
+			}
+			else {
+				if ($oe->{groupType} eq '2') {	# 2 -global; 8 -universal
+					my $du =$oe->{Parent} =~/([^\\\/]+)$/ 
+						? $1 
+						: $oe->{Parent};
+					my $dn =lc($du);
+					if (!$dnl{$dn} && $dn !~/^(?:nt authority|builtin)$/) {
+						$dnl{$dn} =1;
+						push @dnl, $du;
+					}
+				}
+				push @rv, &$fgm($_[0], $oe);
+			}
+		}
+		join("\t", @rv)
+	};
  for (my $di =0; $di <=$#dnl; $di++) {
 	my $du =$dnl[$di];
 	local $_ =$du;
@@ -3654,9 +3690,10 @@ sub ugf_w32 {	# ugfile() module using Win32 ADSI WinNT://
 	# domain controller:	domain users, local domain groups, domain groups
 	my $dp =$dn eq $ldn || $dn eq $hdn ? '' : $du;
 	unless ($hdn && $ldn && ($dn eq $hdn)) {
-		$od->{Filter} =['User'];
 		# omited default domain part
-		foreach my $oe (Win32::OLE::in($od)) {
+		$od->{Filter} =['User'];
+		my $oi =Win32::OLE::Enum->new($od);
+		while (defined($oi) && defined(my $oe=$oi->Next())) {
 			next if !$oe || !$oe->{Class} || !$oe->{Name} || substr($oe->{Name},-1,1) eq '$' || substr($oe->{Name},-1,1) eq '&';
 			next if $oe->{AccountDisabled};
 			next if $oe->{Name} =~/^(?:SYSTEM|INTERACTIVE|NETWORK|IUSR_|IWAM_|HP ITO |opc_op|patrol|SMS |SMS&_|SMSClient|SMSServer|SMSService|SMSSvc|SMSLogon|SMSInternal|SMS Site|SQLDebugger|sqlov|SharePoint|RTCService)/i;
@@ -3672,7 +3709,8 @@ sub ugf_w32 {	# ugfile() module using Win32 ADSI WinNT://
 	}
 	unless (0) {
 		$od->{Filter} =['Group'];
-		foreach my $oe (Win32::OLE::in($od)) {
+		my $oi =Win32::OLE::Enum->new($od);
+		while (defined($oi) && defined(my $oe=$oi->Next())) {
 			next	if !$oe || !$oe->{Class} 
 				|| !$oe->{Name} 
 				|| substr($oe->{Name},-1,1) eq '$' 
@@ -3707,17 +3745,20 @@ sub ugf_w32ldap { # ugfile() module using Win32 ADSI LDAP:// and WinNT://
  my $hn ={};	# dn -> name
  my $hm ={};	# group dn -> members
  eval('use Win32::OLE'); Win32::OLE->Option('Warn'=>0);
+ eval('use Win32::OLE::Enum');
  my $ll =w32isDC($s);	# local DC
  my $ld =w32domain($s);
  my $lh =Win32::NodeName();
  my $ae;
-    $ae =sub{	foreach my $oe (Win32::OLE::in($_[0])) {
+    $ae =sub{	return(undef) if !$_[0];
+		my $oi =Win32::OLE::Enum->new($_[0]);
+		while (defined($oi) && defined(my $oe=$oi->Next())) {
 			if (!ref($oe) ||!$oe->{Class} ||!($oe->{cn} ||$oe->{Name})) {
 			}
 			elsif ($oe->{Class} =~/^(?:container|organizationalUnit|builtinDomain)$/i) {
 				&$ae($oe, @_[1..$#_])
 			}
-			elsif (($oe->{cn} ||$oe->{Name} ||'') =~/\$$/) {
+			elsif (($oe->{sAMAccountName} ||$oe->{cn} ||$oe->{Name} ||'') =~/\$$/) {
 			}
 			elsif ($oe->{Class} =~/^(?:user|group)$/i) {
 				&{$_[1]}($oe)
@@ -3767,47 +3808,51 @@ sub ugf_w32ldap { # ugfile() module using Win32 ADSI LDAP:// and WinNT://
 					&& ($oe->{Class} =~/^(?:group)$/i)
 					&& (($oe->{groupType}||0) & 0x00000004);
 					# ADS_GROUP_TYPE_LOCAL_GROUP
-			my $id =($pl ? $oe->{GUID} : ($oe->{cn} ||$oe->{Name}));
+			my $id =($pl ? $oe->{GUID} : ($oe->{sAMAccountName} ||$oe->{cn} ||$oe->{Name}));
 			my $en =($pw ? $pw .'\\' : '')
-				.($oe->{cn} ||$oe->{Name});
+				.($oe->{sAMAccountName} ||$oe->{cn} ||$oe->{Name});
 			$hn->{$id} =$en;
-			my $on =undef;	# 'foreignSecurityPrincipal'->'foreignIdentifier' may be empty
-			$hm->{$id} =[
-				map {	if	(!$_ ||!$_->{Class}) {()}
-					elsif	($_->{Class} =~/^(foreignSecurityPrincipal)$/) {
-						if ($oe->{foreignIdentifier}) {
-							$oe->{foreignIdentifier}
+			if ($oe->{Class} =~/^(?:group)$/i) {
+				$hm->{$en} =$hm->{$id} =[];
+				my $on =undef;	# 'foreignSecurityPrincipal'->'foreignIdentifier' may be empty
+				my $oi =Win32::OLE::Enum->new($oe->{Members});
+				while (defined($oi) && defined(my $om=$oi->Next())) {
+					if	(!$om ||!$om->{Class}) {()}
+					elsif	($om->{Class} =~/^(foreignSecurityPrincipal)$/) {
+						if ($om->{foreignIdentifier}) {
+							push @{$hm->{$id}}, $om->{foreignIdentifier}
 						}
 						else {
-							$on =1; ()
-						}
+							$on =1;						}
 					}
 					else {
-						$pl 
-						? $_->{GUID}
-						: (($_->{Parent}=~/([^\\\/]+)$/) && (lc($1) ne lc($lh)) ? "$1\\" : '')
-						 .($_->{cn} ||$_->{Name});
+						push @{$hm->{$id}}
+						, $pl 
+						? $om->{GUID}
+						: ((($om->{Parent}=~/([^\\\/]+)$/) && (lc($1) ne lc($lh)) ? "$1\\" : '')
+						 .($om->{sAMAccountName} ||$om->{cn} ||$om->{Name}));
 					}
-				} Win32::OLE::in($oe->{Members})]
-				if $oe->{Class} =~/^(?:group)$/i;
-			if ($on) {
-				$on ='WinNT://' .($pw||$ld||$lh) .'/' .($oe->{cn}||$oe->{Name});
-				my $og =Win32::OLE->GetObject($on);
-				return($s
-					? $s->warn("Win32::OLE->GetObject('$on') -> $@")
-					: carp("Win32::OLE->GetObject('$on') -> $@")
-					) if !$og;
-				$on =$hm->{$oe->{GUID}};
-				foreach my $om (Win32::OLE::in($og->{Members})) {
-					# GUIDs different in 'WinNT://' and 'LDAP://'; GUID formats different also.
-					# "User Naming Attributes": objectGUID is a 128-bit GUID structure stored as an OctetString.
-					# typedef struct _GUID {  DWORD Data1;  WORD Data2;  WORD Data3;  BYTE Data4[8];} GUID;
-					# my $k =$om->{GUID};
-					# next if grep /^\Q$k\E$/, @$on;
-					# push @$on, $k;
-					my $k = $om->{Parent}=~/([^\\\/]+)$/ ? $1 : '???';
-					push @$on, $k .'\\' .$om->{Name}
-						if $k && (lc($k) ne lc($pw||$ld));
+				}
+				if ($on) {
+					$on ='WinNT://' .($pw||$ld||$lh) .'/' .($oe->{sAMAccountName} ||$oe->{cn} ||$oe->{Name});
+					my $og =Win32::OLE->GetObject($on);
+					return($s
+						? $s->warn("Win32::OLE->GetObject('$on') -> $@")
+						: carp("Win32::OLE->GetObject('$on') -> $@")
+						) if !$og;
+					$on =$hm->{$oe->{GUID}};
+					my $oi =Win32::OLE::Enum->new($og->{Members});
+					while (defined($oi) && defined(my $om=$oi->Next())) {
+						# GUIDs different in 'WinNT://' and 'LDAP://'; GUID formats different also.
+						# "User Naming Attributes": objectGUID is a 128-bit GUID structure stored as an OctetString.
+						# typedef struct _GUID {  DWORD Data1;  WORD Data2;  WORD Data3;  BYTE Data4[8];} GUID;
+						# my $k =$om->{GUID};
+						# next if grep /^\Q$k\E$/, @$on;
+						# push @$on, $k;
+						my $k = $om->{Parent}=~/([^\\\/]+)$/ ? $1 : '???';
+						push @$on, $k .'\\' .($om->{sAMAccountName} ||$om->{Name})
+							if $k && (lc($k) ne lc($pw||$ld));
+					}
 				}
 			}
 	});
@@ -3834,11 +3879,11 @@ sub ugf_w32ldap { # ugfile() module using Win32 ADSI LDAP:// and WinNT://
 					&& ($oe->{Class} =~/^(?:group)$/i)
 					&& (($oe->{groupType}||0) & 0x00000004);
 					# ADS_GROUP_TYPE_LOCAL_GROUP
-			my $id =($pl ? $oe->{GUID} : ($oe->{cn} ||$oe->{Name}));
-			my $en =$hn->{$id} ||$oe->{cn} ||$oe->{Name};
+			my $id =($pl ? $oe->{GUID} : ($oe->{sAMAccountName} ||$oe->{cn} ||$oe->{Name}));
+			my $en =$hn->{$id} ||$oe->{sAMAccountName} ||$oe->{cn} ||$oe->{Name};
 			return(0)	if $en =~/^(?:Domain Controllers|Domain Computers|Pre-Windows 2000|RAS and IAS Servers|MTS Trusted|SMSInternal|NetOp Activity)/i;
 			return(0)	if $en =~/^(?:SYSTEM|INTERACTIVE|NETWORK|IUSR_|IWAM_|HP ITO |opc_op|patrol|SMS |SMS&_|SMSClient|SMSServer|SMSService|SMSSvc|SMSLogon|SMSInternal|SMS Site|SQLDebugger|sqlov|SharePoint|RTCService)/i;
-			my $ef =($oe->{cn}||$oe->{Name}||'')
+			my $ef =($oe->{sAMAccountName}||$oe->{cn}||$oe->{Name}||'')
 				.(!($oe->{Class} =~/^(?:group)$/i) 
 					|| !($oe->{groupType} & 0x00000004)
 						? '@' .($pi ||$lh) : '');
@@ -3854,10 +3899,10 @@ sub ugf_w32ldap { # ugfile() module using Win32 ADSI LDAP:// and WinNT://
 			print $FG $en, ":\t", $el, "\n"
 				if $el;
 			print $FG "$ld\\$en", ":\t", $el, "\n"
-				,"$en\@$ld", ":\t", $el, "\n"
+				, "$en\@$ld", ":\t", $el, "\n"
 				if $el && !$pw && $pl;
 			print $FG "$lh\\$en", ":\t", $el, "\n"
-				,"$en\@$lh", ":\t", $el, "\n"
+				, "$en\@$lh", ":\t", $el, "\n"
 				if $el && !$pw && !$pl;
 			print $FG $ef, ":\t", $en
 				, !$pw ? ("\t", "$ld\\$en") : ()
@@ -4802,7 +4847,7 @@ sub rfdEdmd {	# Record's files directory editing allowed?
  my $u =$m->{-rvcChgState}	||$_[0]->{-rvcChgState};
  my $v =$m->{-rvcActPtr}	||$_[0]->{-rvcActPtr};
  my $r =$_[2];
- !$v || ($u && ($r->{$u->[0]} && grep {$r->{$u->[0]} eq $_} @{$u}[1..$#{@$u}]))
+ !$v || ($u && ($r->{$u->[0]} && grep {$r->{$u->[0]} eq $_} @{$u}[1..$#$u]))
 }
 
 
@@ -5486,7 +5531,7 @@ sub recUpd {    # Update record(s) in database
 		elsif ($v && (!$u			# version
 				|| (defined($r->{$u->[0]})
 				   && !grep {$r->{$u->[0]} eq $_
-					} @{$u}[1..$#{@$u}]))) {
+					} @{$u}[1..$#$u]))) {
 			$n ={%$r}; @{$n}{recFields($s, $d)} =recValues($s, $d);
 			$p ={%$r, $v=>$r->{'id'}, -table=>$a->{-table}};
 			rmiTrigger($s, $a, $n, $r, qw(-recForm0R -recFlim0R -recEdt0R -recChg0R -recUpd0R  -recChg0W));
@@ -5500,7 +5545,7 @@ sub recUpd {    # Update record(s) in database
 					   || $a->{-file}
 					   || ($d->{$u->[0]}
 						&& grep {$d->{$u->[0]} eq $_
-							} @{$u}[1..$#{@$u}]));
+							} @{$u}[1..$#$u]));
 			do {	rfdRm  ($s, $a->{-table}, $n);
 				rfdCp  ($s, $a->{-file},  $a->{-table}, $n);
 				rfdCln ($s, $a->{-table}, $n)
@@ -5532,7 +5577,7 @@ sub recUpd {    # Update record(s) in database
 				&& $u 
 				&& $n->{$u->[0]} 
 				&& !grep {$n->{$u->[0]} eq $_
-						} @{$u}[1..$#{@$u}];
+						} @{$u}[1..$#$u];
 			rmiIndex  ($s, $a, $n, $r)  if $i;
 		}
 		if (1 && $n) {
@@ -8107,13 +8152,13 @@ sub htmlMenu {	# Screen menu bar
 					if !$n && !$e && $ea;
 	push @r, htmlMB($s, 'recForm',	'')	if $e;
 	push @r, htmlMB($s, 'recUpd',	'')	if $e && !$n;
-	push @r, htmlMB($s, 'recIns',	'')	if $e;
-	push @r, htmlMB($s, 'recDel',	'')	if !$n && $ea
-						&& (!ref($ea) ||!$ea->{-recDel});
 	push @r, htmlMB($s, 'recNew'	# ,undef)
 				,['','_cmd'=>'recNew','_form'=>$_[0]->{-pcmd}->{-form}
 				, '_proto'=>strdata($_[0], $_[0]->{-pcmd}->{-key})])
 					if !$n && !$e && !$s->uguest;
+	push @r, htmlMB($s, 'recIns',	'')	if $e;
+	push @r, htmlMB($s, 'recDel',	'')	if !$n && $ea
+						&& (!ref($ea) ||!$ea->{-recDel});
  }
  if ($a ne 'frmHelp') {			# Help button
 	push @r, htmlMB($s, 'frmHelp');
@@ -10162,7 +10207,7 @@ sub cgiQuery {	# Query records
 				} @{$t->{-rvcAllState} ||$s->{-rvcAllState} ||$s->tn('-rvcAllState') ||[]}]
 			: ($t->{-rvcChgState} ||$s->{-rvcChgState} ||$s->tn('-rvcChgState'));
 		$c->{-qkey} ={}			if $v && !$c->{-qkey};
-		$c->{-qkey}->{$v->[0]} =[@{$v}[1..$#{@$v}]]	if $v;
+		$c->{-qkey}->{$v->[0]} =[@{$v}[1..$#$v]]	if $v;
 		$c->{-qkeyord} ='-aeq'	if $qo;
 	}
 	elsif ($lso eq 'done') {
@@ -10175,28 +10220,28 @@ sub cgiQuery {	# Query records
 				} @{$t->{-rvcAllState} ||$s->{-rvcAllState} ||$s->tn('-rvcAllState') ||[]}]
 		}
 		$c->{-qkey} ={}			if $v && !$c->{-qkey};
-		$c->{-qkey}->{$v->[0]} =[@{$v}[1..$#{@$v}]]	if $v;
+		$c->{-qkey}->{$v->[0]} =[@{$v}[1..$#$v]]	if $v;
 		$c->{-qkeyord} ='-deq'	if $qo;
 	}
 	elsif ($oe && ($lso eq $oe)) {
 		$c->{-qversion} ='+';
 		my $v =$t->{-rvcChgState} ||$s->{-rvcChgState} ||$s->tn('-rvcChgState');
 		$c->{-qkey} ={}			if $v && !$c->{-qkey};
-		$c->{-qkey}->{$v->[0]} =[@{$v}[1..$#{@$v}]]	if $v;
+		$c->{-qkey}->{$v->[0]} =[@{$v}[1..$#$v]]	if $v;
 		$c->{-qkeyord} ='-deq'	if $qo;
 	}
 	elsif ($oo && ($lso eq $oo)) {
 		$c->{-qversion} ='+';
 		my $v =$t->{-rvcCkoState} ||$s->{-rvcCkoState} ||$s->tn('-rvcCkoState');
 		$c->{-qkey} ={}			if $v && !$c->{-qkey};
-		$c->{-qkey}->{$v->[0]} =[@{$v}[1..$#{@$v}]]	if $v;
+		$c->{-qkey}->{$v->[0]} =[@{$v}[1..$#$v]]	if $v;
 		$c->{-qkeyord} ='-deq'	if $qo;
 	}
 	elsif ($od && ($lso eq $od)) {
 		$c->{-qversion} ='+';
 		my $v =$t->{-rvcDelState} ||$s->{-rvcDelState} ||$s->tn('-rvcDelState');
 		$c->{-qkey} ={}			if $v && !$c->{-qkey};
-		$c->{-qkey}->{$v->[0]} =[@{$v}[1..$#{@$v}]]	if $v;
+		$c->{-qkey}->{$v->[0]} =[@{$v}[1..$#$v]]	if $v;
 		$c->{-qkeyord} ='-deq'	if $qo;
 	}
 	elsif ($ov && ($lso eq $ov)) {

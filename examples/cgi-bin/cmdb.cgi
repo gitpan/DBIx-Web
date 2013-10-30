@@ -419,8 +419,8 @@ $w->set(
 			,-lbl_ru=>'Тема'
 			,-flg=>'-', -hidel=>1
 			,-expr=>"IF(name IS NOT NULL AND name !='',"
-				."CONCAT_WS(' - ', name, definition),"
-				."CONCAT_WS(' - ', name, system, slot, service, action, computer, interface, device, port, ugroup, role, user, definition))"
+				."CONCAT_WS(' - ', name, type, model, invno, office, device, interface, definition, role, user, userdef),"
+				."CONCAT_WS(' - ', name, system, slot, service, action, computer, interface, device, port, ugroup, role, user, userdef, definition))"
 			,-lsthtml=>sub{	my $r =$_[3]->{-rec};
 					# return($_[0]->htmlEscape($r->{definition}));
 					$r->{-a_a} =$_[0]->lngslot($_[0]->{-table}->{cmdbm}->{-mdefld}->{action}->{-inp},'-labels')
@@ -429,8 +429,13 @@ $w->set(
 						if !$r->{-a_r};
 					$_[0]->htmlEscape(join(' - ', map {!$_ ? () : $_}
                                         $r->{name}
-					? (@$r{qw(name type model invno office device interface userdef definition)})
-							# ??? review
+					? (@$r{qw(name type model invno office device interface definition)}
+						, join(' ', map {!$_ ? () : $_}
+							  $r->{role} && $r->{-a_r}->{$r->{role}} || $r->{role}
+							, $r->{user}
+							, $r->{userdef})
+						)
+						# ??? review
 					: (@$r{qw(name system slot service)}
 					, join(' ', map {!$_ ? () : $_} 
 						  $r->{action} && $r->{-a_a}->{$r->{action}} || $r->{action}
@@ -756,7 +761,7 @@ $w->set(
 		,{-fld=>'userdef'
 			,-lbl=>'UserDef', -cmt=>'User definition'
 			,-lbl_ru=>'ОпрПольз', -cmt_ru=>'Определение пользователя'
-			,-flg=>'', -hidel=>1
+			,-flg=>'l', -hidel=>1
 			}
 		,{-fld=>'seclvl'
 			,-lbl=>'Permit', -cmt=>'Security level/clearance/classification'

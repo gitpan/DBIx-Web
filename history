@@ -1,3 +1,13 @@
+# 2013-10-28 new -PlainGroupFile/-PlainUserFile
+# 2013-10-22 syntax corrections:
+#		$#{@$v} -> $#$v	; $#{@$u} -> $#$u
+#		if ($^O ne 'MSWin32') -> if (0 && ($^O ne 'MSWin32')) {CORE::glob(@_)
+#		Win32::LoginName -> Win32::LoginName()
+# 2013-08-23 corrected ugf_w32ldap(); improved ugf_w32()
+# 2012-09-21 corrected udisp(), udispq()
+# 2009-06-09 htmlMenu() changed: 'recNew' moved towards 'RecEdit', before 'recIns' and 'recDel'.
+# 2009-06-09 misc corrections & improvements
+# 2009-05-25 starting 0.80 version
 # 2009-05-03 htmlStart() changed, conditional -expires=>'now'
 # 2009-04-30 corrected cgiAction() switching to recKey() for 'recRead' and '-edit'
 # 2009-04-02 changed -frmLsc in cgiQuery() to accept unmentioned fieldnames
